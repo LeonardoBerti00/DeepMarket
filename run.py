@@ -3,19 +3,35 @@ import wandb
 from lightning.pytorch.loggers import WandbLogger
 import constants as cst
 from config import Configuration
+from data_preprocessing.DataModule import DataModule
+from data_preprocessing.LOB.LOBDataset import LOBDataset
+from data_preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 import torch
 
 def run():
     config = Configuration()
+
+    if (not config.IS_DATA_PREPROCESSED):
+        data_builder = LOBSTERDataBuilder(
+            stock_name=config.CHOSEN_STOCK.name,
+            data_dir=cst.DATA_DIR,
+            n_lob_levels=config.N_LOB_LEVELS,
+            date_trading_days=config.DATE_TRADING_DAYS,
+            split_rates=config.SPLIT_RATES,
+        )
+        data_builder.pre_processing()
+    else:
+        pass
+
+    '''
     if (config.IS_SWEEP):
 
         wandb_logger = WandbLogger(project="MMLM", log_model=True, save_dir=cst.WANDB_DIR)
         wandb_config = wandb_init()
         checkpoint_callback = wandb.ModelCheckpoint(monitor="val_loss", mode="min")
         with wandb.init(config=wandb_config):
-
             trainer = L.Trainer(
                 accelerator="cpu",
                 precision="32",
@@ -28,7 +44,7 @@ def run():
 
     else:
         trainer = L.Trainer(
-            accelerator="cpu",
+            accelerator="gpu",
             precision="32",
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             profiler="advanced",
@@ -36,35 +52,16 @@ def run():
             num_sanity_val_steps=0,
         )
 
-    train_set = MultiSourceDataset(
-        sr=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_RATE],
-        channels=config.HYPER_PARAMETERS[cst.LearningHyperParameter.CHANNEL_SIZE],
-        min_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MIN_DURATION],
-        max_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MAX_DURATION],
-        aug_shift=config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUG_SHIFT],
-        sample_length=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_LENGTH],
-        audio_files_dir=cst.AUDIO_FILES_DIR_TRAIN,
-        stems=cst.STEMS,
+    train_set = LOBDataset(
+        stock=config.STOCK,
+        trading_day=config.TRADING_DAYS,
+
+
     )
-    val_set = MultiSourceDataset(
-        sr=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_RATE],
-        channels=config.HYPER_PARAMETERS[cst.LearningHyperParameter.CHANNEL_SIZE],
-        min_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MIN_DURATION],
-        max_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MAX_DURATION],
-        aug_shift=config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUG_SHIFT],
-        sample_length=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_LENGTH],
-        audio_files_dir=cst.AUDIO_FILES_DIR_VAL,
-        stems=cst.STEMS,
+    val_set = LOBDataset(
     )
-    test_set = MultiSourceDataset(
-        sr=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_RATE],
-        channels=config.HYPER_PARAMETERS[cst.LearningHyperParameter.CHANNEL_SIZE],
-        min_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MIN_DURATION],
-        max_duration=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MAX_DURATION],
-        aug_shift=config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUG_SHIFT],
-        sample_length=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SAMPLE_LENGTH],
-        audio_files_dir=cst.AUDIO_FILES_DIR_TEST,
-        stems=cst.STEMS,
+    test_set = LOBDataset(
+
     )
     data_module = Datamodule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
@@ -122,3 +119,4 @@ def wandb_init():
     sweep_id = wandb.sweep(sweep_config, project="MMLM")
     wandb.agent(sweep_id, run, count=sweep_config["run_cap"])
     return sweep_config
+    '''

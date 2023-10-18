@@ -15,7 +15,7 @@ class LearningHyperParameter(str, Enum):
     CONDITIONAL_DROPOUT = "conditional_dropout"
     DROPOUT = "dropout"
     BACKWARD_WINDOW_SIZE = "backward_window_size"          #it's the number of snapshots that we use to condition
-    N_LOB_LEVELS = "n_lob_levels"
+
 
 
 class Optimizers(Enum):
@@ -92,8 +92,7 @@ DEVICE_TYPE = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 
-DATA_SOURCE = "data/TSLA_2015-01-02_2015-01-30"
-DATA_PICKLES = "data/pickles/"
+DATA_DIR = "data"
 
 
 

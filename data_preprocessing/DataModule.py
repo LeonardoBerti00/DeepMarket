@@ -1,7 +1,7 @@
 
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-import src.constants as cst
+import constants as cst
 
 
 class DataModule(pl.LightningDataModule):

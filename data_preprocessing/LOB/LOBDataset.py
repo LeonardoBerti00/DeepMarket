@@ -19,20 +19,14 @@ class LOBDataset(data.Dataset):
 
     def __init__(
             self,
-            config: Configuration,
-            dataset_type,
-            stocks_list,
+            stock,
             start_end_trading_day,
             vol_price_mu=None,
             vol_price_sig=None,
-            num_classes=cst.NUM_CLASSES
     ):
         """ Initialization. """
-        self.config = config
-        self.dataset_type = dataset_type
-        self.stocks_list = stocks_list
+        self.stock = stock
         self.start_end_trading_day = start_end_trading_day
-        self.num_classes = num_classes
 
         self.vol_price_mu = vol_price_mu
         self.vol_price_sig = vol_price_sig

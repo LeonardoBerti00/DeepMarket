@@ -11,31 +11,22 @@ class Configuration:
         self.SEED = 500
         self.VALIDATE_EVERY = 1
 
-        self.IS_DATA_PRELOAD = True
+        self.IS_DATA_PREPROCESSED = False
 
-        self.TRAIN_VAL_TEST_SPLIT = (.8, .1, .1)  # META Only
+        self.SPLIT_RATES = (.65, .05, .3)
+        self.N_LOB_LEVELS = 3
+        self.CHOSEN_MODEL = ""
 
-        self.CHOSEN_DATASET = cst.DatasetFamily.FI
-        self.CHOSEN_MODEL = cst.Models.METALOB
+        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
 
-        self.CHOSEN_STOCKS = {
-            cst.STK_OPEN.TRAIN: cst.Stocks.FI,
-            cst.STK_OPEN.TEST: cst.Stocks.FI
-        }
-
-        self.IS_WANDB = True
-        self.IS_TUNE_H_PARAMS = False
+        self.IS_SWEEP = False
 
         self.HP_SEARCH_METHOD = 'bayes'  # 'bayes'
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
         self.WANDB_SWEEP_NAME = None
-
-        self.SWEEP_METRIC = {
-            'goal': 'maximize',
-            'name': None
-        }
 
         self.JSON_DIRECTORY = ""
         self.NUM_WORKERS = 4
@@ -52,11 +43,10 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPS] = 1e-08  # default value for ADAM
         self.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM] = 0.9
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BACKWARD_WINDOW_SIZE] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.BACKWARD_WINDOW_SIZE] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
-        self.HYPER_PARAMETERS[LearningHyperParameter.N_LOB_LEVELS] = 0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
 
 
