@@ -73,54 +73,54 @@ class LOBSTERDataBuilder:
                 if i < split_days[0]:     #then we are creating the df for the training set
                     if (i % 2) == 0:
                         if i == 0:
-                            messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            train_messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
                         else:
-                            message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            train_message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
 
                     else:
                         if i == 1:
                             orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            if (len(orderbooks) != len(messages)):
-                                raise ValueError("Orderbook length is different than messages")
+                            if (len(orderbooks) != len(train_messages)):
+                                raise ValueError("Orderbook length is different than train_messages")
                         else:
                             orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            messages = pd.concat([messages, message], axis=0)
+                            train_messages = pd.concat([train_messages, train_message], axis=0)
                             orderbooks = pd.concat([orderbooks, orderbook], axis=0)
 
                 elif split_days[0] <= i < split_days[1]:        #then we are creating the df for the validation set
                     if (i % 2) == 0:
                         if (i == split_days[0]):
-                            dataframes.append([messages, orderbooks])
-                            messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            dataframes.append([train_messages, orderbooks])
+                            val_messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
                         else:
-                            message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            val_message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
                     else:
                         if i == split_days[0]+1:
                             orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            if (len(orderbooks) != len(messages)):
-                                raise ValueError("Orderbook length is different than messages")
+                            if (len(orderbooks) != len(val_messages)):
+                                raise ValueError("Orderbook length is different than val_messages")
                         else:
                             orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            messages = pd.concat([messages, message], axis=0)
+                            val_messages = pd.concat([val_messages, val_message], axis=0)
                             orderbooks = pd.concat([orderbooks, orderbook], axis=0)
 
                 else:                #then we are creating the df for the test set
 
                     if (i % 2) == 0:
                         if (i == split_days[1]):
-                            dataframes.append([messages, orderbooks])
-                            messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            dataframes.append([val_messages, orderbooks])
+                            test_messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
                         else:
-                            message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                            test_message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
 
                     else:
                         if i == split_days[1]+1:
                             orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            if (len(orderbooks) != len(messages)):
-                                raise ValueError("Orderbook length is different than messages")
+                            if (len(orderbooks) != len(test_messages)):
+                                raise ValueError("Orderbook length is different than test_messages")
                         else:
                             orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            messages = pd.concat([messages, message], axis=0)
+                            test_messages = pd.concat([test_messages, test_message], axis=0)
                             orderbooks = pd.concat([orderbooks, orderbook], axis=0)
 
             else:
@@ -166,7 +166,7 @@ class LOBSTERDataBuilder:
         # do the difference of time row per row in messages and subsitute the values with the differences
         for i in range(len(dataframes)):
             dataframes[i][0]["time"] = dataframes[i][0]["time"].diff()
-            dataframes[i][0]["time"] = dataframes[i][0]["time"].fillna(0)
+            dataframes[i][0][0]["time"] = 0
 
         # azzerate the indexes of the messages and orderbooks
         for i in range(len(dataframes)):

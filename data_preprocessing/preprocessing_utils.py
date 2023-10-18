@@ -11,19 +11,21 @@ def z_score_orderbook(data, mean_vol=None, mean_prices=None, std_vol=None,  std_
 
     #do the same thing for prices
     if (mean_prices is None) or (std_prices is None):
-        mean_price = data.iloc[:, 0::2].stack().mean()
-        std_price = data.iloc[:, 0::2].stack().std()
+        mean_prices = data.iloc[:, 0::2].stack().mean() #price
+        std_prices = data.iloc[:, 0::2].stack().std() #price
 
     #apply the z score to the original data
     data.iloc[:, 1::2] = (data.iloc[:, 1::2] - mean_vol) / std_vol
     #do the same thing for prices
     data.iloc[:, 0::2] = (data.iloc[:, 0::2] - mean_prices) / std_prices
 
-    data = data.fillna(method="bfill")
-    data = data.fillna(method="ffill")
+    # check if there are null values, then raise value error
+    if data.isnull().values.any():
+        raise ValueError("data contains null value")
 
     return data, mean_vol, mean_prices, std_vol,  std_prices
 
 
 def normalize_messages():
+    
     pass
