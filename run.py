@@ -118,4 +118,3 @@ def wandb_init():
     sweep_id = wandb.sweep(sweep_config, project="MMLM")
     wandb.agent(sweep_id, run, count=sweep_config["run_cap"])
     return sweep_config
-    '''
