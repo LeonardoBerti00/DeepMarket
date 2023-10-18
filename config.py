@@ -11,11 +11,13 @@ class Configuration:
         self.SEED = 500
         self.VALIDATE_EVERY = 1
 
+        self.IS_AUGMENTATION = True
+
         self.IS_DATA_PREPROCESSED = False
 
         self.SPLIT_RATES = (.65, .05, .3)
         self.N_LOB_LEVELS = 3
-        self.CHOSEN_MODEL = ""
+        self.CHOSEN_MODEL = cst.Models.crea_un_modello_stronzo
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
@@ -43,11 +45,13 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPS] = 1e-08  # default value for ADAM
         self.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM] = 0.9
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BACKWARD_WINDOW_SIZE] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.BACKWARD_WINDOW_SIZE] = 10
         self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
+        self.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM] = 32
 
 
 

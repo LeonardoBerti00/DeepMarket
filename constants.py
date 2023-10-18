@@ -3,6 +3,7 @@ import torch
 
 
 class LearningHyperParameter(str, Enum):
+    BACKWARD_WINDOW_SIZE = "backward_window_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
     WEIGHT_DECAY = "weight_decay"
@@ -13,8 +14,8 @@ class LearningHyperParameter(str, Enum):
     BATCH_SIZE = "batch_size"
     CONDITIONAL_DROPOUT = "conditional_dropout"
     DROPOUT = "dropout"
-    BACKWARD_WINDOW_SIZE = "backward_window_size"          #it's the number of snapshots that we use to condition
-
+    COND_BACKWARD_WINDOW_SIZE = "cond_backward_window_size"          #it's the number of snapshots that we use to condition
+    LATENT_DIM = "latent_dim"
 
 
 class Optimizers(Enum):
@@ -32,7 +33,7 @@ class Metrics(Enum):      #Quantitative evaluation
     kolmogorov_smirnov = 'kolmogorov_smirnov'
 
 class Models(str, Enum):
-    pass
+    crea_un_modello_stronzo = "crea_un_modello_stronzo"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
 
@@ -85,6 +86,7 @@ class DatasetType(Enum):
     VALIDATION = "val"
 
 LEN_LEVEL = 4
+LEN_EVENT = 5
 
 DEVICE_TYPE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
