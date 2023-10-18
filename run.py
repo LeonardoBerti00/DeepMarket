@@ -22,10 +22,7 @@ def run():
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-    else:
-        pass
 
-    '''
     if (config.IS_SWEEP):
 
         wandb_logger = WandbLogger(project="MMLM", log_model=True, save_dir=cst.WANDB_DIR)
@@ -53,21 +50,23 @@ def run():
         )
 
     train_set = LOBDataset(
-        stock=config.STOCK,
-        trading_day=config.TRADING_DAYS,
-
-
+        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
+        T = config.HYPER_PARAMETERS[cst.LearningHyperParameter.BACKWARD_WINDOW_SIZE],
     )
+
     val_set = LOBDataset(
+        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
+        T = config.HYPER_PARAMETERS[cst.LearningHyperParameter.BACKWARD_WINDOW_SIZE],
     )
-    test_set = LOBDataset(
 
+    test_set = LOBDataset(
+        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
+        T = config.HYPER_PARAMETERS[cst.LearningHyperParameter.BACKWARD_WINDOW_SIZE],
     )
-    data_module = Datamodule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
+
+    data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
-    #model = VAE_MLP(config).to(cst.DEVICE)
-    #model = VAE_CNN(config).to(cst.DEVICE)
-    model = VQVAE_CNN(config).to(cst.DEVICE)
+    model = ...
     trainer.fit(model, train_dataloader, val_dataloader)
     trainer.test(model, dataloaders=test_dataloader)
     wandb.finish()

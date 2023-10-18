@@ -26,6 +26,27 @@ def z_score_orderbook(data, mean_vol=None, mean_prices=None, std_vol=None,  std_
     return data, mean_vol, mean_prices, std_vol,  std_prices
 
 
-def normalize_messages():
-    
-    pass
+def normalize_messages(data, mean_vol=None, mean_prices=None, std_vol=None,  std_prices=None):
+    #divide by 1000 the time column of data that is call time
+    #data["time"] = data["time"] / 1000
+
+    #apply z score to prices and volume column
+    if (mean_vol is None) or (std_vol is None):
+        mean_vol = data["volumes"].mean()
+        std_vol = data["volumes"].std()
+
+    if (mean_prices is None) or (std_prices is None):
+        mean_prices = data["price"].mean()
+        std_prices = data["price"].std()
+
+    data["volumes"] = (data["volumes"] - mean_vol) / std_vol
+    data["price"] = (data["price"] - mean_prices) / std_prices
+
+    # check if there are null values, then raise value error
+    if data.isnull().values.any():
+        raise ValueError("data contains null value")
+
+    # transform in column direction all the -1 in 0
+    data["direction"] = data["direction"].replace(-1, 0)
+
+    return data, mean_vol, mean_prices, std_vol,  std_prices
