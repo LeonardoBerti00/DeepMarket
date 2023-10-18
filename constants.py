@@ -1,6 +1,5 @@
 from enum import Enum
 import torch
-import numpy as np
 
 
 class LearningHyperParameter(str, Enum):
@@ -85,7 +84,7 @@ class DatasetType(Enum):
     TEST = "test"
     VALIDATION = "val"
 
-
+LEN_LEVEL = 4
 
 DEVICE_TYPE = 'cuda' if torch.cuda.is_available() else 'cpu'
 

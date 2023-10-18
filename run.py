@@ -21,7 +21,7 @@ def run():
             date_trading_days=config.DATE_TRADING_DAYS,
             split_rates=config.SPLIT_RATES,
         )
-        data_builder.pre_processing()
+        data_builder.prepare_save_datasets()
     else:
         pass
 

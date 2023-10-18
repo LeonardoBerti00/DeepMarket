@@ -1,5 +1,3 @@
-
-
 from torch.utils import data
 import torch.nn.functional as F
 import numpy as np
@@ -13,25 +11,15 @@ from data_preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from config import Configuration
 
 
-
 class LOBDataset(data.Dataset):
     """ Characterizes a dataset for PyTorch. """
 
     def __init__(
             self,
-            stock,
-            start_end_trading_day,
-            vol_price_mu=None,
-            vol_price_sig=None,
+            path,
     ):
-        """ Initialization. """
-        self.stock = stock
-        self.start_end_trading_day = start_end_trading_day
-
-        self.vol_price_mu = vol_price_mu
-        self.vol_price_sig = vol_price_sig
-
-        self.data = self.get_data()
+        self.path = path
+        self.get_data()
 
     def __len__(self):
         """ Denotes the total number of samples. """
@@ -43,5 +31,5 @@ class LOBDataset(data.Dataset):
         pass
 
     def get_data(self):
-        """ Generates samples of data. """
-        pass
+        """ Loads the data. """
+        self.data = np.load(self.path)
