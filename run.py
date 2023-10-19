@@ -57,16 +57,19 @@ def run():
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
         L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        K=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_WINDOW_SIZE],
     )
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
         L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        K=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_WINDOW_SIZE],
     )
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
         L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        K=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_WINDOW_SIZE],
     )
 
     data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)

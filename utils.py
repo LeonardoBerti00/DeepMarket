@@ -17,6 +17,6 @@ def noise_scheduler(diffusion_steps, s):
     return alphas_dash, betas
 
 #formula taken from "Denoising Diffusion Probabilistic Models"
-def compute_mean_tilde_t(x_0, x_t, alpha_dash_t, alpha_dash_t_1, beta_t, alpha_t):
+def compute_mean_tilde_t(x_0, x_T, alpha_dash_t, alpha_dash_t_1, beta_t, alpha_t):
     # alpha_dash_t_1 is alpha_dash(t-1) 
-    return math.sqrt(alpha_dash_t_1)*beta_t*x_0 / (1-alpha_dash_t) + math.sqrt(alpha_t)*(1-alpha_dash_t_1)*x_t / (1-alpha_dash_t)
+    return math.sqrt(alpha_dash_t_1)*beta_t*x_0 / (1-alpha_dash_t) + math.sqrt(alpha_t)*(1-alpha_dash_t_1)*x_T / (1-alpha_dash_t)
