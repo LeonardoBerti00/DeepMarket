@@ -22,7 +22,7 @@ def run():
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-
+        exit
     if (config.IS_SWEEP):
 
         wandb_logger = WandbLogger(project="MMLM", log_model=True, save_dir=cst.WANDB_DIR)

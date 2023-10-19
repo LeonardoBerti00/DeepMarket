@@ -32,14 +32,14 @@ def normalize_messages(data, mean_vol=None, mean_prices=None, std_vol=None,  std
 
     #apply z score to prices and volume column
     if (mean_vol is None) or (std_vol is None):
-        mean_vol = data["volumes"].mean()
-        std_vol = data["volumes"].std()
+        mean_vol = data["volume"].mean()
+        std_vol = data["volume"].std()
 
     if (mean_prices is None) or (std_prices is None):
         mean_prices = data["price"].mean()
         std_prices = data["price"].std()
 
-    data["volumes"] = (data["volumes"] - mean_vol) / std_vol
+    data["volume"] = (data["volume"] - mean_vol) / std_vol
     data["price"] = (data["price"] - mean_prices) / std_prices
 
     # check if there are null values, then raise value error
