@@ -88,6 +88,13 @@ class DatasetType(Enum):
     TRAIN = "train"
     TEST = "test"
     VALIDATION = "val"
+    
+    
+class CSDIParameters(Enum):
+    CHANNELS = 4
+    SIDE_DIM = 10
+    N_HEADS = 2
+    
 
 PRECISION = 32
 

@@ -1,8 +1,9 @@
+from models.augmenters.AbstractAugmenter import AugmenterAB
 import torch.nn as nn
 import torch
+import torch.nn.functional as F
 
-
-class DiffusionEmbedding(nn.Module):
+class CSDIEmbedding(AugmenterAB, nn.Module):
     
     def __init__(self, num_steps, embedding_dim=128, projection_dim=None):
         super().__init__()
@@ -30,4 +31,7 @@ class DiffusionEmbedding(nn.Module):
         table = steps * frequencies  # (T,dim)
         table = torch.cat([torch.sin(table), torch.cos(table)], dim=1)  # (T,dim*2)
         return table
+    
+    def augment(self, input: torch.Tensor):
+        return super().augment(input)
 

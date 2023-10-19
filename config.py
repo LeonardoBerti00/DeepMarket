@@ -1,4 +1,4 @@
-from constants import LearningHyperParameter
+from constants import CSDIParameters, LearningHyperParameter
 import constants as cst
 
 class Configuration:
@@ -57,6 +57,13 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 
+        
+        
+        self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}
+        
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS] = 2
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM] = 10
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.CHANNELS] = 2
 
 
 
