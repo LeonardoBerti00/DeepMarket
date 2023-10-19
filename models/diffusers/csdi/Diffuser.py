@@ -1,4 +1,5 @@
-from models.diffusers.csdi.Embedder import DiffusionEmbedding
+from config import Configuration
+from constants import CSDIParameters, LearningHyperParameter
 from models.diffusers.csdi.Residuals import ResidualBlock
 from models.diffusers.csdi.utils import Conv1d_with_init
 import torch
@@ -7,13 +8,19 @@ import math
 import torch.nn.functional as F
 
 class DiffCSDI(nn.Module):
-    def __init__(self, config, inputdim=2):
+    
+    def __init__(self, config: Configuration, inputdim=2):
         super().__init__()
-        self.channels = config["channels"]
+        self.channels = config.CSDI_PARAMETERS.CHANNELS
+        self.num_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
+        self.embedding_dim = config.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM]
+        self.side_dim = config.CSDI_HYPARAPAMETERS[CSDIParameters.SIDE_DIM]
+        self.n_heads = config.CSDI_HYPARAPAMETERS[CSDIParameters.N_HEADS]
+        
 
         self.diffusion_embedding = DiffusionEmbedding(
-            num_steps=config["num_steps"],
-            embedding_dim=config["diffusion_embedding_dim"],
+            num_steps=self.num_steps,
+            embedding_dim=self.embedding_dim,
         )
 
         self.input_projection = Conv1d_with_init(inputdim, self.channels, 1)
@@ -26,7 +33,7 @@ class DiffCSDI(nn.Module):
                 ResidualBlock(
                     side_dim=config["side_dim"],
                     channels=self.channels,
-                    diffusion_embedding_dim=config["diffusion_embedding_dim"],
+                    diffusion_embedding_dim=self.embedding_dim,
                     nheads=config["nheads"],
                 )
                 for _ in range(config["layers"])
