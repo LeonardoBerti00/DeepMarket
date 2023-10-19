@@ -11,6 +11,7 @@
 7. train with one stock and check the performance with another one
 8. experiment with latent representation of market state, so the input conditioning, using a VQ-VAE or RQ-VAE
 9. experiment with a latent diffusion model, so doing all in a latent space
+   1.  This has been proven to not work in videos. See Flaborea et al. Multimodal Motion Conditioned Diffusion Model for Skeleton-based Video Anomaly Detection - Appendix. Maybe we can try, but I wouldn't get my hopes up.
 10. experiment with Spatial-temporal Representation in mid-price-centred Moving Windows (https://arxiv.org/pdf/2110.05479.pdf)
 
 
