@@ -1,7 +1,6 @@
 from torch.utils import data
 import numpy as np
 import torch
-import constants as cst
 
 
 class LOBDataset(data.Dataset):
@@ -10,19 +9,18 @@ class LOBDataset(data.Dataset):
             self,
             path,
             T,
-
     ):
         self.path = path
-        self.get_data()
         self.T = T
+        self._get_data()
 
     def __len__(self):
         """ Denotes the total number of samples. """
         return len(self.data)-self.T+1
 
     def __getitem__(self, index):
-        return self.data[index:index+self.T]
+        return self.data[index:index+self.T].cuda(non_blocking=True)
 
-    def get_data(self):
+    def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path), device=cst.DEVICE_TYPE)
+        self.data = torch.from_numpy(np.load(self.path))
