@@ -1,4 +1,5 @@
 import math
+import torch.nn as nn
 
 
 def pick_model(config, model_name):
