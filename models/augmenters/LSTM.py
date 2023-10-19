@@ -18,7 +18,8 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
         self.lstm = nn.LSTM(x_size, latent_dim, num_layers=1, batch_first=True, dropout=dropout)
         
     def forward(self, input):
-        return self.lstm(input)
+        x, (h_n, c_n) = self.lstm(input)
+        return x
     
     def augment(self, input):
         return self.forward(input)

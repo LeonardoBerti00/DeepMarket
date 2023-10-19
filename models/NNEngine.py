@@ -59,7 +59,7 @@ class NNEngine(L.LightningModule):
 
     def forward(self, x):
         if self.augmenter and self.T != 0:
-            x, (h_n, c_n) = self.augmenter.augment(x)     #siete d'accordo sulla scelta dell'output?
+            x = self.augmenter.augment(x)
         recon = self.diffuser(x)
         return recon
 
