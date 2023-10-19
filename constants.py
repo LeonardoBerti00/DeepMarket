@@ -3,6 +3,7 @@ import torch
 
 
 class LearningHyperParameter(str, Enum):
+    DIFFUSION_STEPS = "diffusion_steps"
     BACKWARD_WINDOW_SIZE = "backward_window_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
@@ -16,6 +17,7 @@ class LearningHyperParameter(str, Enum):
     DROPOUT = "dropout"
     COND_BACKWARD_WINDOW_SIZE = "cond_backward_window_size"          #it's the number of snapshots that we use to condition
     LATENT_DIM = "latent_dim"
+    S = "s"
 
 
 class Optimizers(Enum):

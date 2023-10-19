@@ -53,7 +53,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM] = 32
-
+        self.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS] = 100
+        self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
 
 
 

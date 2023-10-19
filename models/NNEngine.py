@@ -39,7 +39,6 @@ class NNEngine(L.LightningModule):
         """
         self.diffuser = diffuser
         self.augmenter = augmenter
-        
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
