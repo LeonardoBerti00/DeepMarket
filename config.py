@@ -12,6 +12,7 @@ class Configuration:
         self.VALIDATE_EVERY = 1
 
         self.IS_AUGMENTATION = True
+        self.IS_TRAINING = True
 
         self.IS_DATA_PREPROCESSED = False
 

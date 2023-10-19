@@ -1,23 +1,16 @@
+from config import Configuration
+from models.augmenters.AbstractAugmenter import AugmenterAB
+from models.diffusers.DiffusionModel import DiffusionAB
 import torch
 from einops import rearrange
 import lightning as L
 from constants import LearningHyperParameter
 from torch import nn
 from torch.nn import functional as F
-from abc import ABC, abstractmethod
 import math
 import time
 import constants as cst
 from utils import pick_model
-
-class DiffusionModel(ABC):
-    """An abstract class for loss functions."""
-
-    @abstractmethod
-    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
-        """Computes the loss given the true and predicted values."""
-        pass
-
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
@@ -35,7 +28,8 @@ class SinusoidalPosEmb(nn.Module):
 
 
 class NNEngine(L.LightningModule):
-    def __init__(self, config):
+    
+    def __init__(self, diffuser: DiffusionAB, config: Configuration, augmenter: AugmenterAB = None):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
@@ -43,29 +37,30 @@ class NNEngine(L.LightningModule):
         Parameters:
 
         """
+        self.diffuser = diffuser
+        self.augmenter = augmenter
+        
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
         self.training = config.IS_TRAINING
-        dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.train_losses = []
         self.val_losses = []
         self.test_losses = []
-        x_size = cst.LEN_EVENT
         self.T = config.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE]
-        latent_dim = config.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM]
-        IS_AUGMENTATION = config.IS_AUGMENTATION
+        
+        """IS_AUGMENTATION = config.IS_AUGMENTATION
 
         if (IS_AUGMENTATION and self.T!=0):
             self.lstm = nn.LSTM(x_size, latent_dim, num_layers=1, batch_first=True, dropout=dropout)
-            self.diffusion_model = pick_model(config, config.CHOSEN_MODEL)
+            self.diffusion_model = pick_model(config, config.CHOSEN_MODEL)"""
 
     def forward(self, x):
-        if (self.IS_AUGMENTATION):
-            x, (h_n, c_n) = self.lstm(x)     #siete d'accordo sulla scelta dell'output?
-        recon = self.model(x)
+        if self.augmenter and self.T != 0:
+            x, (h_n, c_n) = self.augmenter.augment(x)     #siete d'accordo sulla scelta dell'output?
+        recon = self.diffuser(x)
         return recon
 
     def training_step(self, x, batch_idx):
@@ -101,7 +96,7 @@ class NNEngine(L.LightningModule):
 
     def loss(self, input, recon, **kwargs):
         # Reconstruction loss is the mse between the input and the reconstruction
-        return self.model.loss(input, recon, **kwargs)
+        return self.diffuser.loss(input, recon, **kwargs)
 
     def on_train_epoch_end(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
