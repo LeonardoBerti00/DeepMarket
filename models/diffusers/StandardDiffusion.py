@@ -1,6 +1,8 @@
 import math
 
 import torch
+
+from models.NNEngine import SinusoidalPosEmb
 from models.diffusers.DiffusionModel import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
@@ -8,7 +10,7 @@ from torch import nn
 from utils import compute_mean_tilde_t
 
 
-class Standard_Diffusion(nn.Module, DiffusionAB):
+class StandardDiffusion(nn.Module, DiffusionAB):
     """An abstract class for loss functions."""
 
     def __init__(self, config, alphas_dash, betas):
@@ -26,7 +28,7 @@ class Standard_Diffusion(nn.Module, DiffusionAB):
         self.betas = betas
         self.losses = []
         self.v = nn.Parameter(torch.randn(self.features_size))
-
+        self.SinusoidalPosEmb = SinusoidalPosEmb(self.diffusion_steps)
 
     def forward(self, x_T, eps_true):
         return self.reverse(x_T, eps_true)
@@ -40,7 +42,8 @@ class Standard_Diffusion(nn.Module, DiffusionAB):
             alpha_t = 1 - beta_t
             alpha_dash_t = self.alphas_dash[t]
             beta_tilde_t = (1 - self.alphas_dash[t-1]) / (1 - self.alphas_dash[t]) * beta_t
-            eps_t = self.NN(x_t, t)
+            emb_t = self.SinusoidalPosEmb(t)
+            eps_t = self.NN(x_t, emb_t)
             z = torch.distributions.Normal(0, 1).sample(x_t.shape)
             sigma_t = math.exp(self.v*math.log(beta_t) + (1-self.v)*math.log(beta_tilde_t))       #formula taken from IDDPM paper
             x_t = 1 / math.sqrt(alpha_t) * (x_t[:] - (beta_t / math.sqrt(1 - alpha_dash_t)) * eps_t) + sigma_t * z
