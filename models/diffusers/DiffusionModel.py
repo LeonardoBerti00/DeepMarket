@@ -8,3 +8,4 @@ class DiffusionAB(ABC):
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         """Computes the loss given the true and predicted values."""
         pass
+    
