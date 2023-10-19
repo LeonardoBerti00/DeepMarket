@@ -10,7 +10,7 @@ from torch.nn import functional as F
 import math
 import time
 import constants as cst
-from utils import pick_model
+from utils import pick_model, noise_scheduler
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
@@ -48,8 +48,10 @@ class NNEngine(L.LightningModule):
         self.train_losses = []
         self.val_losses = []
         self.test_losses = []
-        self.T = config.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE]
-        
+        self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
+        self.cond_window_size = config.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE]
+        self.alphas_dash, self.betas = noise_scheduler(self.diffusion_steps, config.HYPER_PARAMETERS[LearningHyperParameter.S])
+
         """IS_AUGMENTATION = config.IS_AUGMENTATION
 
         if (IS_AUGMENTATION and self.T!=0):
@@ -59,8 +61,20 @@ class NNEngine(L.LightningModule):
     def forward(self, x):
         if self.augmenter and self.T != 0:
             x = self.augmenter.augment(x)
-        recon = self.diffuser(x)
+
+        x_t = self.forward_process(x)
+
+        recon = self.diffuser(x_t)
         return recon
+
+
+    def forward_process(self, x):
+        cov_matrix = torch.eye(self.x_size)
+        mean = math.sqrt(self.alphas_dash[-1]) * x
+        std = (1 - self.alphas_dash[-1]) * cov_matrix
+        x_t = torch.distributions.Normal(mean, std).rsample()
+        return x_t
+
 
     def training_step(self, x, batch_idx):
         recon = self.forward(x)

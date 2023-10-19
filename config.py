@@ -55,6 +55,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM] = 32
         self.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
+        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 
 
 

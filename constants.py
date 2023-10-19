@@ -18,6 +18,7 @@ class LearningHyperParameter(str, Enum):
     COND_BACKWARD_WINDOW_SIZE = "cond_backward_window_size"          #it's the number of snapshots that we use to condition
     LATENT_DIM = "latent_dim"
     S = "s"
+    LAMBDA = "lambda"
 
 
 class Optimizers(Enum):
