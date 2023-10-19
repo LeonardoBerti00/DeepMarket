@@ -13,7 +13,7 @@ class DiffCSDI(nn.Module):
         super().__init__()
         self.channels = config.CSDI_PARAMETERS.CHANNELS
         self.num_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-        self.embedding_dim = config.HYPER_PARAMETERS[LearningHyperParameter.LATENT_DIM]
+        self.embedding_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.side_dim = config.CSDI_HYPARAPAMETERS[CSDIParameters.SIDE_DIM]
         self.n_heads = config.CSDI_HYPARAPAMETERS[CSDIParameters.N_HEADS]
         

@@ -9,11 +9,9 @@ class LOBDataset(data.Dataset):
             self,
             path,
             L,
-            K,
     ):
         self.path = path
         self.L = L          #sequence length
-        self.K = K
         self._get_data()
 
     def __len__(self):
@@ -21,7 +19,7 @@ class LOBDataset(data.Dataset):
         return len(self.data)-self.L+1
 
     def __getitem__(self, index):
-        return self.data[index+self.K:index+self.L].cuda(non_blocking=True), self.data[index:index+self.K].cuda(non_blocking=True),
+        return self.data[index:index+self.L].cuda(non_blocking=True)
 
     def _get_data(self):
         """ Loads the data. """

@@ -17,7 +17,7 @@ class LearningHyperParameter(str, Enum):
     DROPOUT = "dropout"
     WINDOW_SIZE = "window_size"          #it's the sequence length
     MASKED_WINDOW_SIZE = "masked_window_size"
-    LATENT_DIM = "latent_dim"
+    AUGMENT_DIM = "AUGMENT_DIM"
     S = "s"
     LAMBDA = "lambda"
 

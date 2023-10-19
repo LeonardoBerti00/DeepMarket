@@ -61,20 +61,23 @@ class NNEngine(L.LightningModule):
         
         
 
-    def forward(self, x, y):
+    def forward(self, input):
         if self.IS_AUGMENTATION:
-            x = self.augmenter.augment(x)
+            input = self.augmenter.augment(input)
 
-        x_T = self.forward_process(x)
+        #divide input into x and y
+        y, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
 
-        recon = self.diffuser(x_T)
+        mask_T = self.forward_process(x_0)
+
+        recon = self.diffuser(mask_T, y)
         
         return recon
 
 
-    def forward_process(self, x):
+    def forward_process(self, x_0):
         cov_matrix = torch.eye(self.x_size)
-        mean = math.sqrt(self.alphas_dash[-1]) * x
+        mean = math.sqrt(self.alphas_dash[-1]) * x_0
         std = (1 - self.alphas_dash[-1]) * cov_matrix
         x_T = torch.distributions.Normal(mean, std).rsample()
         return x_T
