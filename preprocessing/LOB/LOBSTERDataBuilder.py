@@ -1,5 +1,5 @@
 import os
-from data_preprocessing.preprocessing_utils import z_score_orderbook, normalize_messages
+from preprocessing.preprocessing_utils import z_score_orderbook, normalize_messages
 import pandas as pd
 
 import numpy as np

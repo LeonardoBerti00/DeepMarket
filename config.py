@@ -46,8 +46,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPS] = 1e-08  # default value for ADAM
         self.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM] = 0.9
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE] = 50
-        self.HYPER_PARAMETERS[LearningHyperParameter.BACKWARD_WINDOW_SIZE] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE] = 50        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
         self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1

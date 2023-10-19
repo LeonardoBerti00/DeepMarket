@@ -10,7 +10,8 @@ from torch.nn import functional as F
 import math
 import time
 import constants as cst
-from utils import pick_model, noise_scheduler
+from utils import pick_diffuser, noise_scheduler
+from models.augmenters import LSTMAugmenter
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
@@ -29,7 +30,7 @@ class SinusoidalPosEmb(nn.Module):
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, diffuser: DiffusionAB, config: Configuration, augmenter: AugmenterAB = None):
+    def __init__(self, config: Configuration):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
@@ -37,8 +38,7 @@ class NNEngine(L.LightningModule):
         Parameters:
 
         """
-        self.diffuser = diffuser
-        self.augmenter = augmenter
+        self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
@@ -49,22 +49,26 @@ class NNEngine(L.LightningModule):
         self.val_losses = []
         self.test_losses = []
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-        self.cond_window_size = config.HYPER_PARAMETERS[LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE]
+        self.L = config.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE]
+        self.K = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE]
+        self.len_cond = self.L - self.K
         self.alphas_dash, self.betas = noise_scheduler(self.diffusion_steps, config.HYPER_PARAMETERS[LearningHyperParameter.S])
 
-        """IS_AUGMENTATION = config.IS_AUGMENTATION
+        self.IS_AUGMENTATION = config.IS_AUGMENTATION
 
-        if (IS_AUGMENTATION and self.T!=0):
-            self.lstm = nn.LSTM(x_size, latent_dim, num_layers=1, batch_first=True, dropout=dropout)
-            self.diffusion_model = pick_model(config, config.CHOSEN_MODEL)"""
+        if (self.IS_AUGMENTATION):
+            self.augmenter = LSTMAugmenter(config)
+        
+        
 
     def forward(self, x):
-        if self.augmenter and self.T != 0:
+        if self.IS_AUGMENTATION:
             x = self.augmenter.augment(x)
 
         x_t = self.forward_process(x)
 
         recon = self.diffuser(x_t)
+        
         return recon
 
 

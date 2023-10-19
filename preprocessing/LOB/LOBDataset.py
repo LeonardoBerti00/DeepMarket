@@ -8,18 +8,18 @@ class LOBDataset(data.Dataset):
     def __init__(
             self,
             path,
-            T,
+            L,
     ):
         self.path = path
-        self.T = T
+        self.L = L          #sequence length
         self._get_data()
 
     def __len__(self):
         """ Denotes the total number of samples. """
-        return len(self.data)-self.T+1
+        return len(self.data)-self.L+1
 
     def __getitem__(self, index):
-        return self.data[index:index+self.T].cuda(non_blocking=True)
+        return self.data[index:index+self.L].cuda(non_blocking=True)
 
     def _get_data(self):
         """ Loads the data. """

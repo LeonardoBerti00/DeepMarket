@@ -2,8 +2,8 @@ import math
 import torch.nn as nn
 
 
-def pick_model(config, model_name):
-    return "questo è un metodo che chiameremo fuori da NNEngine. NNEngin otterrà gli oggetti già fatti sennò è una merda. Ok"
+def pick_diffuser(config, model_name):
+    return "fai un diffuser al posto di cazzeggiare"
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
 def noise_scheduler(diffusion_steps, s):
@@ -15,3 +15,8 @@ def noise_scheduler(diffusion_steps, s):
     betas = [1 - (alphas_dash[i]/alphas_dash[i-1]) for i in range(1, len(alphas_dash))]
     betas.insert(0, 1)
     return alphas_dash, betas
+
+#formula taken from "Denoising Diffusion Probabilistic Models"
+def compute_mean_tilde_t(x_0, x_t, alpha_dash_t, alpha_dash_t_1, beta_t, alpha_t):
+    # alpha_dash_t_1 is alpha_dash(t-1) 
+    return math.sqrt(alpha_dash_t_1)*beta_t*x_0 / (1-alpha_dash_t) + math.sqrt(alpha_t)*(1-alpha_dash_t_1)*x_t / (1-alpha_dash_t)

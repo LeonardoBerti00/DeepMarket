@@ -3,15 +3,19 @@ import wandb
 from lightning.pytorch.loggers import WandbLogger
 import constants as cst
 from config import Configuration
-from data_preprocessing.DataModule import DataModule
-from data_preprocessing.LOB.LOBDataset import LOBDataset
-from data_preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
+from preprocessing.DataModule import DataModule
+from preprocessing.LOB.LOBDataset import LOBDataset
+from preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from utils import pick_model
+from utils import pick_diffuser
 from models.NNEngine import NNEngine
 
 def run():
     config = Configuration()
+    if (cst.DEVICE_TYPE == "cpu"):
+        accelerator = "cpu"
+    else:
+        accelerator = "gpu"
 
     if (not config.IS_DATA_PREPROCESSED):
         data_builder = LOBSTERDataBuilder(
@@ -22,7 +26,7 @@ def run():
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-        exit
+
     if (config.IS_SWEEP):
 
         wandb_logger = WandbLogger(project="MMLM", log_model=True, save_dir=cst.WANDB_DIR)
@@ -30,8 +34,8 @@ def run():
         checkpoint_callback = wandb.ModelCheckpoint(monitor="val_loss", mode="min")
         with wandb.init(config=wandb_config):
             trainer = L.Trainer(
-                accelerator="cpu",
-                precision="32",
+                accelerator=accelerator,
+                precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
                 profiler="advanced",
                 callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True), checkpoint_callback],
@@ -40,9 +44,10 @@ def run():
             )
 
     else:
+
         trainer = L.Trainer(
-            accelerator="gpu",
-            precision="32",
+            accelerator=accelerator,
+            precision=cst.PRECISION,
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             profiler="advanced",
             callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)],
@@ -51,35 +56,25 @@ def run():
 
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
-        T=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE],
+        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
     )
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
-        T=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE],
+        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
     )
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
-        T=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_BACKWARD_WINDOW_SIZE],
+        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
     )
 
     data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
 
-    # add diffuser and augmenter
-    if config.IS_AUGMENTATION:
-        # create augmenter based on config name
-        augmenter = None
-        pass
-    
-    diffuser = None
-    
     model = NNEngine(
-        diffuser=diffuser,
         config=config,
-        augmenter=augmenter
     ).to(config.DEVICE)
 
     trainer.fit(model, train_dataloader, val_dataloader)

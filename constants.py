@@ -15,7 +15,8 @@ class LearningHyperParameter(str, Enum):
     BATCH_SIZE = "batch_size"
     CONDITIONAL_DROPOUT = "conditional_dropout"
     DROPOUT = "dropout"
-    COND_BACKWARD_WINDOW_SIZE = "cond_backward_window_size"          #it's the number of snapshots that we use to condition
+    WINDOW_SIZE = "window_size"          #it's the sequence length
+    MASKED_WINDOW_SIZE = "masked_window_size"
     LATENT_DIM = "latent_dim"
     S = "s"
     LAMBDA = "lambda"
@@ -87,6 +88,8 @@ class DatasetType(Enum):
     TRAIN = "train"
     TEST = "test"
     VALIDATION = "val"
+
+PRECISION = 32
 
 LEN_LEVEL = 4
 LEN_EVENT = 5
