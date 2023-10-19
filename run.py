@@ -68,8 +68,18 @@ def run():
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
 
+    # add diffuser and augmenter
+    if config.IS_AUGMENTATION:
+        # create augmenter based on config name
+        augmenter = None
+        pass
+    
+    diffuser = None
+    
     model = NNEngine(
+        diffuser=diffuser,
         config=config,
+        augmenter=augmenter
     ).to(config.DEVICE)
 
     trainer.fit(model, train_dataloader, val_dataloader)
