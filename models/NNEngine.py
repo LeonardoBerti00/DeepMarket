@@ -1,5 +1,5 @@
 from config import Configuration
-from models.augmenters.AbstractAugmenter import AugmenterAB
+from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 from models.diffusers.DiffusionModel import DiffusionAB
 import torch
 from einops import rearrange
@@ -11,7 +11,7 @@ import math
 import time
 import constants as cst
 from utils import pick_diffuser, noise_scheduler
-from models.augmenters import LSTMAugmenter
+from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):

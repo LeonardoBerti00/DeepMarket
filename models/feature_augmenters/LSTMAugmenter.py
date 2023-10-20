@@ -4,7 +4,7 @@ import torch.nn as nn
 import constants as cst
 
 
-from models.augmenters.AbstractAugmenter import AugmenterAB
+from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 
 class LSTMAugmenter(AugmenterAB, nn.Module):

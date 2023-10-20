@@ -64,6 +64,7 @@ class Configuration:
         self.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS] = 2
         self.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM] = 10
         self.CSDI_HYPERPARAMETERS[CSDIParameters.CHANNELS] = 2
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.DIFFUSION_STEP_EMB_DIM] = 128
 
 
 

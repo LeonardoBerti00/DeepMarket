@@ -1,9 +1,9 @@
-from models.augmenters.AbstractAugmenter import AugmenterAB
+from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
 
-class CSDIEmbedding(AugmenterAB, nn.Module):
+class CSDIEmbeddingDiffusionStep(AugmenterAB, nn.Module):
     
     def __init__(self, num_steps, embedding_dim=128, projection_dim=None):
         super().__init__()

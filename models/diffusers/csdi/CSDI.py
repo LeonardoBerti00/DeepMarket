@@ -1,33 +1,60 @@
+from config import Configuration
 from models.diffusers.DiffusionModel import DiffusionAB
+from models.diffusers.csdi.Diffuser import DiffCSDI
 import torch.nn as nn
 import torch
 import constants as cst
 import numpy as np
-from utils import Conv1d_with_init, get_torch_trans
 import math
 import torch.nn.functional as F
 
 class CSDIDiffuser(DiffusionAB, nn.Module):
     
-    def __init__(self, config):
+    def __init__(self, config: Configuration):
         super().__init__()
         
         self.device = cst.DEVICE_TYPE
         # devo ancora leggere il paper e capire cosa prende come argomenti dal codice
         # https://github.com/ermongroup/CSDI/tree/main
+        self.target_dim = cst.LEN_EVENT
+        self.L = config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE]
+        self.K = config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_WINDOW_SIZE]
+        self.len_cond = self.L - self.K
+
+        self.emb_time_dim = config["model"]["timeemb"]
+        self.emb_feature_dim = config["model"]["featureemb"]
+        self.is_unconditional = config["model"]["is_unconditional"]
+        self.target_strategy = config["model"]["target_strategy"]
+
+        self.emb_total_dim = self.emb_time_dim + self.emb_feature_dim
+        if self.is_unconditional == False:
+            self.emb_total_dim += 1  # for conditional mask
+
+        config_diff = config["diffusion"]
+        config_diff["side_dim"] = self.emb_total_dim
+
+        input_dim = 1 if self.is_unconditional == True else 2
+        self.diffmodel = DiffCSDI(config_diff, input_dim)
+
+        # parameters for diffusion models
+        self.num_steps = config_diff["num_steps"]
+        if config_diff["schedule"] == "quad":
+            self.beta = np.linspace(
+                config_diff["beta_start"] ** 0.5, config_diff["beta_end"] ** 0.5, self.num_steps
+            ) ** 2
+        elif config_diff["schedule"] == "linear":
+            self.beta = np.linspace(
+                config_diff["beta_start"], config_diff["beta_end"], self.num_steps
+            )
+
+        self.alpha_hat = 1 - self.beta
+        self.alpha = np.cumprod(self.alpha_hat)
+        self.alpha_torch = torch.tensor(self.alpha).float().to(self.device).unsqueeze(1).unsqueeze(1)
         
         
-    def forward(self, input, is_train=True):
-        observed_data, observed_mask, observed_tp, gt_mask, for_pattern_mask, _ = self.process_data(input)
-        
-        if not is_train:
-            cond_mask = gt_mask
-        elif self.target_strategy != "random":
-            cond_mask = self.get_hist_mask(observed_mask, for_pattern_mask=for_pattern_mask)
-        else:
-            cond_mask = self.get_randmask(observed_mask)
-            
-        side_info = self.get_side_info(observed_tp, cond_mask)
+    def forward(self, noised_x, cond, eps, is_train=True):
+                    
+        side_info = self.get_side_info(cond, cond_mask, augmented_features=noised_x)
         
         # TODO: modify this loss and maybe also the signature in DiffusionAB
         return self.loss(true=observed_data,
@@ -35,8 +62,12 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
                          observed_mask=observed_mask,
                          side_info=side_info,
                          is_train=is_train)
+       
         
     def time_embedding(self, pos, d_model=128):
+        """
+            Time embedding as Eq. 13 in the paper
+        """
         pe = torch.zeros(pos.shape[0], pos.shape[1], d_model).to(self.device)
         position = pos.unsqueeze(2)
         div_term = 1 / torch.pow(
@@ -45,44 +76,16 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
         return pe
-        
-    def get_randmask(self, observed_mask):
-        rand_for_mask = torch.rand_like(observed_mask) * observed_mask
-        rand_for_mask = rand_for_mask.reshape(len(rand_for_mask), -1)
-        for i in range(len(observed_mask)):
-            sample_ratio = np.random.rand()  # missing ratio
-            num_observed = observed_mask[i].sum().item()
-            num_masked = round(num_observed * sample_ratio)
-            rand_for_mask[i][rand_for_mask[i].topk(num_masked).indices] = -1
-        cond_mask = (rand_for_mask > 0).reshape(observed_mask.shape).float()
-        return cond_mask
 
-    def get_hist_mask(self, observed_mask, for_pattern_mask=None):
-        if for_pattern_mask is None:
-            for_pattern_mask = observed_mask
-        if self.target_strategy == "mix":
-            rand_mask = self.get_randmask(observed_mask)
 
-        cond_mask = observed_mask.clone()
-        for i in range(len(cond_mask)):
-            mask_choice = np.random.rand()
-            if self.target_strategy == "mix" and mask_choice > 0.5:
-                cond_mask[i] = rand_mask[i]
-            else:  # draw another sample for histmask (i-1 corresponds to another sample)
-                cond_mask[i] = cond_mask[i] * for_pattern_mask[i - 1] 
-        return cond_mask
-    
-    def get_side_info(self, observed_tp, cond_mask):
+    def get_side_info(self, observed_tp, cond_mask, augmented_features):
         B, K, L = cond_mask.shape
 
         time_embed = self.time_embedding(observed_tp, self.emb_time_dim)  # (B,L,emb)
         time_embed = time_embed.unsqueeze(2).expand(-1, -1, K, -1)
-        feature_embed = self.embed_layer(
-            torch.arange(self.target_dim).to(self.device)
-        )  # (K,emb)
-        feature_embed = feature_embed.unsqueeze(0).unsqueeze(0).expand(B, L, -1, -1)
-
-        side_info = torch.cat([time_embed, feature_embed], dim=-1)  # (B,L,K,*)
+        
+        augmented_features = augmented_features.unsqueeze(0).unsqueeze(0).expand(B, L, -1, -1)
+        side_info = torch.cat([time_embed, augmented_features], dim=-1)  # (B,L,K,*)
         side_info = side_info.permute(0, 3, 2, 1)  # (B,*,K,L)
 
         if self.is_unconditional == False:
@@ -91,9 +94,6 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
 
         return side_info
 
-    def process_data(self, input):
-        pass
-        
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         if kwargs['is_train']:
             return self.calc_loss(true, recon, observed_mask=kwargs['observed_mask'],
