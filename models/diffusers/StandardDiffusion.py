@@ -1,20 +1,18 @@
 import math
 from typing import Dict
-
 import torch
-
-from models.NNEngine import SinusoidalPosEmb
-from models.diffusers.DiffusionModel import DiffusionAB
+from models.SinusoidalPosEmb import SinusoidalPosEmb
+from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from utils import compute_mean_tilde_t
 
 
 class StandardDiffusion(nn.Module, DiffusionAB):
     """An abstract class for loss functions."""
 
-    def __init__(self, config, alphas_dash, betas):
+    def __init__(self, config):
+        super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
@@ -25,13 +23,13 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         else:
             self.features_size = cst.LEN_EVENT
         self.NN = nn.Transformer(d_model=self.features_size, nhead=8, num_encoder_layers=2, num_decoder_layers=2, dim_feedforward=2048, dropout=self.dropout, activation='relu', batch_first=True)
-        self.alphas_dash = alphas_dash
-        self.betas = betas
+        self.alphas_dash = config.ALPHAS_DASH
+        self.betas = config.BETAS
         self.losses = []
         self.v = nn.Parameter(torch.randn(self.features_size))
         self.SinusoidalPosEmb = SinusoidalPosEmb(self.diffusion_steps)
 
-    def forward(self, x_T: torch.Tensor, context: Dict[str: torch.Tensor]):
+    def forward(self, x_T: torch.Tensor, context: Dict):
         assert 'eps' in context
         eps = context['eps']
         return self.reverse(x_T, eps)

@@ -13,7 +13,7 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
         super().__init__()
         dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         AUGMENT_DIM = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
-        x_size = cst.LEN_EVENT
+        x_size = cst.LEN_EVENT + cst.LEN_LEVEL * config.N_LOB_LEVELS
         
         self.lstm = nn.LSTM(x_size, AUGMENT_DIM, num_layers=1, batch_first=True, dropout=dropout)
         

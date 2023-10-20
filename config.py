@@ -14,11 +14,11 @@ class Configuration:
         self.IS_AUGMENTATION = True
         self.IS_TRAINING = True
 
-        self.IS_DATA_PREPROCESSED = False
+        self.IS_DATA_PREPROCESSED = True
 
         self.SPLIT_RATES = (.65, .05, .3)
         self.N_LOB_LEVELS = 3
-        self.CHOSEN_MODEL = cst.Models.crea_un_modello_stronzo
+        self.CHOSEN_MODEL = cst.Models.DDPM
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
@@ -57,8 +57,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 
-        
-        
+        self.ALPHAS_DASH, self.BETAS = None, None
+
         self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}
         
         self.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS] = 2

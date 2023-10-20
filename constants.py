@@ -37,7 +37,7 @@ class Metrics(Enum):      #Quantitative evaluation
     kolmogorov_smirnov = 'kolmogorov_smirnov'
 
 class Models(str, Enum):
-    crea_un_modello_stronzo = "crea_un_modello_stronzo"
+    DDPM = "DDPM"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
 
@@ -102,7 +102,7 @@ PRECISION = 32
 LEN_LEVEL = 4
 LEN_EVENT = 5
 
-DEVICE_TYPE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"

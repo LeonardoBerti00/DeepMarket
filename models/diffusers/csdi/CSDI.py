@@ -1,6 +1,6 @@
 from typing import Dict
 from config import Configuration
-from models.diffusers.DiffusionModel import DiffusionAB
+from models.diffusers.DiffusionAB import DiffusionAB
 from models.diffusers.csdi.Diffuser import CSDIEpsilon
 import torch.nn as nn
 import torch

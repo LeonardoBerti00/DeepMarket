@@ -1,31 +1,11 @@
 from config import Configuration
-from models.feature_augmenters.AbstractAugmenter import AugmenterAB
-from models.diffusers.DiffusionModel import DiffusionAB
+from models.diffusers.DiffusionAB import DiffusionAB
 import torch
-from einops import rearrange
 import lightning as L
 from constants import LearningHyperParameter
-from torch import nn
-from torch.nn import functional as F
-import math
 import time
-import constants as cst
-from utils import pick_diffuser, noise_scheduler
+from utils import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
-
-class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.dim = dim
-
-    def forward(self, x):
-        device = x.device
-        half_dim = self.dim // 2
-        emb = math.log(10000) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
-        emb = x[:, None] * emb[None, :]
-        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
-        return emb
 
 
 class NNEngine(L.LightningModule):
@@ -52,36 +32,27 @@ class NNEngine(L.LightningModule):
         self.L = config.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE]
         self.K = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE]
         self.len_cond = self.L - self.K
-        self.alphas_dash, self.betas = noise_scheduler(self.diffusion_steps, config.HYPER_PARAMETERS[LearningHyperParameter.S])
+        self.alphas_dash, self.betas = config.ALPHAS_DASH, config.BETAS
 
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
 
         if (self.IS_AUGMENTATION):
             self.augmenter = LSTMAugmenter(config)
-        
-        
+
 
     def forward(self, input):
+        # divide input into x and y
+        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
+
         if self.IS_AUGMENTATION:
             input = self.augmenter.augment(input)
 
-        #divide input into x and y
-        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
         # forward
         x_T, context = self.diffuser.reparametrized_forward(x_0, self.diffusion_steps-1, conditioning=cond)
         # reverse
         recon = self.diffuser(x_T, context)
         
         return recon
-
-
-    def forward_process(self, x_0, t):
-        # Standard forward process, takaes in input x_0 and returns x_t after t steps of noise
-        cov_matrix = torch.eye(self.x_size)
-        mean = math.sqrt(self.alphas_dash[t]) * x_0
-        std = (1 - self.alphas_dash[t]) * cov_matrix
-        x_T = torch.distributions.Normal(mean, std).rsample()
-        return x_T
 
 
     def training_step(self, x, batch_idx):

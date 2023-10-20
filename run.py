@@ -1,4 +1,5 @@
 import lightning as L
+import torch
 import wandb
 from lightning.pytorch.loggers import WandbLogger
 import constants as cst
@@ -7,12 +8,16 @@ from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
 from preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from utils import pick_diffuser
+from utils import pick_diffuser, noise_scheduler
 from models.NNEngine import NNEngine
 
 def run():
     config = Configuration()
-    if (cst.DEVICE_TYPE == "cpu"):
+    config.ALPHAS_DASH, config.BETAS = noise_scheduler(
+        diffusion_steps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS],
+        s=config.HYPER_PARAMETERS[cst.LearningHyperParameter.S]
+    )
+    if (cst.DEVICE == "cpu"):
         accelerator = "cpu"
     else:
         accelerator = "gpu"
@@ -75,7 +80,7 @@ def run():
 
     model = NNEngine(
         config=config,
-    ).to(config.DEVICE)
+    ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)
     trainer.test(model, dataloaders=test_dataloader)

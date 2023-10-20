@@ -1,7 +1,7 @@
 from torch.utils import data
 import numpy as np
 import torch
-
+import constants as cst
 
 class LOBDataset(data.Dataset):
     """ Characterizes a dataset for PyTorch. """
@@ -19,7 +19,7 @@ class LOBDataset(data.Dataset):
         return len(self.data)-self.L+1
 
     def __getitem__(self, index):
-        return self.data[index:index+self.L].cuda(non_blocking=True)
+        return self.data[index:index+self.L].to(cst.DEVICE, non_blocking=True)
 
     def _get_data(self):
         """ Loads the data. """
