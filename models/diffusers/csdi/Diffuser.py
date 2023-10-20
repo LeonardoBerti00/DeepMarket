@@ -8,24 +8,24 @@ import torch.nn as nn
 import math
 import torch.nn.functional as F
 
-class DiffCSDI(nn.Module):
+class CSDIEpsilon(nn.Module):
     
-    def __init__(self, config: Configuration, inputdim=2):
+    def __init__(self, num_steps=100, embedding_dim=128, side_dim=145, n_heads=2, input_dim=2, layers=1):
         super().__init__()
         
         # TODO: maybe make it a parameter
         self.channels = 1
-        self.num_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-        self.embedding_dim = config.CSDI_HYPERPARAMETERS[CSDIParameters.DIFFUSION_STEP_EMB_DIM]
-        self.side_dim = config.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM]
-        self.n_heads = config.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS]
+        self.num_steps = num_steps
+        self.embedding_dim = embedding_dim
+        self.side_dim = side_dim
+        self.n_heads = n_heads
         
         self.diffusion_embedding = CSDIEmbeddingDiffusionStep(
             num_steps=self.num_steps,
             embedding_dim=self.embedding_dim,
         )
 
-        self.input_projection = Conv1d_with_init(inputdim, self.channels, 1)
+        self.input_projection = Conv1d_with_init(input_dim, self.channels, 1)
         self.output_projection1 = Conv1d_with_init(self.channels, self.channels, 1)
         self.output_projection2 = Conv1d_with_init(self.channels, 1, 1)
         nn.init.zeros_(self.output_projection2.weight)
@@ -38,7 +38,7 @@ class DiffCSDI(nn.Module):
                     diffusion_embedding_dim=self.embedding_dim,
                     nheads=self.n_heads,
                 )
-                for _ in range(config["layers"])
+                for _ in range(layers)
             ]
         )
 

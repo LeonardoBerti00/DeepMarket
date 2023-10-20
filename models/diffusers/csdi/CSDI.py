@@ -1,7 +1,7 @@
 from typing import Dict
 from config import Configuration
 from models.diffusers.DiffusionModel import DiffusionAB
-from models.diffusers.csdi.Diffuser import DiffCSDI
+from models.diffusers.csdi.Diffuser import CSDIEpsilon
 import torch.nn as nn
 import torch
 import constants as cst
@@ -18,14 +18,16 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         # devo ancora leggere il paper e capire cosa prende come argomenti dal codice
         # https://github.com/ermongroup/CSDI/tree/main
         self.target_dim = cst.LEN_EVENT
-        self.L = config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE]
-        self.K = config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_WINDOW_SIZE]
-        self.len_cond = self.L - self.K
+        
+        self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS]
+        self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
+        self.side_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.SIDE_DIM]
+        self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
+        
 
         self.emb_time_dim = config["model"]["timeemb"]
         self.emb_feature_dim = config["model"]["featureemb"]
         self.is_unconditional = config["model"]["is_unconditional"]
-        self.target_strategy = config["model"]["target_strategy"]
 
         self.emb_total_dim = self.emb_time_dim + self.emb_feature_dim
         if self.is_unconditional == False:
@@ -35,7 +37,7 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         config_diff["side_dim"] = self.emb_total_dim
 
         input_dim = 1 if self.is_unconditional == True else 2
-        self.diffmodel = DiffCSDI(config_diff, input_dim)
+        self.diffuser = CSDIEpsilon(config, 2)
 
         # parameters for diffusion models
         self.num_steps = config_diff["num_steps"]
@@ -47,10 +49,6 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
             self.beta = np.linspace(
                 config_diff["beta_start"], config_diff["beta_end"], self.num_steps
             )
-
-        self.alpha_hat = 1 - self.beta
-        self.alpha = np.cumprod(self.alpha_hat)
-        self.alpha_torch = torch.tensor(self.alpha).float().to(self.device).unsqueeze(1).unsqueeze(1)
         
         
     def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs):
@@ -71,7 +69,7 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         return x_t, {'eps': eps, 'conditioning': cond, 'cond_mask': cond_mask }
         
         
-    def forward(self, x_T: torch.Tensor,  context: Dict[str, torch.Tensor]):
+    def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
         assert 'conditioning' in context
         assert 'eps' in context
         assert 'cond_mask' in context
@@ -80,18 +78,21 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         eps = context['eps']
         cond_mask = context['cond_mask']
         is_train = context.get('is_train', True)
+        set_t = context.get('set_t', -1)
         
         features = torch.cat([cond, x_T])
         # features[:,:,0] is the timestamp of the data            
         side_info = self.get_side_info(features[:,:,0], cond_mask, features)
         
-        # TODO: modify this loss and maybe also the signature in DiffusionAB
-        return self.loss(true=observed_data,
-                         recon=cond_mask,
-                         observed_mask=observed_mask,
-                         side_info=side_info,
-                         is_train=is_train)
-       
+        B = features.shape[0]
+        if not is_train:  # for validation
+            t = (torch.ones(B) * set_t).long().to(self.device)
+        else:
+            t = torch.randint(0, self.num_steps, [B]).to(self.device)
+
+        total_input = torch.cat([cond, x_T], dim=1)
+
+        return self.diffuser(total_input, side_info, t)  # (B,K,L)
         
     def time_embedding(self, pos, d_model=128):
         """
@@ -157,9 +158,9 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         noise = torch.randn_like(observed_data)
         noisy_data = (current_alpha ** 0.5) * observed_data + (1.0 - current_alpha) ** 0.5 * noise
 
-        total_input = self.set_input_to_diffmodel(noisy_data, observed_data, cond_mask)
+        total_input = self.set_input_to_diffuser(noisy_data, observed_data, cond_mask)
 
-        predicted = self.diffmodel(total_input, side_info, t)  # (B,K,L)
+        predicted = self.diffuser(total_input, side_info, t)  # (B,K,L)
 
         target_mask = observed_mask - cond_mask
         residual = (noise - predicted) * target_mask
