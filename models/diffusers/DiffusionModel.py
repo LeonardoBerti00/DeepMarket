@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 import torch
-import math
 
 class DiffusionAB(ABC):
     """An abstract class for loss functions."""
@@ -19,8 +18,8 @@ class DiffusionAB(ABC):
     def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         # Reparametrization trick for the diffusion process taken from DDPM paper
         eps = torch.distributions.normal.Normal(0, 1).sample(input.shape)
-        first_term = math.sqrt(self.alphas_dash[diffusion_steps]) * input
-        second_term = math.sqrt(1 - self.alphas_dash[diffusion_steps]) * eps
+        first_term = torch.sqrt(self.alphas_dash[diffusion_steps]) * input
+        second_term = torch.sqrt(1 - self.alphas_dash[diffusion_steps]) * eps
         x_t = first_term + second_term
         return x_t, {'eps': eps}
     
