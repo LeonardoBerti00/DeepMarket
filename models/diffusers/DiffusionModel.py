@@ -20,7 +20,7 @@ class DiffusionAB(ABC):
         # Reparametrization trick for the diffusion process taken from DDPM paper
         eps = torch.distributions.normal.Normal(0, 1).sample(input.shape)
         first_term = math.sqrt(self.alphas_dash[diffusion_steps]) * input
-        second_term = (1 - self.alphas_dash[diffusion_steps]) * eps
+        second_term = math.sqrt(1 - self.alphas_dash[diffusion_steps]) * eps
         x_t = first_term + second_term
         return x_t, {'eps': eps}
     
