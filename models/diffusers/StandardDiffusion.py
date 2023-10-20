@@ -1,4 +1,5 @@
 import math
+from typing import Dict
 
 import torch
 
@@ -30,8 +31,10 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         self.v = nn.Parameter(torch.randn(self.features_size))
         self.SinusoidalPosEmb = SinusoidalPosEmb(self.diffusion_steps)
 
-    def forward(self, x_T, eps_true):
-        return self.reverse(x_T, eps_true)
+    def forward(self, x_T: torch.Tensor, context: Dict[str: torch.Tensor]):
+        assert 'eps' in context
+        eps = context['eps']
+        return self.reverse(x_T, eps)
 
 
     def reverse_reparameterized(self, x_T, eps_true):

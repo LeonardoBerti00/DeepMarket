@@ -1,3 +1,4 @@
+from typing import Dict
 from config import Configuration
 from models.diffusers.DiffusionModel import DiffusionAB
 from models.diffusers.csdi.Diffuser import DiffCSDI
@@ -67,14 +68,22 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         x_t = x_t * (1 - cond_mask)
 
         cond = whole_input * cond_mask
-        return x_t, eps, cond, cond_mask
+        return x_t, {'eps': eps, 'conditioning': cond, 'cond_mask': cond_mask }
         
         
-    def forward(self, noised_x, cond, eps, is_train=True):
+    def forward(self, x_T: torch.Tensor,  context: Dict[str, torch.Tensor]):
+        assert 'conditioning' in context
+        assert 'eps' in context
+        assert 'cond_mask' in context
         
+        cond = context['conditioning']
+        eps = context['eps']
+        cond_mask = context['cond_mask']
+        is_train = context.get('is_train', True)
         
-                    
-        side_info = self.get_side_info(cond, cond_mask, augmented_features=noised_x)
+        features = torch.cat([cond, x_T])
+        # features[:,:,0] is the timestamp of the data            
+        side_info = self.get_side_info(features[:,:,0], cond_mask, features)
         
         # TODO: modify this loss and maybe also the signature in DiffusionAB
         return self.loss(true=observed_data,
@@ -98,14 +107,14 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         return pe
 
 
-    def get_side_info(self, observed_tp, cond_mask, augmented_features):
+    def get_side_info(self, observed_tp, cond_mask, features):
         B, K, L = cond_mask.shape
 
         time_embed = self.time_embedding(observed_tp, self.emb_time_dim)  # (B,L,emb)
         time_embed = time_embed.unsqueeze(2).expand(-1, -1, K, -1)
         
-        augmented_features = augmented_features.unsqueeze(0).unsqueeze(0).expand(B, L, -1, -1)
-        side_info = torch.cat([time_embed, augmented_features], dim=-1)  # (B,L,K,*)
+        features = features.unsqueeze(0).unsqueeze(0).expand(B, L, -1, -1)
+        side_info = torch.cat([time_embed, features], dim=-1)  # (B,L,K,*)
         side_info = side_info.permute(0, 3, 2, 1)  # (B,*,K,L)
 
         if self.is_unconditional == False:

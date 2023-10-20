@@ -68,9 +68,9 @@ class NNEngine(L.LightningModule):
         #divide input into x and y
         cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
         # forward
-        x_T, eps = self.diffuser.reparametrized_forward(x_0, self.diffusion_steps-1, conditioning=cond)
+        x_T, context = self.diffuser.reparametrized_forward(x_0, self.diffusion_steps-1, conditioning=cond)
         # reverse
-        recon = self.diffuser(x_T, cond, eps)
+        recon = self.diffuser(x_T, context)
         
         return recon
 
