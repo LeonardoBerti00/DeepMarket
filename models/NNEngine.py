@@ -38,7 +38,7 @@ class NNEngine(L.LightningModule):
         Parameters:
 
         """
-        self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
+        self.diffuser: DiffusionAB = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
@@ -66,11 +66,11 @@ class NNEngine(L.LightningModule):
             input = self.augmenter.augment(input)
 
         #divide input into x and y
-        y, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
-
-        x_T, eps = self.forward_process_reparameterized(x_0, self.diffusion_steps-1)
-
-        recon = self.diffuser(x_T, y, eps)
+        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
+        # forward
+        x_T, eps = self.diffuser.reparametrized_forward(x_0, cond, self.diffusion_steps-1)
+        # reverse
+        recon = self.diffuser(x_T, cond, eps)
         
         return recon
 
@@ -82,15 +82,6 @@ class NNEngine(L.LightningModule):
         std = (1 - self.alphas_dash[t]) * cov_matrix
         x_T = torch.distributions.Normal(mean, std).rsample()
         return x_T
-
-
-    def forward_process_reparameterized(self, x_0, t):
-        # Reparametrization trick for the diffusion process taken from DDPM paper
-        eps = torch.distributions.normal.Normal(0, 1).sample(x_0.shape)
-        first_term = math.sqrt(self.alphas_dash[t]) * x_0
-        second_term = (1 - self.alphas_dash[t]) * eps
-        x_t = first_term + second_term
-        return x_t, eps
 
 
     def training_step(self, x, batch_idx):
