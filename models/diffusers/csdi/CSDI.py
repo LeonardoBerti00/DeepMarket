@@ -52,7 +52,27 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         self.alpha_torch = torch.tensor(self.alpha).float().to(self.device).unsqueeze(1).unsqueeze(1)
         
         
+    def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs):
+        # here the conditioning and input are merged together again
+        # because CSDI needs the mask on the entire input
+        assert 'conditioning' in kwargs
+        
+        cond = kwargs['conditioning']
+        whole_input = torch.cat([cond, input])
+        
+        cond_mask = torch.zeros(whole_input.shape)
+        cond_mask[:, :len(cond), :] = 1
+        
+        x_t, eps = super().reparameterized_forward(whole_input, diffusion_steps)
+        x_t = x_t * (1 - cond_mask)
+
+        cond = whole_input * cond_mask
+        return x_t, eps, cond, cond_mask
+        
+        
     def forward(self, noised_x, cond, eps, is_train=True):
+        
+        
                     
         side_info = self.get_side_info(cond, cond_mask, augmented_features=noised_x)
         

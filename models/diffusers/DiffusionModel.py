@@ -15,7 +15,7 @@ class DiffusionAB(ABC):
         """Computes the loss given the true and predicted values."""
         pass
     
-    def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs) -> torch.Tensor:
+    def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs):
         # Reparametrization trick for the diffusion process taken from DDPM paper
         eps = torch.distributions.normal.Normal(0, 1).sample(input.shape)
         first_term = math.sqrt(self.alphas_dash[diffusion_steps]) * input
