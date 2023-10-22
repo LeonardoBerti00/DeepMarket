@@ -20,6 +20,13 @@ class LearningHyperParameter(str, Enum):
     AUGMENT_DIM = "AUGMENT_DIM"
     S = "s"
     LAMBDA = "lambda"
+    EMB_T_DIM = "emb_t_dim"
+    DiT_DEPTH = "dit_depth"
+    DiT_MLP_RATIO = "dit_mlp_ratio"
+    DiT_NUM_HEADS = "dit_num_heads"
+    DiT_HIDDEN_SIZE = "dit_hidden_size"
+    DiT_TYPE = "dit_type"
+
 
 
 class Optimizers(Enum):
@@ -98,9 +105,10 @@ class CSDIParameters(Enum):
     
 
 PRECISION = 32
-
+N_LOB_LEVELS = 3
 LEN_LEVEL = 4
 LEN_EVENT = 5
+COND_SIZE = LEN_LEVEL*N_LOB_LEVELS + LEN_EVENT
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 

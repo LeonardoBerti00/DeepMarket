@@ -1,4 +1,6 @@
 1. Diffusion models, everyone can implement one or two ideas and we can compare them
+    1.1. finire implementare DiT con altri due metodi di conditioning (@leo)
+    1.2. Testare DiT con tutte le tipologie di input e tipi di conditioning (@leo)
 2. function to do the quantitative evaluation and plot the metrics:
     2.1. predictive score
     2.2. discriminative score
@@ -6,7 +8,7 @@
     2.4. kolmogorov smirnov
 3. function to plot the results and do the qualitative evaluation as in the coletta paper, you can find the plot to do in overleaf, maybe I can ask Matteo if the code is public
 4. hyperparameters search (also with a window size T different from 1, so it means to generate T events instead of 1 at a time)
-5. train and test with TSLA and INTC
+5. constraint the generated execution events to assure that the match is done with a real order in the order book, so the price is the same as the one in the order book
 6. Integrate ABIDES to do a full trading financial simulation as in the coletta paper
 7. train with one stock and check the performance with another one
 8. experiment with latent representation of market state, so the input conditioning, using a VQ-VAE or RQ-VAE
@@ -15,3 +17,4 @@
 10. experiment with Spatial-temporal Representation in mid-price-centred Moving Windows (https://arxiv.org/pdf/2110.05479.pdf)
 
 
+(qui mettere solo major to do mentre per minor usare il classico TODO)

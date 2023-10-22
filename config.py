@@ -17,7 +17,7 @@ class Configuration:
         self.IS_DATA_PREPROCESSED = True
 
         self.SPLIT_RATES = (.65, .05, .3)
-        self.N_LOB_LEVELS = 3
+
         self.CHOSEN_MODEL = cst.Models.DDPM
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
@@ -56,6 +56,15 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
+        self.HYPER_PARAMETERS[LearningHyperParameter.EMB_T_DIM] = 2
+
+
+        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
+        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_HIDDEN_SIZE] = 64
+        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
+
 
         self.ALPHAS_DASH, self.BETAS = None, None
 

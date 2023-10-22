@@ -13,11 +13,10 @@ class LOBSTERDataBuilder:
         self,
         stock_name,
         data_dir,
-        n_lob_levels,
         date_trading_days,
         split_rates,
     ):
-        self.n_lob_levels = n_lob_levels
+        self.n_lob_levels = cst.N_LOB_LEVELS
         self.data_dir = data_dir
         self.date_trading_days = date_trading_days
         self.stock_name = stock_name

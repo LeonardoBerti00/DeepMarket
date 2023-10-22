@@ -2,9 +2,10 @@ from config import Configuration
 from models.diffusers.DiffusionAB import DiffusionAB
 import torch
 import lightning as L
+import constants as cst
 from constants import LearningHyperParameter
 import time
-from utils import pick_diffuser
+from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 
 
@@ -37,20 +38,27 @@ class NNEngine(L.LightningModule):
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
 
         if (self.IS_AUGMENTATION):
-            self.augmenter = LSTMAugmenter(config)
+            self.augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
 
 
     def forward(self, input):
         # divide input into x and y
-        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :]
+        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :cst.LEN_EVENT]
+        #print mean of both
+        print(torch.mean(cond), torch.mean(x_0))
+
+        # cond.shape = (batch_size, L-K, 17)
+        # x_0.shape = (batch_size, K, 5)
 
         if self.IS_AUGMENTATION:
-            input = self.augmenter.augment(input)
+            x_0 = self.augmenter.augment(x_0)
+        # x_0.shape = (batch_size, K, latent_dim)
 
-        # forward
-        x_T, context = self.diffuser.reparametrized_forward(x_0, self.diffusion_steps-1, conditioning=cond)
+        # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
+        x_T, context = self.diffuser.reparametrized_forward(x_0, diffusion_step=self.diffusion_steps-1)
+
         # reverse
-        recon = self.diffuser(x_T, context)
+        recon = self.diffuser(x_T, context, cond)
         
         return recon
 

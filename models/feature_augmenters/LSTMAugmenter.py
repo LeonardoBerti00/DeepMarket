@@ -9,13 +9,12 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 class LSTMAugmenter(AugmenterAB, nn.Module):
     
-    def __init__(self, config: Configuration):
+    def __init__(self, config: Configuration, input_size):
         super().__init__()
         dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
-        AUGMENT_DIM = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
-        x_size = cst.LEN_EVENT + cst.LEN_LEVEL * config.N_LOB_LEVELS
-        
-        self.lstm = nn.LSTM(x_size, AUGMENT_DIM, num_layers=1, batch_first=True, dropout=dropout)
+        augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
+
+        self.lstm = nn.LSTM(input_size, augment_dim, num_layers=1, batch_first=True, dropout=dropout)
         
     def forward(self, input):
         x, (h_n, c_n) = self.lstm(input)

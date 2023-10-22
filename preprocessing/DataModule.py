@@ -14,14 +14,17 @@ class DataModule(pl.LightningDataModule):
         self.test_set = test_set
         self.batch_size = batch_size
         self.is_shuffle_train = is_shuffle_train
-        self.pin_memory = True if cst.DEVICE == 'cuda' else False
+        if train_set.data.device.type != cst.DEVICE:       #this is true only when we are using a GPU but the data is still on the CPU
+            self.pin_memory = True
+        else:
+            self.pin_memory = False
         self.num_workers = num_workers
 
     def train_dataloader(self):
         return DataLoader(
             dataset=self.train_set,
             batch_size=self.batch_size,
-            shuffle=self.is_shuffle_train,
+            shuffle=False, #self.is_shuffle_train,
             pin_memory=self.pin_memory,
             drop_last=False,
             num_workers=self.num_workers
