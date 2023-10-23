@@ -24,10 +24,11 @@ class DataModule(pl.LightningDataModule):
         return DataLoader(
             dataset=self.train_set,
             batch_size=self.batch_size,
-            shuffle=False, #self.is_shuffle_train,
+            shuffle=self.is_shuffle_train,
             pin_memory=self.pin_memory,
             drop_last=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )
 
     def val_dataloader(self):
@@ -37,7 +38,8 @@ class DataModule(pl.LightningDataModule):
             shuffle=False,
             pin_memory=self.pin_memory,
             drop_last=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )
 
     def test_dataloader(self):
@@ -47,5 +49,6 @@ class DataModule(pl.LightningDataModule):
             shuffle=False,
             pin_memory=self.pin_memory,
             drop_last=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )

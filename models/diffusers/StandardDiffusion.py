@@ -57,6 +57,7 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         eps = context['eps']
         return self.reverse_reparameterized(x_T, cond, eps)
 
+    #def reparametrized_forward(self, x_0: torch.Tensor, diffusion_step: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
 
     def reverse_reparameterized(self, x_T, cond, eps_true):
         x_t = x_T

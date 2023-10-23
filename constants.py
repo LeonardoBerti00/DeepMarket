@@ -118,7 +118,6 @@ LEN_EVENT = 5
 COND_SIZE = LEN_LEVEL*N_LOB_LEVELS + LEN_EVENT
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 WANDB_DIR = "data/wandb"

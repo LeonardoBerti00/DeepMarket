@@ -26,6 +26,7 @@ class NNEngine(L.LightningModule):
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.cond_type = config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE]
+        self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.train_losses = []
         self.val_losses = []
         self.val_ema_losses = []
@@ -74,16 +75,20 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
 
-    def training_step(self, cond, x, batch_idx):
-        recon = self.forward(cond, x)
-        loss = self.loss(x, recon)
+    def training_step(self, input, batch_idx):
+        x_0 = input[1]
+        cond = input[0]
+        recon = self.forward(cond, x_0)
+        loss = self.loss(x_0, recon)
         self.log('train_loss', loss)
         self.train_losses.append(loss)
         return loss
 
-    def validation_step(self, cond, x, batch_idx):
-        recon = self.forward(cond, x)
-        loss = self.loss(x, recon)
+    def validation_step(self, input, batch_idx):
+        x_0 = input[1]
+        cond = input[0]
+        recon = self.forward(cond, x_0)
+        loss = self.loss(x_0, recon)
         self.log('val_loss', loss)
         self.val_losses.append(loss)
 
@@ -92,14 +97,16 @@ class NNEngine(L.LightningModule):
         # (2) copies EMA parameters to model
         # (3) after exiting the `with`, restore original parameters to resume training later
         with self.ema.average_parameters():
-            recon = self.forward(cond, x)
-            ema_loss = self.loss(x, recon)
+            recon = self.forward(cond, x_0)
+            ema_loss = self.loss(x_0, recon)
             self.val_ema_losses.append(ema_loss)
         return loss
 
-    def test_step(self, cond, x, batch_idx):
-        recon = self.forward(cond, x)
-        loss = self.loss(x, recon)
+    def test_step(self, input, batch_idx):
+        x_0 = input[1]
+        cond = input[0]
+        recon = self.forward(cond, x_0)
+        loss = self.loss(x_0, recon)
         self.log('test_loss', loss)
         self.test_losses.append(loss)
 
@@ -108,8 +115,8 @@ class NNEngine(L.LightningModule):
         # (2) copies EMA parameters to model
         # (3) after exiting the `with`, restore original parameters to resume training later
         with self.ema.average_parameters():
-            recon = self.forward(cond, x)
-            ema_loss = self.loss(x, recon)
+            recon = self.forward(cond, x_0)
+            ema_loss = self.loss(x_0, recon)
             self.val_ema_losses.append(ema_loss)
         return loss
 
@@ -122,7 +129,7 @@ class NNEngine(L.LightningModule):
             self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
         elif self.optimizer == 'LION':
             self.optimizer = Lion(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)
         return {"optimizer": self.optimizer, "lr_scheduler": scheduler}
 
     def loss(self, input, recon, **kwargs):
