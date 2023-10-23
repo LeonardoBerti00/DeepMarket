@@ -15,11 +15,11 @@ class Configuration:
         self.IS_AUGMENTATION_COND = False
         self.IS_TRAINING = True
 
-        self.IS_DATA_PREPROCESSED = False
+        self.IS_DATA_PREPROCESSED = True
 
         self.SPLIT_RATES = (.65, .05, .3)
 
-        self.CHOSEN_MODEL = cst.Models.DDPM
+        self.CHOSEN_MODEL = cst.Models.CSDI
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]

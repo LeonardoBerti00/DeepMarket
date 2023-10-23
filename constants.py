@@ -46,6 +46,7 @@ class Metrics(Enum):      #Quantitative evaluation
 
 class Models(str, Enum):
     DDPM = "DDPM"
+    CSDI = "CSDI"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
 
