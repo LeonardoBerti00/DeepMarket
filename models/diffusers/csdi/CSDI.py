@@ -21,35 +21,15 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         
         self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS]
         self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
-        self.side_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.SIDE_DIM]
         self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
-        
-
-        self.emb_time_dim = config["model"]["timeemb"]
-        self.emb_feature_dim = config["model"]["featureemb"]
-        self.is_unconditional = config["model"]["is_unconditional"]
-
-        self.emb_total_dim = self.emb_time_dim + self.emb_feature_dim
-        if self.is_unconditional == False:
-            self.emb_total_dim += 1  # for conditional mask
-
-        config_diff = config["diffusion"]
-        config_diff["side_dim"] = self.emb_total_dim
-
-        input_dim = 1 if self.is_unconditional == True else 2
-        self.diffuser = CSDIEpsilon(config, 2)
-
-        # parameters for diffusion models
-        self.num_steps = config_diff["num_steps"]
-        if config_diff["schedule"] == "quad":
-            self.beta = np.linspace(
-                config_diff["beta_start"] ** 0.5, config_diff["beta_end"] ** 0.5, self.num_steps
-            ) ** 2
-        elif config_diff["schedule"] == "linear":
-            self.beta = np.linspace(
-                config_diff["beta_start"], config_diff["beta_end"], self.num_steps
-            )
-        
+        self.embedding_time_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_TIME_DIM]
+        self.embedding_feature_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_FEATURE_DIM]
+        self.layers = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.LAYERS]
+        self.side_dim = self.embedding_time_dim + self.embedding_feature_dim + 1
+        # TODO: change into dynamic input dim
+        self.input_dim = 2
+        self.schedule = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_SCHEDULER]
+        self.diffuser = CSDIEpsilon(self.num_steps, self.embedding_dim, self.side_dim, self.n_heads, self.input_dim, self.layers)
         
     def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs):
         # here the conditioning and input are merged together again
@@ -118,9 +98,8 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         side_info = torch.cat([time_embed, features], dim=-1)  # (B,L,K,*)
         side_info = side_info.permute(0, 3, 2, 1)  # (B,*,K,L)
 
-        if self.is_unconditional == False:
-            side_mask = cond_mask.unsqueeze(1)  # (B,1,K,L)
-            side_info = torch.cat([side_info, side_mask], dim=1)
+        side_mask = cond_mask.unsqueeze(1)  # (B,1,K,L)
+        side_info = torch.cat([side_info, side_mask], dim=1)
 
         return side_info
 
@@ -158,8 +137,10 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         noise = torch.randn_like(observed_data)
         noisy_data = (current_alpha ** 0.5) * observed_data + (1.0 - current_alpha) ** 0.5 * noise
 
-        total_input = self.set_input_to_diffuser(noisy_data, observed_data, cond_mask)
-
+        cond_obs  = (cond_mask * observed_data).unsqueeze(1)
+        noisy_target = ((1-cond_mask) * noisy_data).unsqueeze(1)
+        total_input = torch.cat([cond_obs, noisy_target], dim=1)
+        
         predicted = self.diffuser(total_input, side_info, t)  # (B,K,L)
 
         target_mask = observed_mask - cond_mask

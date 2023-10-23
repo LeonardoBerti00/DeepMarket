@@ -15,7 +15,7 @@ class Configuration:
         self.IS_AUGMENTATION_COND = False
         self.IS_TRAINING = True
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
 
         self.SPLIT_RATES = (.65, .05, .3)
 
@@ -73,6 +73,9 @@ class Configuration:
         self.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM] = 10
         self.CSDI_HYPERPARAMETERS[CSDIParameters.CHANNELS] = 2
         self.CSDI_HYPERPARAMETERS[CSDIParameters.DIFFUSION_STEP_EMB_DIM] = 128
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_TIME_DIM] = 128
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_FEATURE_DIM] = 128
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.LAYERS] = 2
 
 
 

@@ -103,6 +103,9 @@ class CSDIParameters(Enum):
     SIDE_DIM = 10
     N_HEADS = 2
     DIFFUSION_STEP_EMB_DIM = 128
+    EMBEDDING_TIME_DIM = 128
+    EMBEDDING_FEATURE_DIM = 16
+    LAYERS = 1
     
 
 PRECISION = 32

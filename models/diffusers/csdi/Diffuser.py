@@ -1,8 +1,5 @@
-from config import Configuration
-from constants import CSDIParameters, LearningHyperParameter
 from models.diffusers.csdi.Embedder import CSDIEmbeddingDiffusionStep
 from models.diffusers.csdi.Residuals import ResidualBlock
-from models.diffusers.csdi.utils import Conv1d_with_init
 import torch
 import torch.nn as nn
 import math
@@ -24,10 +21,12 @@ class CSDIEpsilon(nn.Module):
             num_steps=self.num_steps,
             embedding_dim=self.embedding_dim,
         )
+        
+        
 
-        self.input_projection = Conv1d_with_init(input_dim, self.channels, 1)
-        self.output_projection1 = Conv1d_with_init(self.channels, self.channels, 1)
-        self.output_projection2 = Conv1d_with_init(self.channels, 1, 1)
+        self.input_projection = self.Conv1d_with_init(input_dim, self.channels, 1)
+        self.output_projection1 = self.Conv1d_with_init(self.channels, self.channels, 1)
+        self.output_projection2 = self.Conv1d_with_init(self.channels, 1, 1)
         nn.init.zeros_(self.output_projection2.weight)
 
         self.residual_layers = nn.ModuleList(
@@ -41,6 +40,12 @@ class CSDIEpsilon(nn.Module):
                 for _ in range(layers)
             ]
         )
+        
+    def Conv1d_with_init(self, in_channels, out_channels, kernel_size):
+        layer = nn.Conv1d(in_channels, out_channels, kernel_size)
+        nn.init.kaiming_normal_(layer.weight)
+        return layer
+
 
     def forward(self, x, cond_info, diffusion_step):
         B, inputdim, K, L = x.shape
