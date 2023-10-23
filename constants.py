@@ -45,7 +45,7 @@ class Metrics(Enum):      #Quantitative evaluation
     kolmogorov_smirnov = 'kolmogorov_smirnov'
 
 class Models(str, Enum):
-    DDPM = "DDPM"
+    DiT = "DiT"
     CSDI = "CSDI"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
@@ -107,7 +107,9 @@ class CSDIParameters(Enum):
     EMBEDDING_TIME_DIM = 128
     EMBEDDING_FEATURE_DIM = 16
     LAYERS = 1
-    
+
+
+SEED = 0
 
 PRECISION = 32
 N_LOB_LEVELS = 3
@@ -119,8 +121,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
-
+WANDB_DIR = "data/wandb"
 DATA_DIR = "data"
 
-
+PROJECT_NAME = "CDTS"
 

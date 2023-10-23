@@ -7,6 +7,8 @@ from constants import LearningHyperParameter
 import time
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
+from lion_pytorch import Lion
+from torch_ema import ExponentialMovingAverage
 
 
 class NNEngine(L.LightningModule):
@@ -15,9 +17,6 @@ class NNEngine(L.LightningModule):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
-
-        Parameters:
-
         """
         self.diffuser: DiffusionAB = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
@@ -29,9 +28,10 @@ class NNEngine(L.LightningModule):
         self.cond_type = config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE]
         self.train_losses = []
         self.val_losses = []
+        self.val_ema_losses = []
         self.test_losses = []
+        self.test_ema_losses = []
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-
         self.alphas_dash, self.betas = config.ALPHAS_DASH, config.BETAS
         self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
         self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
@@ -40,6 +40,8 @@ class NNEngine(L.LightningModule):
             self.augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
         elif (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
             self.augmenter_cond = LSTMAugmenter(config, cst.COND_SIZE)
+
+        self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
 
 
     def forward(self, cond, x_0):
@@ -72,26 +74,43 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
 
-    def training_step(self, x, batch_idx):
-        recon = self.forward(x)
+    def training_step(self, cond, x, batch_idx):
+        recon = self.forward(cond, x)
         loss = self.loss(x, recon)
         self.log('train_loss', loss)
         self.train_losses.append(loss)
         return loss
 
-    def validation_step(self, x, batch_idx):
-        recon = self.forward(x)
+    def validation_step(self, cond, x, batch_idx):
+        recon = self.forward(cond, x)
         loss = self.loss(x, recon)
         self.log('val_loss', loss)
         self.val_losses.append(loss)
-        self.val_snr.append(self.si_snr(x, recon))
+
+        # Validation: with EMA
+        # (1) saves original parameters before replacing with EMA version
+        # (2) copies EMA parameters to model
+        # (3) after exiting the `with`, restore original parameters to resume training later
+        with self.ema.average_parameters():
+            recon = self.forward(cond, x)
+            ema_loss = self.loss(x, recon)
+            self.val_ema_losses.append(ema_loss)
         return loss
 
-    def test_step(self, x, batch_idx):
-        recon = self.forward(x)
+    def test_step(self, cond, x, batch_idx):
+        recon = self.forward(cond, x)
         loss = self.loss(x, recon)
         self.log('test_loss', loss)
         self.test_losses.append(loss)
+
+        # Testing: with EMA
+        # (1) saves original parameters before replacing with EMA version
+        # (2) copies EMA parameters to model
+        # (3) after exiting the `with`, restore original parameters to resume training later
+        with self.ema.average_parameters():
+            recon = self.forward(cond, x)
+            ema_loss = self.loss(x, recon)
+            self.val_ema_losses.append(ema_loss)
         return loss
 
     def configure_optimizers(self):
@@ -101,7 +120,10 @@ class NNEngine(L.LightningModule):
             self.optimizer = torch.optim.RMSprop(self.parameters(), lr=self.lr)
         elif self.optimizer == 'SGD':
             self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
-        return self.optimizer
+        elif self.optimizer == 'LION':
+            self.optimizer = Lion(self.parameters(), lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer)
+        return {"optimizer": self.optimizer, "lr_scheduler": scheduler}
 
     def loss(self, input, recon, **kwargs):
         # Reconstruction loss is the mse between the input and the reconstruction
@@ -113,18 +135,24 @@ class NNEngine(L.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         loss = sum(self.val_losses) / len(self.val_losses)
+        loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
         print(f"\n val loss {loss}")
+        print(f"\n val ema loss {loss_ema}")
 
     def on_test_epoch_end(self) -> None:
         loss = sum(self.test_losses) / len(self.test_losses)
+        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
         print(f"\n test loss {loss}")
+        print(f"\n test ema loss {loss_ema}")
 
-    def inference_time(self, batch):
-        x, _ = batch
+    def inference_time(self, cond, x):
         t0 = time.time()
-        _ = self(x)
+        _ = self(cond, x)
         torch.cuda.current_stream().synchronize()
         t1 = time.time()
         elapsed = t1 - t0
         # print("Inference for the model:", elapsed, "ms")
         return elapsed
+
+    def on_before_zero_grad(self, *args, **kwargs):
+        self.ema.update()

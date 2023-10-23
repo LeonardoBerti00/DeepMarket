@@ -5,8 +5,8 @@ from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from utils.utils import sinusoidal_positional_embedding
-from models.DiT import DiT, ConditionEmbedder
+from models.diffusers.DiT.DiT import DiT
+
 
 class StandardDiffusion(nn.Module, DiffusionAB):
     """An abstract class for loss functions."""
@@ -20,13 +20,20 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         self.x_SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
-        self.emb_t_dim = config.HYPER_PARAMETERS[LearningHyperParameter.EMB_T_DIM]
-        # TODO: Leonardo check this please
-        if config.IS_AUGMENTATION_X or config.IS_AUGMENTATION_COND:
+
+        if config.IS_AUGMENTATION_X:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         else:
             self.input_size = cst.LEN_EVENT
-        self.cond_size = cst.COND_SIZE    #TODO change this, because cond size can be equal to x size if the conditoning is concatenation
+
+        if config.IS_AUGMENTATION_COND:
+            self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
+        else:
+            if (config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] == 'full'):
+                self.cond_size = cst.COND_SIZE
+            else:
+                self.cond_size = cst.LEN_EVENT
+
         self.NN = DiT(
             self.input_size,
             self.cond_seq_size,
