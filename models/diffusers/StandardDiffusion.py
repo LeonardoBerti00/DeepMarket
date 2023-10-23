@@ -21,7 +21,8 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         self.SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
         self.emb_t_dim = config.HYPER_PARAMETERS[LearningHyperParameter.EMB_T_DIM]
-        if config.IS_AUGMENTATION:
+        # TODO: Leonardo check this please
+        if config.IS_AUGMENTATION_X or config.IS_AUGMENTATION_COND:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         else:
             self.input_size = cst.LEN_EVENT
