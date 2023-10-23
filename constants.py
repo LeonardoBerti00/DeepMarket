@@ -4,7 +4,7 @@ import torch
 
 class LearningHyperParameter(str, Enum):
     DIFFUSION_STEPS = "diffusion_steps"
-    BACKWARD_WINDOW_SIZE = "backward_window_size"
+    BACKWARD_SEQ_SIZE = "backward_SEQ_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
     WEIGHT_DECAY = "weight_decay"
@@ -15,11 +15,12 @@ class LearningHyperParameter(str, Enum):
     BATCH_SIZE = "batch_size"
     CONDITIONAL_DROPOUT = "conditional_dropout"
     DROPOUT = "dropout"
-    WINDOW_SIZE = "window_size"          #it's the sequence length
-    MASKED_WINDOW_SIZE = "masked_window_size"
+    SEQ_SIZE = "SEQ_size"          #it's the sequence length
+    MASKED_SEQ_SIZE = "masked_SEQ_size"
     AUGMENT_DIM = "AUGMENT_DIM"
     S = "s"
     LAMBDA = "lambda"
+    COND_TYPE = "cond_type"
     EMB_T_DIM = "emb_t_dim"
     DiT_DEPTH = "dit_depth"
     DiT_MLP_RATIO = "dit_mlp_ratio"
@@ -73,7 +74,7 @@ class LOB_Charts(Enum):      #Qualitative evaluation
     order_volume = 'order_volume'
     quoote_interarrival_time = 'quoote_interarrival_time'
     time_to_first_fill = 'time_to_first_fill'
-    num_lim_orders_time_window = 'num_lim_orders_time_window'
+    num_lim_orders_time_SEQ = 'num_lim_orders_time_SEQ'
 
 
 class Stocks(Enum):

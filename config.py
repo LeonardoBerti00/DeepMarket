@@ -11,7 +11,8 @@ class Configuration:
         self.SEED = 500
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = True
+        self.IS_AUGMENTATION_X = True
+        self.IS_AUGMENTATION_COND = False
         self.IS_TRAINING = True
 
         self.IS_DATA_PREPROCESSED = True
@@ -46,8 +47,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPS] = 1e-08  # default value for ADAM
         self.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM] = 0.9
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE] = 50        #it's the sequencce length
-        self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
         self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
@@ -57,14 +58,12 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.EMB_T_DIM] = 2
-
-
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_HIDDEN_SIZE] = 64
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
-
+        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "full"    #it can be full or 'only_event'
 
         self.ALPHAS_DASH, self.BETAS = None, None
 

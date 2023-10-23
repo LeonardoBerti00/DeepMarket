@@ -26,33 +26,29 @@ class NNEngine(L.LightningModule):
         self.training = config.IS_TRAINING
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
+        self.cond_type = config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE]
         self.train_losses = []
         self.val_losses = []
         self.test_losses = []
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-        self.L = config.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE]
-        self.K = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE]
-        self.len_cond = self.L - self.K
+
         self.alphas_dash, self.betas = config.ALPHAS_DASH, config.BETAS
+        self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
+        self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
 
-        self.IS_AUGMENTATION = config.IS_AUGMENTATION
-
-        if (self.IS_AUGMENTATION):
+        if (self.IS_AUGMENTATION_X):
             self.augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
+        elif (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
+            self.augmenter_cond = LSTMAugmenter(config, cst.COND_SIZE)
 
 
-    def forward(self, input):
-        # divide input into x and y
-        cond, x_0 = input[:, :self.len_cond, :], input[:, self.len_cond:, :cst.LEN_EVENT]
+    def forward(self, cond, x_0):
+
         #print mean of both
         print(torch.mean(cond), torch.mean(x_0))
 
-        # cond.shape = (batch_size, L-K, 17)
-        # x_0.shape = (batch_size, K, 5)
-
-        if self.IS_AUGMENTATION:
-            x_0 = self.augmenter.augment(x_0)
-        # x_0.shape = (batch_size, K, latent_dim)
+        # augment
+        x_0, cond = self.augment(x_0, cond)
 
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
         x_T, context = self.diffuser.reparametrized_forward(x_0, diffusion_step=self.diffusion_steps-1)
@@ -61,6 +57,19 @@ class NNEngine(L.LightningModule):
         recon = self.diffuser(x_T, context, cond)
         
         return recon
+
+    def augment(self, x_0, cond):
+        if self.IS_AUGMENTATION_X:
+            x_0 = self.augmenter.augment(x_0)
+        # x_0.shape = (batch_size, K, latent_dim)
+
+        if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
+            cond = self.augmenter_cond.augment(cond)
+        # cond.shape = (batch_size, cond_size, latent_dim)
+
+        if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
+            cond = self.augmenter.augment(cond)
+        return x_0, cond
 
 
     def training_step(self, x, batch_idx):

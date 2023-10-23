@@ -37,17 +37,23 @@ def run_wandb(wandb_config, accelerator, wandb_logger):
 def train(config, trainer):
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
-        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
-        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
-        L=config.HYPER_PARAMETERS[cst.LearningHyperParameter.WINDOW_SIZE],
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)

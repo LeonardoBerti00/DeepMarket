@@ -14,12 +14,12 @@ class StandardDiffusion(nn.Module, DiffusionAB):
     def __init__(self, config):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
-        self.cond_droput = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
+        self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
-        self.x_window_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_WINDOW_SIZE]
-        self.window_size = config.HYPER_PARAMETERS[LearningHyperParameter.WINDOW_SIZE]
-        self.cond_seq_size = self.window_size - self.x_window_size
+        self.x_SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
+        self.SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
+        self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
         self.emb_t_dim = config.HYPER_PARAMETERS[LearningHyperParameter.EMB_T_DIM]
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
@@ -34,7 +34,7 @@ class StandardDiffusion(nn.Module, DiffusionAB):
             self.diffusion_steps,
             self.depth,
             self.num_heads,
-            self.x_window_size,
+            self.x_SEQ_size,
             self.mlp_ratio,
             self.cond_dropout_prob,
             self.type
