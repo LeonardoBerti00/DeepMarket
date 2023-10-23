@@ -5,18 +5,17 @@ from models.diffusers.csdi.Diffuser import CSDIEpsilon
 import torch.nn as nn
 import torch
 import constants as cst
-import numpy as np
-import math
-import torch.nn.functional as F
 
-class CSDIDiffuser(DiffusionAB, nn.Module):
+"""
+    Adapted from https://github.com/ermongroup/CSDI/tree/main
+"""
+class CSDIDiffuser(nn.Module, DiffusionAB):
     
     def __init__(self, config: Configuration):
-        super().__init__()
+        DiffusionAB.__init__(self, config)
+        super(CSDIDiffuser, self).__init__()
         
-        self.device = cst.DEVICE_TYPE
-        # devo ancora leggere il paper e capire cosa prende come argomenti dal codice
-        # https://github.com/ermongroup/CSDI/tree/main
+        self.device = cst.DEVICE
         self.target_dim = cst.LEN_EVENT
         
         self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS]
@@ -28,7 +27,6 @@ class CSDIDiffuser(DiffusionAB, nn.Module):
         self.side_dim = self.embedding_time_dim + self.embedding_feature_dim + 1
         # TODO: change into dynamic input dim
         self.input_dim = 2
-        self.schedule = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_SCHEDULER]
         self.diffuser = CSDIEpsilon(self.num_steps, self.embedding_dim, self.side_dim, self.n_heads, self.input_dim, self.layers)
         
     def reparametrized_forward(self, input: torch.Tensor, diffusion_steps: int, **kwargs):

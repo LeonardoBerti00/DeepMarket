@@ -37,6 +37,12 @@ def sinusoidal_positional_embedding(token_sequence_size, token_embedding_dim, n=
     return embeddings
 
 
+def Conv1d_with_init(in_channels, out_channels, kernel_size):
+    layer = torch.nn.Conv1d(in_channels, out_channels, kernel_size)
+    torch.nn.init.kaiming_normal_(layer.weight)
+    return layer
+
+
 def wandb_init():
     #wandb.login("d29d51017f4231b5149d36ad242526b374c9c60a")
     sweep_config = {

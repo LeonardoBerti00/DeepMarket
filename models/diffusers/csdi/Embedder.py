@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class CSDIEmbeddingDiffusionStep(AugmenterAB, nn.Module):
     
     def __init__(self, num_steps, embedding_dim=128, projection_dim=None):
-        super().__init__()
+        super(CSDIEmbeddingDiffusionStep, self).__init__()
         if projection_dim is None:
             projection_dim = embedding_dim
         self.register_buffer(

@@ -1,12 +1,17 @@
-from models.diffusers.csdi.utils import Conv1d_with_init, get_torch_trans
+
 import torch.nn as nn
 import torch
 import math
 
+from utils.utils import Conv1d_with_init
+
 class ResidualBlock(nn.Module):
     
     def __init__(self, side_dim, channels, diffusion_embedding_dim, nheads):
-        super().__init__()
+        super(ResidualBlock, self).__init__()
+        
+        print(f'diffusion_embedding_dim = {diffusion_embedding_dim}')
+        print(f'nheads = {nheads}')
         
         self.diffusion_projection = nn.Linear(diffusion_embedding_dim, channels)
         self.cond_projection = Conv1d_with_init(side_dim, 2 * channels, 1)
@@ -14,10 +19,10 @@ class ResidualBlock(nn.Module):
         self.output_projection = Conv1d_with_init(channels, 2 * channels, 1)
 
         self.time_layer = nn.TransformerEncoder(nn.TransformerEncoderLayer(
-            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu", num_layers=1))
+            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu"), num_layers=1)
         
         self.feature_layer = nn.TransformerEncoder(nn.TransformerEncoderLayer(
-            d_model=channels, nheads=nheads, dim_feedforward=64, activation="gelu", num_layers=1))
+            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu"), num_layers=1)
         
     def forward_time(self, y, base_shape):
         B, channel, K, L = base_shape

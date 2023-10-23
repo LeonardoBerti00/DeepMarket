@@ -2,16 +2,17 @@ import math
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 import torch
+from config import Configuration
 import constants as cst
 
 
 class DiffusionAB(ABC):
     """An abstract class for loss functions."""
 
-    def __init__(self, config, alphas_dash, betas):
+    def __init__(self, config: Configuration):
         self.config = config
-        self.alphas_dash = alphas_dash
-        self.betas = betas
+        self.alphas_dash = config.ALPHAS_DASH
+        self.betas = config.BETAS
 
     @abstractmethod
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
