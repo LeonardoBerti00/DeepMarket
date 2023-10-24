@@ -55,12 +55,14 @@ class NNEngine(L.LightningModule):
         x_0, cond = self.augment(x_0, cond)
 
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
-        x_T, context = self.diffuser.reparametrized_forward(x_0, self.diffusion_steps-1, **{
-            "conditioning": cond
-        })
+        x_T, context = self.diffuser.reparametrized_forward(x_0, 
+                                                            self.diffusion_steps-1, 
+                                                            **{
+                                                                "conditioning": cond
+                                                            })
 
         # reverse
-        recon = self.diffuser(x_T, context, cond)
+        recon = self.diffuser(x_T, context)
         
         return recon
 
