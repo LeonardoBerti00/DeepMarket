@@ -20,7 +20,7 @@ class Configuration:
 
         self.SPLIT_RATES = (.65, .05, .3)
 
-        self.CHOSEN_MODEL = cst.Models.DiT
+        self.CHOSEN_MODEL = cst.Models.CSDI
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
@@ -71,6 +71,9 @@ class Configuration:
         self.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM] = 10
         self.CSDI_HYPERPARAMETERS[CSDIParameters.CHANNELS] = 2
         self.CSDI_HYPERPARAMETERS[CSDIParameters.DIFFUSION_STEP_EMB_DIM] = 128
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_TIME_DIM] = 128
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_FEATURE_DIM] = 16
+        self.CSDI_HYPERPARAMETERS[CSDIParameters.LAYERS] = 1
 
     def wandb_config_setup(self):
         self.WANDB_SWEEP_NAME = self.cf_name_format().format(

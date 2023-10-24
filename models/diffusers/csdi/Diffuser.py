@@ -46,6 +46,8 @@ class CSDIEpsilon(nn.Module):
 
     def forward(self, x, cond_info, diffusion_step):
         B, inputdim, K, L = x.shape
+        
+        print(f'x.shape = {x.shape}')
 
         x = x.reshape(B, inputdim, K * L)
         x = self.input_projection(x)
