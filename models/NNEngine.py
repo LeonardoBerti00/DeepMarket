@@ -37,9 +37,10 @@ class NNEngine(L.LightningModule):
         self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
         self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
 
+        # TODO: Why not choose this augmenter from the config?
         if (self.IS_AUGMENTATION_X):
             self.augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
-        elif (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
+        if (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
             self.augmenter_cond = LSTMAugmenter(config, cst.COND_SIZE)
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
