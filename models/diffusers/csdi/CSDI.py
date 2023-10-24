@@ -23,8 +23,6 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
         self.embedding_time_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_TIME_DIM]
         self.embedding_feature_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_FEATURE_DIM]
-        print(self.embedding_time_dim)
-        print(self.embedding_feature_dim)
         self.layers = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.LAYERS]
         self.side_dim = self.embedding_time_dim + self.embedding_feature_dim + 1
         # TODO: change into dynamic input dim
