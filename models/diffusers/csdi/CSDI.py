@@ -33,14 +33,16 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         # here the conditioning and input are merged together again
         # because CSDI needs the mask on the entire input
         assert 'conditioning' in kwargs
-        
-        cond = kwargs['conditioning']
-        whole_input = torch.cat([cond, input])
+        cond: torch.Tensor = kwargs['conditioning']
+        # both conditioning and input need to have the same number of features
+        assert cond.shape[-1] == input.shape[-1]
+    
+        whole_input = torch.cat([cond, input], dim=1)
         
         cond_mask = torch.zeros(whole_input.shape)
-        cond_mask[:, :len(cond), :] = 1
-        
-        x_t, eps = super().reparameterized_forward(whole_input, diffusion_steps)
+        cond_mask[:, :self.cond_seq_size + 1, :] = 1
+                        
+        x_t, eps = DiffusionAB.reparametrized_forward(self, whole_input, diffusion_steps)
         x_t = x_t * (1 - cond_mask)
 
         cond = whole_input * cond_mask
@@ -86,7 +88,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         return pe
 
 
-    def get_side_info(self, observed_tp, cond_mask, features):
+    def get_side_info(self, observed_tp: torch.Tensor, cond_mask: torch.Tensor, features: torch.Tensor):
         B, K, L = cond_mask.shape
 
         time_embed = self.time_embedding(observed_tp, self.embedding_time_dim)  # (B,L,emb)

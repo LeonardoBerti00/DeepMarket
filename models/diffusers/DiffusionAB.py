@@ -13,6 +13,10 @@ class DiffusionAB(ABC):
         self.config = config
         self.alphas_dash = config.ALPHAS_DASH
         self.betas = config.BETAS
+        
+        self.x_SEQ_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE]
+        self.SEQ_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
+        self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
 
     @abstractmethod
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
