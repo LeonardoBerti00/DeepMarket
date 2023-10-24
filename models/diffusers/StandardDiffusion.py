@@ -17,9 +17,6 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
-        self.x_SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
-        self.SEQ_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
-        self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
 
         if config.IS_AUGMENTATION_X:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
