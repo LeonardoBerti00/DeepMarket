@@ -3,28 +3,30 @@ from scipy.stats import entropy
 import scipy.stats as stats
 
 ######################### Jensen-Shannon Divergence #########################
-# It is used to measure the similarity between two probability distributions #
+# It is used to measure the similarity between two probability distributions ---> 0: same distribution, 1: different distribution #
 
 class JSDCalculator:
     def __init__(self, historical_data, generated_data, bins=10):
-        self.p_1 = np.mean(historical_data, axis=0)
-        self.q_1 = np.mean(generated_data, axis=0)
+        self.p_1 = np.mean(historical_data.numpy(), axis=0)
+        self.q_1 = np.mean(generated_data.numpy(), axis=0)
         self.bins = bins
-
+    
+    # to calculate the JSD between two probability distributions
     def jsd(self):
-        # calculate the average distribution
         m = 0.5 * (self.p_1 + self.q_1)
-        # calculate the divergence of Kullback-Leibler between each distribution and the average
-        dkl_p = entropy(self.p_1, m, base=2)
-        dkl_q = entropy(self.q_1, m, base=2)
-        # Calculate the JSD
-        jsd = 0.5 * (dkl_p + dkl_q)
+        jsd = np.sqrt(0.5 * (entropy(self.p_1, m) + entropy(self.q_1, m)))
         return jsd
 
-    def calculate_jsd(self):
-        # Calcola la JSD tra le distribuzioni empiriche
-        jsd = self.jsd()
-        print(f"JSD tra le distribuzioni empiriche: {jsd:.3f}")
+    # to calculate the JSD between two probability distributions for each feature
+    def jsd_for_each_feature(self):
+        jsd_list = []
+        for i in range(self.p_1.shape[0]):
+            p_i = self.p_1[i]
+            q_i = self.q_1[i]
+            m_i = 0.5 * (p_i + q_i)
+            jsd_i = np.sqrt(0.5 * (entropy(p_i, m_i) + entropy(q_i, m_i)))
+            jsd_list.append(jsd_i)
+        return jsd_list
 
 
 ######################### Kolmogorov-Smironov statistic (test) #########################
@@ -32,8 +34,8 @@ class JSDCalculator:
 
 class KSCalculator:
     def __init__(self, historical_data, generated_data):
-        self.p_1 = np.mean(historical_data, axis=0)
-        self.q_1 = np.mean(generated_data, axis=0)
+        self.p_1 = np.mean(historical_data.numpy(), axis=0)
+        self.q_1 = np.mean(generated_data.numpy(), axis=0)
 
     def calculate_ks(self):
         ks_stat, p_value = stats.ks_2samp(self.p_1, self.q_1)
