@@ -4,6 +4,7 @@ from typing import Dict, Tuple
 import torch
 from config import Configuration
 import constants as cst
+from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 
 class DiffusionAB(ABC):
@@ -38,4 +39,3 @@ class DiffusionAB(ABC):
         std = (1 - self.alphas_dash[diffusion_step]) * cov_matrix
         x_T = torch.distributions.Normal(mean, std).rsample().to(cst.DEVICE)
         return x_T, {'mean': mean, 'std': std}
-    

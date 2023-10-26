@@ -42,10 +42,13 @@ class ResidualBlock(nn.Module):
         y = y.reshape(B, L, channel, K).permute(0, 2, 3, 1).reshape(B, channel, K * L)
         return y
 
-    def forward(self, x, cond_info, diffusion_emb):
+    def forward(self, x: torch.Tensor, cond_info: torch.Tensor, diffusion_emb):
         B, channel, K, L = x.shape
+        print(f'x.shape = {x.shape}')
         base_shape = x.shape
         x = x.reshape(B, channel, K * L)
+        
+        print(f'cond_info.shape={cond_info.shape}')
 
         diffusion_emb = self.diffusion_projection(diffusion_emb).unsqueeze(-1)  # (B,channel,1)
         y = x + diffusion_emb
@@ -54,8 +57,9 @@ class ResidualBlock(nn.Module):
         y = self.forward_feature(y, base_shape)  # (B,channel,K*L)
         y = self.mid_projection(y)  # (B,2*channel,K*L)
 
+        cond_info = cond_info.permute(0,3,2,1)
         _, cond_dim, _, _ = cond_info.shape
-        cond_info = cond_info.reshape(B, cond_dim, K * L)
+        cond_info = cond_info.reshape(B, cond_dim, -1)
         cond_info = self.cond_projection(cond_info)  # (B,2*channel,K*L)
         y = y + cond_info
 

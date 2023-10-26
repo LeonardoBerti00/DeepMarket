@@ -9,7 +9,7 @@ from utils.utils import Conv1d_with_init
 
 class CSDIEpsilon(nn.Module):
     
-    def __init__(self, num_steps=100, embedding_dim=128, side_dim=145, n_heads=2, input_dim=2, layers=1):
+    def __init__(self, num_steps=10, embedding_dim=128, side_dim=129, n_heads=2, input_dim=2, layers=1):
         super(CSDIEpsilon, self).__init__()
         
         # TODO: maybe make it a parameter
@@ -44,17 +44,20 @@ class CSDIEpsilon(nn.Module):
         
 
 
-    def forward(self, x, cond_info, diffusion_step):
+    def forward(self, x: torch.Tensor, cond_info: torch.Tensor, diffusion_step):
+        print(diffusion_step.shape)
         B, inputdim, K, L = x.shape
         
-        print(f'x.shape = {x.shape}')
-
         x = x.reshape(B, inputdim, K * L)
+        
         x = self.input_projection(x)
+        print(f'x.shape after 1st conv1d = {x.shape}')
         x = F.relu(x)
         x = x.reshape(B, self.channels, K, L)
 
         diffusion_emb = self.diffusion_embedding(diffusion_step)
+        
+        print(f'diff_embedding.shape={diffusion_emb.shape}')
 
         skip = []
         for layer in self.residual_layers:
