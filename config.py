@@ -60,7 +60,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_HIDDEN_SIZE] = 64
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
-        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "full"    #it can be full or 'only_event'
+        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "only_event"    #it can be full or 'only_event'
 
         self.ALPHAS_DASH, self.BETAS = None, None
 

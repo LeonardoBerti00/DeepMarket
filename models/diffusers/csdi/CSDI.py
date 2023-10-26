@@ -4,6 +4,7 @@ from models.diffusers.DiffusionAB import DiffusionAB
 from models.diffusers.csdi.Diffuser import CSDIEpsilon
 import torch.nn as nn
 import torch
+import numpy as np
 import constants as cst
 
 """
@@ -58,23 +59,26 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         whole_input = context['whole_input']
         cond_mask = context['cond_mask']
         is_train = context.get('is_train', True)
-        set_t = context.get('t', -1)
 
         # whole_input[:,:,0] is the timestamp of the data 
         side_info = self.get_side_info(whole_input[:,:,0], cond_mask).permute(0,2,3,1)
                 
-        B = x_T.shape[0]
-        if not is_train:  # for validation
-            t = (torch.ones(B) * set_t).long().to(self.device)
-        else:
-            t = torch.randint(0, self.num_steps, [B]).to(self.device)
-
         cond = cond.unsqueeze(-1)
         x_T = x_T.unsqueeze(-1)
         total_input = torch.cat([cond, x_T], dim=-1) # (B,L,K,2)
         total_input = total_input.permute(0, 3, 2, 1)  # (B,2,K,L)
-
-        return self.diffuser(total_input, side_info, t)  # (B,K,L)
+        
+        if is_train:
+            t = torch.randint(0, self.num_steps, [x_T.shape[0]]).to(self.device)
+            recon = self.diffuser(total_input, side_info, t).permute(0,2,1).unsqueeze(0)
+        else:
+            recon = list()
+            for set_t in range(self.num_steps):
+                t = (torch.ones(x_T.shape[0]) * set_t).long().to(self.device)
+                recon.append(self.diffuser(total_input, side_info, t).permute(0,2,1))
+            recon = torch.from_numpy(np.array(recon))
+                
+        return recon, {'cond_mask': cond_mask}
         
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """
@@ -101,26 +105,21 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         return side_info
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
-        assert 'is_train' in kwargs        
-        return self.calc_loss(true, recon) if kwargs['is_train'] else self.calc_loss_valid(true, recon)
-   
-    
-    def calc_loss_valid(self, true: torch.Tensor, recon: torch.Tensor):
+        assert 'cond_mask' in kwargs
+        assert 'conditioning' in kwargs
+        cond_mask: torch.Tensor = kwargs['cond_mask']
+        real_cond: torch.Tensor = kwargs['conditioning']
+        # TODO: shape mismatch fra cond_mask e noise
+        noise = torch.rand_like(torch.cat([real_cond, true], dim=1))
+        print(f'noise.shape = {noise.shape}')
+        target_mask = torch.ones(cond_mask.shape) - cond_mask
+        print(f'recon.shape = {recon.shape}')
         loss_sum = 0
-        for t in range(self.num_steps):  # calculate loss for all t
-            loss = self.calc_loss(true, recon)
-            loss_sum += loss.detach()
-        return loss_sum / self.num_steps
-    
-    def calc_loss(self, true: torch.Tensor, pred: torch.Tensor):
-        noise = torch.randn_like(true)
-        target_mask = observed_mask - cond_mask
-        residual = (noise - pred) * target_mask
-        num_eval = target_mask.sum()
-        loss = (residual ** 2).sum() / (num_eval if num_eval > 0 else 1)
-        return loss
-    
-    
-    
-
-
+        for t in range(recon.shape[0]):
+            print(f'recon[t].shape = {recon[t].shape}')
+            residual = (noise - recon[t]) * target_mask
+            num_eval = target_mask.sum()
+            loss = (residual ** 2).sum() / (num_eval if num_eval > 0 else 1)
+            loss_sum += loss.item()
+        
+        return loss_sum / recon.shape[0]

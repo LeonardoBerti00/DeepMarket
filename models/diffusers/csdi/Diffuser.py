@@ -51,14 +51,11 @@ class CSDIEpsilon(nn.Module):
         x = x.reshape(B, inputdim, K * L)
         
         x = self.input_projection(x)
-        print(f'x.shape after 1st conv1d = {x.shape}')
         x = F.relu(x)
         x = x.reshape(B, self.channels, K, L)
 
         diffusion_emb = self.diffusion_embedding(diffusion_step)
         
-        print(f'diff_embedding.shape={diffusion_emb.shape}')
-
         skip = []
         for layer in self.residual_layers:
             x, skip_connection = layer(x, cond_info, diffusion_emb)

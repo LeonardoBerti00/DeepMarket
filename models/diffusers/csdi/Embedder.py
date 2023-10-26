@@ -34,4 +34,7 @@ class CSDIEmbeddingDiffusionStep(AugmenterAB, nn.Module):
     
     def augment(self, input: torch.Tensor):
         return super().augment(input)
+    
+    def deaugment(self, input: torch.Tensor):
+        return input
 

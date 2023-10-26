@@ -1,3 +1,4 @@
+from typing import Dict, Tuple
 from config import Configuration
 from models.diffusers.DiffusionAB import DiffusionAB
 import torch
@@ -10,7 +11,7 @@ from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-
+import numpy as np
 
 class NNEngine(L.LightningModule):
     
@@ -41,36 +42,45 @@ class NNEngine(L.LightningModule):
         # TODO: Why not choose this augmenter from the config?
         if (self.IS_AUGMENTATION_X):
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
-        if (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
+        if (self.IS_AUGMENTATION_COND):
             self.conditioning_augmenter = LSTMAugmenter(config, cst.COND_SIZE)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
 
 
     def forward(self, cond, x_0, is_train=True):
-
         #print mean of both
         print(torch.mean(cond), torch.mean(x_0))
-
+        # save the real input for future
+        real_input, real_cond = x_0, cond
         # augment
         x_0, cond = self.augment(x_0, cond)
-
+        # get the diffusion step t
         t = self.diffusion_steps - 1
         if isinstance(self.diffuser, CSDIDiffuser.__class__):
             t = torch.randint(0, self.diffusion_steps - 1) if is_train else t
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
         x_T, context = self.diffuser.reparametrized_forward(x_0, t, **{ "conditioning": cond })
-
         # reverse
-        recon = self.diffuser(x_T, context.update({'is_train': is_train, 't': t}))
-        
-        return recon
+        context.update({'is_train': is_train})
+        recon, reverse_context = self.diffuser(x_T, context)
+        # de-augment the denoised input (recon)
+        recon = self.deaugment(recon, real_input)
+        reverse_context.update({'conditioning': real_cond})
+        # return the deaugmented denoised input and the reverse context
+        return recon, reverse_context
+    
+    # TODO: optimize (vectorized code)
+    def deaugment(self, reversed_input: torch.Tensor, real_input: torch.Tensor):
+        deaugmented = torch.zeros(reversed_input.shape[:-1] + (real_input.shape[-1],))
+        for t in range(reversed_input.shape[0]):
+            deaugmented[t] = self.feature_augmenter.deaugment(reversed_input[t])
+        return deaugmented
 
-    def augment(self, x_0, cond):
+    def augment(self, x_0: torch.Tensor, cond: torch.Tensor):
         if self.IS_AUGMENTATION_X:
             x_0 = self.feature_augmenter.augment(x_0)
         # x_0.shape = (batch_size, K, latent_dim)
-
         if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
             cond = self.conditioning_augmenter.augment(cond)
         # cond.shape = (batch_size, cond_size, latent_dim)
@@ -83,8 +93,9 @@ class NNEngine(L.LightningModule):
     def training_step(self, input, batch_idx):
         x_0 = input[1]
         cond = input[0]
-        recon = self.forward(cond, x_0, is_train=True)
-        loss = self.loss(x_0, recon, **{'is_train': True})
+        recon, reverse_context = self.forward(cond, x_0, is_train=True)
+        reverse_context.update({'is_train': True})
+        loss = self.loss(x_0, recon, **reverse_context)
         self.log('train_loss', loss)
         self.train_losses.append(loss)
         return loss
@@ -92,8 +103,9 @@ class NNEngine(L.LightningModule):
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
         cond = input[0]
-        recon = self.forward(cond, x_0, is_train=False)
-        loss = self.loss(x_0, recon, **{'is_train': False})
+        recon, reverse_context = self.forward(cond, x_0, is_train=False)
+        reverse_context.update({'is_train': False})
+        loss = self.loss(x_0, recon, **reverse_context)
         self.log('val_loss', loss)
         self.val_losses.append(loss)
 
@@ -102,16 +114,18 @@ class NNEngine(L.LightningModule):
         # (2) copies EMA parameters to model
         # (3) after exiting the `with`, restore original parameters to resume training later
         with self.ema.average_parameters():
-            recon = self.forward(cond, x_0)
-            ema_loss = self.loss(x_0, recon)
+            recon, reverse_context = self.forward(cond, x_0, is_train=False)
+            reverse_context.update({'is_train': False})
+            ema_loss = self.loss(x_0, recon, **reverse_context)
             self.val_ema_losses.append(ema_loss)
         return loss
 
     def test_step(self, input, batch_idx):
         x_0 = input[1]
         cond = input[0]
-        recon = self.forward(cond, x_0)
-        loss = self.loss(x_0, recon)
+        recon, reverse_context = self.forward(cond, x_0, is_train=False)
+        reverse_context.update({'is_train': False})
+        loss = self.loss(x_0, recon, **reverse_context)
         self.log('test_loss', loss)
         self.test_losses.append(loss)
 
@@ -120,8 +134,9 @@ class NNEngine(L.LightningModule):
         # (2) copies EMA parameters to model
         # (3) after exiting the `with`, restore original parameters to resume training later
         with self.ema.average_parameters():
-            recon = self.forward(cond, x_0)
-            ema_loss = self.loss(x_0, recon)
+            recon, reverse_context = self.forward(cond, x_0, is_train=False)
+            reverse_context.update({'is_train': False})
+            ema_loss = self.loss(x_0, recon, **reverse_context)
             self.val_ema_losses.append(ema_loss)
         return loss
 

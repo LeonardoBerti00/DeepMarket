@@ -9,3 +9,8 @@ class AugmenterAB(ABC):
     @abstractmethod
     def augment(self, input: torch.Tensor):
         pass
+    
+    
+    @abstractmethod
+    def deaugment(self, input: torch.Tensor):
+        pass

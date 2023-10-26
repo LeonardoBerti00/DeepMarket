@@ -9,10 +9,7 @@ class ResidualBlock(nn.Module):
     
     def __init__(self, side_dim, channels, diffusion_embedding_dim, nheads):
         super(ResidualBlock, self).__init__()
-        
-        print(f'diffusion_embedding_dim = {diffusion_embedding_dim}')
-        print(f'nheads = {nheads}')
-        
+                
         self.diffusion_projection = nn.Linear(diffusion_embedding_dim, channels)
         self.cond_projection = Conv1d_with_init(side_dim, 2 * channels, 1)
         self.mid_projection = Conv1d_with_init(channels, 2 * channels, 1)
@@ -44,12 +41,9 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, cond_info: torch.Tensor, diffusion_emb):
         B, channel, K, L = x.shape
-        print(f'x.shape = {x.shape}')
         base_shape = x.shape
         x = x.reshape(B, channel, K * L)
         
-        print(f'cond_info.shape={cond_info.shape}')
-
         diffusion_emb = self.diffusion_projection(diffusion_emb).unsqueeze(-1)  # (B,channel,1)
         y = x + diffusion_emb
 
