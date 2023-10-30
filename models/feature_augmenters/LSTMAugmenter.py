@@ -15,8 +15,6 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
         augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.input_size = input_size
         self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=1, batch_first=True, dropout=dropout)
-        print(f'augment_dim = {augment_dim}')
-        print(f'input_size = {input_size}')
         self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=1, batch_first=True, dropout=dropout)
         
     def forward(self, input):

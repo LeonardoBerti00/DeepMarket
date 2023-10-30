@@ -59,7 +59,6 @@ class StandardDiffusion(nn.Module, DiffusionAB):
     def reverse_reparameterized(self, x_T, cond, eps_true):
         x_t = x_T
         step_losses = []
-        print("x_t shape: ", x_t.shape)
         for t in range(1, self.diffusion_steps):
             beta_t = self.betas[t]
             alpha_t = 1 - beta_t

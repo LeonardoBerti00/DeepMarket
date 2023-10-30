@@ -40,6 +40,7 @@ class NNEngine(L.LightningModule):
         self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
 
         # TODO: Why not choose this augmenter from the config?
+        # TODO: make both conditioning as default to switch to nn.Identity
         if (self.IS_AUGMENTATION_X):
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
         if (self.IS_AUGMENTATION_COND):
@@ -49,8 +50,6 @@ class NNEngine(L.LightningModule):
 
 
     def forward(self, cond, x_0, is_train=True):
-        #print mean of both
-        print(torch.mean(cond), torch.mean(x_0))
         # save the real input for future
         real_input, real_cond = x_0, cond
         # augment
@@ -62,7 +61,7 @@ class NNEngine(L.LightningModule):
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
         x_T, context = self.diffuser.reparametrized_forward(x_0, t, **{ "conditioning": cond })
         # reverse
-        context.update({'is_train': is_train})
+        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter})
         recon, reverse_context = self.diffuser(x_T, context)
         # de-augment the denoised input (recon)
         recon = self.deaugment(recon, real_input)
@@ -81,12 +80,9 @@ class NNEngine(L.LightningModule):
         if self.IS_AUGMENTATION_X:
             x_0 = self.feature_augmenter.augment(x_0)
         # x_0.shape = (batch_size, K, latent_dim)
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
+        if self.IS_AUGMENTATION_COND:
             cond = self.conditioning_augmenter.augment(cond)
         # cond.shape = (batch_size, cond_size, latent_dim)
-
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
-            cond = self.feature_augmenter.augment(cond)
         return x_0, cond
 
 

@@ -1,11 +1,14 @@
-from typing import Dict, Tuple
-from config import Configuration
-from models.diffusers.DiffusionAB import DiffusionAB
-from models.diffusers.csdi.Diffuser import CSDIEpsilon
-import torch.nn as nn
-import torch
+from typing import Dict
+
 import numpy as np
+import torch
+import torch.nn as nn
+
 import constants as cst
+from config import Configuration
+from models.diffusers.csdi.Diffuser import CSDIEpsilon
+from models.diffusers.DiffusionAB import DiffusionAB
+from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 """
     Adapted from https://github.com/ermongroup/CSDI/tree/main
@@ -54,11 +57,13 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         assert 'conditioning' in context
         assert 'cond_mask' in context
         assert 'whole_input' in context
+        assert 'cond_augmenter' in context
         
         cond = context['conditioning']
         whole_input = context['whole_input']
         cond_mask = context['cond_mask']
         is_train = context.get('is_train', True)
+        cond_augmenter: AugmenterAB = context['cond_augmenter']
 
         # whole_input[:,:,0] is the timestamp of the data 
         side_info = self.get_side_info(whole_input[:,:,0], cond_mask).permute(0,2,3,1)
@@ -78,7 +83,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
                 recon.append(self.diffuser(total_input, side_info, t).permute(0,2,1))
             recon = torch.from_numpy(np.array(recon))
                 
-        return recon, {'cond_mask': cond_mask}
+        return recon, {'cond_mask': cond_augmenter.deaugment(cond_mask)}
         
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """
@@ -109,17 +114,12 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         assert 'conditioning' in kwargs
         cond_mask: torch.Tensor = kwargs['cond_mask']
         real_cond: torch.Tensor = kwargs['conditioning']
-        # TODO: shape mismatch fra cond_mask e noise
         noise = torch.rand_like(torch.cat([real_cond, true], dim=1))
-        print(f'noise.shape = {noise.shape}')
         target_mask = torch.ones(cond_mask.shape) - cond_mask
-        print(f'recon.shape = {recon.shape}')
         loss_sum = 0
         for t in range(recon.shape[0]):
-            print(f'recon[t].shape = {recon[t].shape}')
             residual = (noise - recon[t]) * target_mask
             num_eval = target_mask.sum()
             loss = (residual ** 2).sum() / (num_eval if num_eval > 0 else 1)
-            loss_sum += loss.item()
-        
+            loss_sum += loss
         return loss_sum / recon.shape[0]
