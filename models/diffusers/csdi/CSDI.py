@@ -33,7 +33,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         self.input_dim = 2
         self.diffuser = CSDIEpsilon(self.num_steps, self.embedding_dim, self.side_dim, self.n_heads, self.input_dim, self.layers)
         
-    def reparametrized_forward(self, input: torch.Tensor, diffusion_step: int, **kwargs):
+    def forward_reparametrized(self, input: torch.Tensor, diffusion_step: int, **kwargs):
         # here the conditioning and input are merged together again
         # because CSDI needs the mask on the entire input
         assert 'conditioning' in kwargs
@@ -46,7 +46,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         cond_mask = torch.zeros(whole_input.shape)
         cond_mask[:, :self.cond_seq_size + 1, :] = 1
                         
-        x_t, eps = DiffusionAB.reparametrized_forward(self, whole_input, diffusion_step)
+        x_t, eps = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
         x_t = x_t * (1 - cond_mask)
 
         cond = whole_input * cond_mask

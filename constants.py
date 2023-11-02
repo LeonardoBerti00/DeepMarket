@@ -20,7 +20,7 @@ class LearningHyperParameter(str, Enum):
     AUGMENT_DIM = "AUGMENT_DIM"
     S = "s"
     LAMBDA = "lambda"
-    COND_TYPE = "event_only"
+    COND_TYPE = "event_only"                    #or event_only or full
     EMB_T_DIM = "emb_t_dim"
     DiT_DEPTH = "dit_depth"
     DiT_MLP_RATIO = "dit_mlp_ratio"
@@ -115,7 +115,6 @@ PRECISION = 32
 N_LOB_LEVELS = 3
 LEN_LEVEL = 4
 LEN_EVENT = 5
-COND_SIZE = LEN_LEVEL*N_LOB_LEVELS + LEN_EVENT if LearningHyperParameter.COND_TYPE != 'event_only' else LEN_EVENT
 
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'

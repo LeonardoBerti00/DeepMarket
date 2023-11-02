@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, Tuple
 from config import Configuration
 from models.diffusers.DiffusionAB import DiffusionAB
@@ -6,6 +7,8 @@ import lightning as L
 import constants as cst
 from constants import LearningHyperParameter
 import time
+
+from models.diffusers.StandardDiffusion import StandardDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
@@ -20,7 +23,7 @@ class NNEngine(L.LightningModule):
         """
         This is the skeleton of the diffusion models.
         """
-        self.diffuser: DiffusionAB = pick_diffuser(config, config.CHOSEN_MODEL)
+        self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
@@ -35,7 +38,7 @@ class NNEngine(L.LightningModule):
         self.test_losses = []
         self.test_ema_losses = []
         self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
-        self.alphas_dash, self.betas = config.ALPHAS_DASH, config.BETAS
+        self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
         self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
         self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
 
@@ -44,31 +47,39 @@ class NNEngine(L.LightningModule):
         if (self.IS_AUGMENTATION_X):
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
         if (self.IS_AUGMENTATION_COND):
-            self.conditioning_augmenter = LSTMAugmenter(config, cst.COND_SIZE)
-        
+            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE)
+
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
 
 
     def forward(self, cond, x_0, is_train=True):
         # save the real input for future
-        real_input, real_cond = x_0, cond
+        real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
+
         # augment
         x_0, cond = self.augment(x_0, cond)
-        # get the diffusion step t
+
         t = self.diffusion_steps - 1
         if isinstance(self.diffuser, CSDIDiffuser.__class__):
             t = torch.randint(0, self.diffusion_steps - 1) if is_train else t
+        elif isinstance(self.diffuser, StandardDiffusion.__class__):
+            t = torch.randint(0, self.diffusion_steps - 1) if is_train else t
+
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
-        x_T, context = self.diffuser.reparametrized_forward(x_0, t, **{ "conditioning": cond })
+        x_T, context = self.diffuser.forward_reparametrized(x_0, t, **{ "conditioning": cond })
+
         # reverse
-        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter})
+        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': t})
         recon, reverse_context = self.diffuser(x_T, context)
+
         # de-augment the denoised input (recon)
         recon = self.deaugment(recon, real_input)
+
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
         return recon, reverse_context
-    
+
+
     # TODO: optimize (vectorized code)
     def deaugment(self, reversed_input: torch.Tensor, real_input: torch.Tensor):
         deaugmented = torch.zeros(reversed_input.shape[:-1] + (real_input.shape[-1],))
@@ -80,9 +91,12 @@ class NNEngine(L.LightningModule):
         if self.IS_AUGMENTATION_X:
             x_0 = self.feature_augmenter.augment(x_0)
         # x_0.shape = (batch_size, K, latent_dim)
-        if self.IS_AUGMENTATION_COND:
+        if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
             cond = self.conditioning_augmenter.augment(cond)
         # cond.shape = (batch_size, cond_size, latent_dim)
+
+        if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
+            cond = self.feature_augmenter.augment(cond)
         return x_0, cond
 
 
