@@ -129,7 +129,7 @@ def print_setup(config):
     print("Is augmented x: ", config.IS_AUGMENTATION_X)
     print("Is augmented conditional: ", config.IS_AUGMENTATION_COND)
     print("Conditioning type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE])
-    if config.CHOSEN_MODEL == "DDPM":
+    if config.CHOSEN_MODEL.name == "DiT":
         print("Conditioning DiT type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DiT_TYPE])
         print("Masked sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE])
 

@@ -12,6 +12,5 @@ HP_DiT = {
     cst.LearningHyperParameter.OPTIMIZER.value: {'values': [cst.Optimizers.ADAM.value, cst.Optimizers.SGD.value, cst.Optimizers.LION.value]},
     cst.LearningHyperParameter.DiT_DEPTH.value: {'values': [2, 4, 6, 8, 12]},
     cst.LearningHyperParameter.DiT_NUM_HEADS.value: {'values': [4, 6, 12]},
-    cst.LearningHyperParameter.DiT_HIDDEN_SIZE.value: {'values': [32, 64, 128]},
     cst.LearningHyperParameter.DiT_TYPE.value: {"adaln_zero", "concatenation", "cross_attention"}
 }

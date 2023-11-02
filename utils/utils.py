@@ -1,22 +1,22 @@
 import math
 import torch
-import wandb
+import constants as cst
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
 def noise_scheduler(diffusion_steps, s):
-    alphas_dash = []
+    alphas_cumprod = []
     f_0 = math.cos((s/(1+s) * (math.pi/2)))**2
     for t in range(1, diffusion_steps+1):
         f_t = math.cos(((t/diffusion_steps+s)/(s+1) * (math.pi/2)))**2
-        alphas_dash.append(f_t / f_0)
-    betas = [1 - (alphas_dash[i]/alphas_dash[i-1]) for i in range(1, len(alphas_dash))]
+        alphas_cumprod.append(f_t / f_0)
+    betas = [1 - (alphas_cumprod[i]/alphas_cumprod[i-1]) for i in range(1, len(alphas_cumprod))]
     betas.insert(0, 1)
-    return alphas_dash, betas
+    return alphas_cumprod, betas
 
 #formula taken from "Denoising Diffusion Probabilistic Models"
-def compute_mean_tilde_t(x_0, x_T, alpha_dash_t, alpha_dash_t_1, beta_t, alpha_t):
-    # alpha_dash_t_1 is alpha_dash(t-1) 
-    return math.sqrt(alpha_dash_t_1)*beta_t*x_0 / (1-alpha_dash_t) + math.sqrt(alpha_t)*(1-alpha_dash_t_1)*x_T / (1-alpha_dash_t)
+def compute_mean_tilde_t(x_0, x_T, alpha_cumprod_t, alpha_cumprod_t_1, beta_t, alpha_t):
+    # alpha_cumprod_t_1 is alpha_cumprod(t-1)
+    return math.sqrt(alpha_cumprod_t_1)*beta_t*x_0 / (1-alpha_cumprod_t) + math.sqrt(alpha_t)*(1-alpha_cumprod_t_1)*x_T / (1-alpha_cumprod_t)
 
 
 def sinusoidal_positional_embedding(token_sequence_size, token_embedding_dim, n=10000.0):
@@ -34,7 +34,7 @@ def sinusoidal_positional_embedding(token_sequence_size, token_embedding_dim, n=
     embeddings[:, 0::2] = torch.sin(positions/denominators) # sin(pos/10000^(2i/d_model))
     embeddings[:, 1::2] = torch.cos(positions/denominators) # cos(pos/10000^(2i/d_model))
 
-    return embeddings
+    return embeddings.to(cst.DEVICE)
 
 
 def Conv1d_with_init(in_channels, out_channels, kernel_size):

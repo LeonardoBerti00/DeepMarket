@@ -20,12 +20,10 @@ class Configuration:
 
         self.SPLIT_RATES = (.65, .05, .3)
 
-        self.CHOSEN_MODEL = cst.Models.CSDI
+        self.CHOSEN_MODEL = cst.Models.DiT
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
-
-
 
         self.HP_SEARCH_METHOD = 'bayes'  # 'bayes'
 
@@ -58,11 +56,10 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
-        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_HIDDEN_SIZE] = 64
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
-        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "only_event"    #it can be full or 'only_event'
-
-        self.ALPHAS_DASH, self.BETAS = None, None
+        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "full"    #it can be full or 'only_event'
+        self.ALPHAS_CUMPROD, self.BETAS = None, None
+        self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT if LearningHyperParameter.COND_TYPE != 'event_only' else cst.LEN_EVENT
 
         #da cmbiare come per DiT
         self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}

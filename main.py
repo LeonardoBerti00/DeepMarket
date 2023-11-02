@@ -20,7 +20,7 @@ def set_torch():
 if __name__ == "__main__":
     set_torch()
     config = Configuration()
-    config.ALPHAS_DASH, config.BETAS = noise_scheduler(
+    config.ALPHAS_CUMPROD, config.BETAS = noise_scheduler(
         diffusion_steps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS],
         s=config.HYPER_PARAMETERS[cst.LearningHyperParameter.S]
     )
