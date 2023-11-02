@@ -3,15 +3,15 @@ import torch
 import constants as cst
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
-def noise_scheduler(diffusion_steps, s):
+def noise_scheduler(num_timesteps, s):
     alphas_cumprod = []
     f_0 = math.cos((s/(1+s) * (math.pi/2)))**2
-    for t in range(1, diffusion_steps+1):
-        f_t = math.cos(((t/diffusion_steps+s)/(s+1) * (math.pi/2)))**2
+    for t in range(1, num_timesteps+1):
+        f_t = math.cos(((t/num_timesteps+s)/(s+1) * (math.pi/2)))**2
         alphas_cumprod.append(f_t / f_0)
     betas = [1 - (alphas_cumprod[i]/alphas_cumprod[i-1]) for i in range(1, len(alphas_cumprod))]
     betas.insert(0, 1)
-    return alphas_cumprod, betas
+    return torch.Tensor(alphas_cumprod).to(cst.DEVICE), torch.Tensor(betas).to(cst.DEVICE)
 
 #formula taken from "Denoising Diffusion Probabilistic Models"
 def compute_mean_tilde_t(x_0, x_T, alpha_cumprod_t, alpha_cumprod_t_1, beta_t, alpha_t):

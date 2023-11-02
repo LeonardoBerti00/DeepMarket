@@ -4,7 +4,7 @@ HP_DiT = {
     cst.LearningHyperParameter.BATCH_SIZE.value: {'values': [64, 128, 256]},
     cst.LearningHyperParameter.CONDITIONAL_DROPOUT.value: {'values': [0.1, 0.2]},
     cst.LearningHyperParameter.DROPOUT.value: {'values': [0, 0.1]},
-    cst.LearningHyperParameter.DIFFUSION_STEPS.value: {'values': [1000, 4000]},
+    cst.LearningHyperParameter.NUM_TIMESTEPS.value: {'values': [1000, 4000]},
     cst.LearningHyperParameter.AUGMENT_DIM.value: {'values': [32, 64]},
     cst.LearningHyperParameter.MASKED_SEQ_SIZE.value: {'values': [1, 10]},
     cst.LearningHyperParameter.COND_TYPE.value: {'values': ['full', 'only_event']},

@@ -14,7 +14,8 @@ from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-import numpy as np
+from models.sampler import LossSecondMomentResampler
+
 
 class NNEngine(L.LightningModule):
     
@@ -37,7 +38,7 @@ class NNEngine(L.LightningModule):
         self.val_ema_losses = []
         self.test_losses = []
         self.test_ema_losses = []
-        self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
+        self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
         self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
         self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
         self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
@@ -46,10 +47,12 @@ class NNEngine(L.LightningModule):
         # TODO: make both conditioning as default to switch to nn.Identity
         if (self.IS_AUGMENTATION_X):
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
-        if (self.IS_AUGMENTATION_COND):
+        if (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
             self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE)
 
-        self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
+        self.ema_params = copy.deepcopy(self.parameters())
+        self.ema = ExponentialMovingAverage(self.ema_params, decay=0.999)
+        self.sampler = LossSecondMomentResampler(self.num_timesteps)
 
 
     def forward(self, cond, x_0, is_train=True):
@@ -59,17 +62,17 @@ class NNEngine(L.LightningModule):
         # augment
         x_0, cond = self.augment(x_0, cond)
 
-        t = self.diffusion_steps - 1
-        if isinstance(self.diffuser, CSDIDiffuser.__class__):
-            t = torch.randint(0, self.diffusion_steps - 1) if is_train else t
-        elif isinstance(self.diffuser, StandardDiffusion.__class__):
-            t = torch.randint(0, self.diffusion_steps - 1) if is_train else t
+        self.t = self.num_timesteps - 1
+        if isinstance(self.diffuser, CSDIDiffuser):
+            self.t = torch.randint(0, self.num_timesteps - 1) if is_train else self.t
+        elif isinstance(self.diffuser, StandardDiffusion):
+            self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
 
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
-        x_T, context = self.diffuser.forward_reparametrized(x_0, t, **{ "conditioning": cond })
+        x_T, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
 
         # reverse
-        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': t})
+        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': self.t})
         recon, reverse_context = self.diffuser(x_T, context)
 
         # de-augment the denoised input (recon)
@@ -108,6 +111,7 @@ class NNEngine(L.LightningModule):
         loss = self.loss(x_0, recon, **reverse_context)
         self.log('train_loss', loss)
         self.train_losses.append(loss)
+        self.sampler.update_losses(self.t, loss)
         return loss
 
     def validation_step(self, input, batch_idx):

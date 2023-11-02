@@ -7,7 +7,6 @@ from constants import LearningHyperParameter
 from torch import nn
 from models.diffusers.DiT.DiT import DiT
 
-
 class StandardDiffusion(nn.Module, DiffusionAB):
     """An abstract class for loss functions."""
 
@@ -15,7 +14,7 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.diffusion_steps = config.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS]
+        self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
@@ -27,6 +26,8 @@ class StandardDiffusion(nn.Module, DiffusionAB):
         self.type = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE]
         self.input_size = cst.LEN_EVENT
         batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
+        self.simple_losses = []
+        self.vbl_losses = []
         if config.IS_AUGMENTATION_X:
             self.hidden_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         else:
@@ -42,7 +43,7 @@ class StandardDiffusion(nn.Module, DiffusionAB):
             self.cond_seq_size,
             self.hidden_size,
             self.cond_size,
-            self.diffusion_steps,
+            self.num_timesteps,
             self.depth,
             self.num_heads,
             self.x_seq_size,
@@ -50,10 +51,9 @@ class StandardDiffusion(nn.Module, DiffusionAB):
             self.cond_dropout_prob,
             self.type
         )
+        self.v = nn.Parameter(torch.randn(batch_size, self.x_seq_size, self.hidden_size))
         self.alphas_cumprod = config.ALPHAS_CUMPROD
         self.betas = config.BETAS
-        self.losses = []
-        self.v = nn.Parameter(torch.randn(batch_size, self.x_seq_size, self.hidden_size))
         self.alphas_cumprod_prev = torch.cat([torch.ones(1), self.alphas_cumprod[:-1]])
         #calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod) / (1.0 - self.alphas_cumprod) * self.betas
@@ -61,32 +61,35 @@ class StandardDiffusion(nn.Module, DiffusionAB):
     def forward(self, x_T: torch.Tensor, context: Dict):
         assert 'eps' in context
         eps = context['eps']
-        assert 'condiitoning' in context
+        assert 'conditioning' in context
         cond = context['conditioning']
-        return self.reverse_reparametrized(x_T, cond, eps)
+        assert 't' in context
+        t = context['t']
+        assert 'is_train' in context
+        is_train = context['is_train']
+        return self.reverse_reparametrized(x_T, t, cond, eps, is_train)
 
-    def forward_reparametrized(self, x_0: torch.Tensor, diffusion_step: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         assert 'conditioning' in kwargs
         cond: torch.Tensor = kwargs['conditioning']
-        x_t, eps = super().forward_reparametrized(x_0, diffusion_step)
+        x_t, eps = super().forward_reparametrized(x_0, t)
         return x_t, {'eps': eps, 'conditioning': cond}
 
-    def reverse_reparametrized(self, x_t, cond, eps_true):
-        step_losses = []
-        for t in range(1, self.diffusion_steps):
-            beta_t = self.betas[t]
-            alpha_t = 1 - beta_t
-            alpha_cumprod_t = self.alphas_cumprod[t]
-            beta_tilde_t = self.posterior_var[t]          #it's the posterior variance of q(x_{t-1} | x_t, x_0)
-            times = torch.full((x_t.shape[0],), t, device=cst.DEVICE)
-            eps_t, var_t = self.NN(x_t, cond, times)
-            assert eps_t.shape == x_t.shape
-            z = torch.distributions.Normal(0, 1).sample(x_t.shape)
-            sigma_t = math.exp(self.v*math.log(beta_t) + (1-self.v)*math.log(beta_tilde_t))       #formula taken from IDDPM paper
-            x_t = 1 / math.sqrt(alpha_t) * (x_t - (beta_t / math.sqrt(1 - alpha_cumprod_t) * eps_t)) + (sigma_t * z)
-            L_t = self.loss_step(eps_t, eps_true)
-            step_losses.append(L_t)
-        self.losses.append(step_losses)
+    def reverse_reparametrized(self, x_t, t, cond, eps_true, is_train):
+        beta_t = self.betas[t]
+        alpha_t = 1 - beta_t
+        alpha_cumprod_t = self.alphas_cumprod[t]
+        beta_tilde_t = self.posterior_var[t]          #it's the posterior variance of q(x_{t-1} | x_t, x_0)
+        times = torch.full((x_t.shape[0],), t, device=cst.DEVICE)
+        eps_t, var_t = self.NN(x_t, cond, times)
+        assert eps_t.shape == x_t.shape
+        z = torch.distributions.Normal(0, 1).sample(x_t.shape)
+        sigma_t = math.exp(self.v*math.log(beta_t) + (1-self.v)*math.log(beta_tilde_t))       #formula taken from IDDPM paper
+        x_t = 1 / math.sqrt(alpha_t) * (x_t - (beta_t / math.sqrt(1 - alpha_cumprod_t) * eps_t)) + (sigma_t * z)
+        L_simple = self.loss_step(eps_t, eps_true)
+        self.simple_losses.append(L_simple)
+        L_vlb = ...
+        self.vbl_losses.append(L_vlb)
         return x_t, {}
 
 
@@ -96,7 +99,7 @@ class StandardDiffusion(nn.Module, DiffusionAB):
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         """Computes the loss taken from IDDPM."""
-        L_simple = self.losses[-1]
-        L_vlb = ...
+        L_simple = self.simple_losses[-1]
+        L_vlb = self.vbl_losses[-1]
         L_hybrid = L_simple + self.lambda_*L_vlb
         return L_hybrid

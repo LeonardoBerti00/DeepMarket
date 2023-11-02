@@ -3,7 +3,7 @@ import torch
 
 
 class LearningHyperParameter(str, Enum):
-    DIFFUSION_STEPS = "diffusion_steps"
+    NUM_TIMESTEPS = "num_timesteps"
     BACKWARD_SEQ_SIZE = "backward_SEQ_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"

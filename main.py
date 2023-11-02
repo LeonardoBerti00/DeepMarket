@@ -21,7 +21,7 @@ if __name__ == "__main__":
     set_torch()
     config = Configuration()
     config.ALPHAS_CUMPROD, config.BETAS = noise_scheduler(
-        diffusion_steps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.DIFFUSION_STEPS],
+        num_timesteps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_TIMESTEPS],
         s=config.HYPER_PARAMETERS[cst.LearningHyperParameter.S]
     )
     if (cst.DEVICE == "cpu"):

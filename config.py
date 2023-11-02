@@ -50,7 +50,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 32
-        self.HYPER_PARAMETERS[LearningHyperParameter.DIFFUSION_STEPS] = 1000
+        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS] = 1000
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.008           #value taken from the papre IDDPM
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
@@ -59,7 +59,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
         self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "full"    #it can be full or 'only_event'
         self.ALPHAS_CUMPROD, self.BETAS = None, None
-        self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT if LearningHyperParameter.COND_TYPE != 'event_only' else cst.LEN_EVENT
+        self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT if self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] == 'full' else cst.LEN_EVENT
 
         #da cmbiare come per DiT
         self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}
