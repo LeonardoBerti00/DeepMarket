@@ -72,16 +72,16 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         x_T = x_T.unsqueeze(-1)
         total_input = torch.cat([cond, x_T], dim=-1) # (B,L,K,2)
         total_input = total_input.permute(0, 3, 2, 1)  # (B,2,K,L)
-        
+
+        B, _, K, L = total_input.shape
         if is_train:
-            t = torch.randint(0, self.num_steps, [x_T.shape[0]]).to(self.device)
+            t = torch.randint(0, self.num_steps, [B]).to(self.device)
             recon = self.diffuser(total_input, side_info, t).permute(0,2,1).unsqueeze(0)
         else:
-            recon = list()
+            recon = torch.zeros((self.num_steps, B, L, K))
             for set_t in range(self.num_steps):
-                t = (torch.ones(x_T.shape[0]) * set_t).long().to(self.device)
-                recon.append(self.diffuser(total_input, side_info, t).permute(0,2,1))
-            recon = torch.from_numpy(np.array(recon))
+                t = (torch.ones(B) * set_t).long().to(self.device)
+                recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
                 
         return recon, {'cond_mask': cond_augmenter.deaugment(cond_mask)}
         
