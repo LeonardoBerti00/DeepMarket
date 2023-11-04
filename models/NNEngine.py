@@ -1,20 +1,18 @@
 import copy
-from typing import Dict, Tuple
 from config import Configuration
-from models.diffusers.DiffusionAB import DiffusionAB
 import torch
 import lightning as L
 import constants as cst
 from constants import LearningHyperParameter
 import time
 
-from models.diffusers.StandardDiffusion import StandardDiffusion
+from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-from models.sampler import LossSecondMomentResampler
+from models.diffusers.DiT.Sampler import LossSecondMomentResampler
 
 
 class NNEngine(L.LightningModule):
@@ -50,8 +48,7 @@ class NNEngine(L.LightningModule):
         if (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
             self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE)
 
-        self.ema_params = copy.deepcopy(self.parameters())
-        self.ema = ExponentialMovingAverage(self.ema_params, decay=0.999)
+        self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.sampler = LossSecondMomentResampler(self.num_timesteps)
 
 
@@ -60,19 +57,19 @@ class NNEngine(L.LightningModule):
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
         # augment
-        x_0, cond = self.augment(x_0, cond)
+        x_0_aug, cond_aug = self.augment(x_0, cond)
 
         self.t = self.num_timesteps - 1
         if isinstance(self.diffuser, CSDIDiffuser):
             self.t = torch.randint(0, self.num_timesteps - 1) if is_train else self.t
-        elif isinstance(self.diffuser, StandardDiffusion):
+        elif isinstance(self.diffuser, GaussianDiffusion):
             self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
 
         # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
         x_T, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
 
         # reverse
-        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': self.t})
+        context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': self.t, 'x_0': x_0})
         recon, reverse_context = self.diffuser(x_T, context)
 
         # de-augment the denoised input (recon)

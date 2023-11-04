@@ -46,11 +46,11 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         cond_mask = torch.zeros(whole_input.shape)
         cond_mask[:, :self.cond_seq_size + 1, :] = 1
                         
-        x_t, eps = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
+        x_t, noise = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
         x_t = x_t * (1 - cond_mask)
 
         cond = whole_input * cond_mask
-        return x_t, {'eps': eps, 'conditioning': cond, 'cond_mask': cond_mask, 'whole_input': whole_input}
+        return x_t, {'noise': noise, 'conditioning': cond, 'cond_mask': cond_mask, 'whole_input': whole_input}
         
         
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):

@@ -16,7 +16,7 @@ def noise_scheduler(num_timesteps, s):
 #formula taken from "Denoising Diffusion Probabilistic Models"
 def compute_mean_tilde_t(x_0, x_T, alpha_cumprod_t, alpha_cumprod_t_1, beta_t, alpha_t):
     # alpha_cumprod_t_1 is alpha_cumprod(t-1)
-    return math.sqrt(alpha_cumprod_t_1)*beta_t*x_0 / (1-alpha_cumprod_t) + math.sqrt(alpha_t)*(1-alpha_cumprod_t_1)*x_T / (1-alpha_cumprod_t)
+    return torch.sqrt(alpha_cumprod_t_1)*beta_t*x_0 / (1-alpha_cumprod_t) + torch.sqrt(alpha_t)*(1-alpha_cumprod_t_1)*x_T / (1-alpha_cumprod_t)
 
 
 def sinusoidal_positional_embedding(token_sequence_size, token_embedding_dim, n=10000.0):

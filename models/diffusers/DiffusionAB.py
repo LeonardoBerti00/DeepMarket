@@ -25,16 +25,16 @@ class DiffusionAB(ABC):
     
     def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         # Reparametrization trick for the diffusion process taken from DDPM paper
-        eps = torch.distributions.normal.Normal(0, 1).sample(x_0.shape).to(cst.DEVICE)
-        first_term = torch.mul(x_0, math.sqrt(self.alphas_cumprod[t]))
-        second_term = torch.mul(eps, math.sqrt(1 - self.alphas_cumprod[t]))
+        noise = torch.distributions.normal.Normal(0, 1).sample(x_0.shape).to(cst.DEVICE)
+        first_term = torch.einsum('bld, b -> bld', x_0, torch.sqrt(self.alphas_cumprod[t]))
+        second_term = torch.einsum('bld, b -> bld', noise, torch.sqrt(1 - self.alphas_cumprod[t]))
         x_t = first_term + second_term
-        return x_t, eps
+        return x_t, noise
 
     def forward_process(self, x_0: torch.Tensor, t: int):
         # Standard forward process, takes in input x_0 and returns x_t after t steps of noise
         cov_matrix = torch.eye(x_0.shape)
-        mean = torch.mul(x_0, math.sqrt(self.alphas_cumprod[t]))
-        std = torch.mul(cov_matrix, math.sqrt(1 - self.alphas_cumprod[t]))
+        mean = torch.mul(x_0, torch.sqrt(self.alphas_cumprod[t]))
+        std = torch.mul(cov_matrix, torch.sqrt(1 - self.alphas_cumprod[t]))
         x_T = torch.distributions.Normal(mean, std).rsample().to(cst.DEVICE)
         return x_T, {'mean': mean, 'std': std}

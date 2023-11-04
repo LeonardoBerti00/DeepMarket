@@ -1,10 +1,10 @@
-from models.diffusers.StandardDiffusion import StandardDiffusion
+from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 
 
 def pick_diffuser(config, model_name):
     if model_name == "DiT":
-        return StandardDiffusion(config)
+        return GaussianDiffusion(config)
     elif model_name == 'CSDI':
         return CSDIDiffuser(config)
     else:

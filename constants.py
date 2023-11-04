@@ -8,7 +8,6 @@ class LearningHyperParameter(str, Enum):
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
     WEIGHT_DECAY = "weight_decay"
-    EPS = "eps"
     MOMENTUM = "momentum"
     EPOCHS = "epochs"
     IS_SHUFFLE_TRAIN_SET = "is_shuffle"

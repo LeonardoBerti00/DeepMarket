@@ -15,9 +15,9 @@ class adaLN_Zero(nn.Module):
     """
     def __init__(self, hidden_size, num_heads, cond_len, mlp_ratio=4.0):
         super().__init__()
-        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
         self.attn = nn.MultiheadAttention(hidden_size, num_heads=num_heads, bias=True, batch_first=True)
-        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
         approx_gelu = lambda: nn.GELU(approximate="tanh")
         self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
@@ -41,7 +41,7 @@ class FinalLayer_adaLN_Zero(nn.Module):
     """
     def __init__(self, hidden_size, input_size):
         super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
         self.linear = nn.Linear(hidden_size, 2 * input_size, bias=True)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
@@ -58,9 +58,9 @@ class FinalLayer_adaLN_Zero(nn.Module):
         x = modulate(self.norm_final(x), shift, scale)
         out = self.linear(x)
         out = rearrange(out, 'n l d -> n l c m', c=2)
-        # it gives in output the noise eps and the variances
-        eps, var = out[:, :, 0], out[:, :, 1]
-        return eps, var
+        # it gives in output the noise and the variances
+        noise, var = out[:, :, 0], out[:, :, 1]
+        return noise, var
 
 
 class DiT(nn.Module):
@@ -83,7 +83,7 @@ class DiT(nn.Module):
     ):
         super().__init__()
         self.num_heads = num_heads
-        self.t_embedder = TimestepEmbedder(hidden_size, num_timesteps)
+        self.t_embedder = TimestepEmbedder(hidden_size, hidden_size//4, num_timesteps)
         self.c_embedder = ConditionEmbedder(cond_seq_len, cond_size, cond_dropout_prob, hidden_size)
         if (token_sequence_size != 1):
             self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, hidden_size)
@@ -134,8 +134,8 @@ class DiT(nn.Module):
         c = rearrange(c, 'n p c -> n (p c)')
         for block in self.blocks:
             x = block(x, c)
-        eps, var = self.final_layer(x, c)
-        return eps, var
+        noise, var = self.final_layer(x, c)
+        return noise, var
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
@@ -144,9 +144,9 @@ class DiT(nn.Module):
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)
         model_out = self.forward(combined, t, y)
-        eps, rest = model_out[:, :3], model_out[:, 3:]
-        cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
-        half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
+        noise, rest = model_out[:, :3], model_out[:, 3:]
+        cond_noise, uncond_noise = torch.split(noise, len(noise) // 2, dim=0)
+        half_noise = uncond_noise + cfg_scale * (cond_noise - uncond_eps)
         eps = torch.cat([half_eps, half_eps], dim=0)
         return torch.cat([eps, rest], dim=1)
 
