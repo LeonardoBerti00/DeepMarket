@@ -28,6 +28,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.vlb_losses = []
         if config.IS_AUGMENTATION_X:
             self.hidden_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
+            self.input_size = self.hidden_size
         else:
             self.hidden_size = self.input_size
 
@@ -51,12 +52,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         self.alphas_cumprod = config.ALPHAS_CUMPROD
         self.betas = config.BETAS
+        self.alphas = 1 - self.betas
         self.alphas_cumprod_prev = torch.cat([torch.ones(1, device=cst.DEVICE), self.alphas_cumprod[:-1]])
 
         #calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod) / (1.0 - self.alphas_cumprod) * self.betas
         self.posterior_log_var_clipped = torch.log(
-            torch.cat(self.posterior_var[1], self.posterior_var[1:])
+            torch.cat([self.posterior_var[:1], self.posterior_var[1:]])
         )
         self.posterior_mean_coef1 = (
             self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
@@ -158,7 +160,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                  - 'pred_xstart': the x_0 predictions.
         """
         true_mean, true_log_variance_clipped = self._q_posterior_mean_var(x_0=x_0, x_t=x_t, t=t)
-        pred_mean = self. _p_mean(
+        pred_mean = self._p_mean(
             noise_t, x_t, t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
         kl = self._normal_kl(
@@ -166,6 +168,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         kl = self._mean_flat(kl) / np.log(2.0)
 
+        '''
         #TODO change from image to time series
         L_0 = -self._discretized_gaussian_log_likelihood(
             x_0, means=pred_mean, log_scales=0.5 * pred_log_var
@@ -173,10 +176,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         assert L_0.shape == x_0.shape
         L_0 = self._mean_flat(L_0) / np.log(2.0)
 
-        # At the first timestep return the decoder NLL,
+        # At the first timestep return the NLL,
         # otherwise return KL(q(x_{t-1}|x_t,x_0) || p(x_{t-1}|x_t))
         output = torch.where((t == 0), L_0, kl)
-        return output
+        '''
+        return kl
 
     def _p_mean(self, noise_t, x_t, t, clip_denoised=True, model_kwargs=None):
         '''
@@ -204,7 +208,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         print("self.posterior_mean.requires_grad", self.posterior_mean_coef1.requires_grad)
         true_log_variance_clipped = self.posterior_log_variance_clipped[t]
         return true_mean, true_log_variance_clipped
-
 
     """
     Ported from the original Ho et al. diffusion models codebase:

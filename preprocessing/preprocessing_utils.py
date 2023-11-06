@@ -46,7 +46,4 @@ def normalize_messages(data, mean_vol=None, mean_prices=None, std_vol=None,  std
     if data.isnull().values.any():
         raise ValueError("data contains null value")
 
-    # transform in column direction all the -1 in 0
-    data["direction"] = data["direction"].replace(-1, 0)
-
     return data, mean_vol, mean_prices, std_vol,  std_prices

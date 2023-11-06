@@ -48,31 +48,21 @@ class LOBSTERDataBuilder:
 
 
     def _normalize_dataframes(self):
+        #apply z score to orderbooks
         for i in range(len(self.dataframes)):
             if (i == 0):
                 self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices = z_score_orderbook(self.dataframes[i][1])
             else:
                 self.dataframes[i][1], _, _, _, _ = z_score_orderbook(self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices)
 
-        #do the same thing with messages
+        #apply z-score to vol and prices of messages
         for i in range(len(self.dataframes)):
             if (i == 0):
                 self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices = normalize_messages(self.dataframes[i][0])
             else:
                 self.dataframes[i][0], _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices)
 
-        #print mean value and std value for each dataframe and for each column
-        '''
-        for i in range(len(self.dataframes)):
-            for j in range(len(self.dataframes[i])):
-                print("Dataframe {}".format(i))
-                print("Column {}".format(j))
-                # print the mean for each column with the name of dataframe[i][j]
-                print("Mean: {}".format(np.mean(self.dataframes[i][j])))
-                #print also the name of the column
-                print("Std: {}".format(np.std(self.dataframes[i][j])))
-                print("")
-        '''
+        #
 
 
     def _save(self, path_where_to_save):

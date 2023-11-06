@@ -57,7 +57,7 @@ class NNEngine(L.LightningModule):
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
         # augment
-        x_0_aug, cond_aug = self.augment(x_0, cond)
+        x_0, cond = self.augment(x_0, cond)
 
         self.t = self.num_timesteps - 1
         if isinstance(self.diffuser, CSDIDiffuser):
@@ -65,15 +65,15 @@ class NNEngine(L.LightningModule):
         elif isinstance(self.diffuser, GaussianDiffusion):
             self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
 
-        # forward, if we want to compute x_t where 0 < t < T, just set diffusion_step to t
-        x_T, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
+        # forward process
+        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
 
         # reverse
         context.update({'is_train': is_train, 'cond_augmenter': self.conditioning_augmenter, 't': self.t, 'x_0': x_0})
-        recon, reverse_context = self.diffuser(x_T, context)
+        recon, reverse_context = self.diffuser(x_t, context)
 
         # de-augment the denoised input (recon)
-        recon = self.deaugment(recon, real_input)
+        recon = self.deaugment(recon)
 
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
@@ -81,11 +81,11 @@ class NNEngine(L.LightningModule):
 
 
     # TODO: optimize (vectorized code)
-    def deaugment(self, reversed_input: torch.Tensor, real_input: torch.Tensor):
-        deaugmented = torch.zeros(reversed_input.shape[:-1] + (real_input.shape[-1],))
-        for t in range(reversed_input.shape[0]):
-            deaugmented[t] = self.feature_augmenter.deaugment(reversed_input[t])
-        return deaugmented
+    def deaugment(self, input: torch.Tensor):
+        if self.IS_AUGMENTATION_X:
+            input = self.feature_augmenter.deaugment(input)
+        return input
+
 
     def augment(self, x_0: torch.Tensor, cond: torch.Tensor):
         if self.IS_AUGMENTATION_X:
@@ -94,7 +94,6 @@ class NNEngine(L.LightningModule):
         if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
             cond = self.conditioning_augmenter.augment(cond)
         # cond.shape = (batch_size, cond_size, latent_dim)
-
         if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
             cond = self.feature_augmenter.augment(cond)
         return x_0, cond

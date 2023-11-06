@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from einops import rearrange
-from timm.models.vision_transformer import Mlp
+from timm.models.vision_transformer import Mlp, Attention
 from models.diffusers.DiT.Embedders import TimestepEmbedder, ConditionEmbedder
 from utils.utils import sinusoidal_positional_embedding
 
@@ -15,9 +15,9 @@ class adaLN_Zero(nn.Module):
     """
     def __init__(self, hidden_size, num_heads, cond_len, mlp_ratio=4.0):
         super().__init__()
-        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
+        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.attn = nn.MultiheadAttention(hidden_size, num_heads=num_heads, bias=True, batch_first=True)
-        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
+        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
         approx_gelu = lambda: nn.GELU(approximate="tanh")
         self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
@@ -30,8 +30,13 @@ class adaLN_Zero(nn.Module):
 
     def forward(self, x, c):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
-        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
-        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        normalized_x = modulate(self.norm1(x), shift_msa, scale_msa)
+        attn_output, _ = self.attn(normalized_x, normalized_x, normalized_x)
+        gated_msa = rearrange(gate_msa, 'n d -> n 1 d')
+        gated_attn_output = torch.einsum('n l d, n l d -> n l d', attn_output, gated_msa)
+        x = x + gated_attn_output
+        normalized_x = modulate(self.norm2(x), shift_mlp, scale_mlp)
+        x = x + gate_mlp.unsqueeze(1) * self.mlp(normalized_x)
         return x
 
 
@@ -39,13 +44,13 @@ class FinalLayer_adaLN_Zero(nn.Module):
     """
     The final layer of DiT.
     """
-    def __init__(self, hidden_size, input_size):
+    def __init__(self, hidden_size, input_size, cond_size):
         super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, noise=1e-6)
+        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.linear = nn.Linear(hidden_size, 2 * input_size, bias=True)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
-            nn.Linear(hidden_size, 2 * hidden_size, bias=True)
+            nn.Linear(hidden_size*cond_size, 2 * hidden_size, bias=True)
         )
         # Zero-out output layers:
         nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
@@ -91,7 +96,7 @@ class DiT(nn.Module):
             self.blocks = nn.ModuleList([
                 adaLN_Zero(hidden_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
             ])
-            self.final_layer = FinalLayer_adaLN_Zero(hidden_size, input_size)
+            self.final_layer = FinalLayer_adaLN_Zero(hidden_size, input_size, cond_seq_len+1)
             self.initialize_weights()
         elif (cond_type == 'crossattention'):
             pass
@@ -137,6 +142,7 @@ class DiT(nn.Module):
         noise, var = self.final_layer(x, c)
         return noise, var
 
+    #TODO: implement forward_with_cfg
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
         Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.

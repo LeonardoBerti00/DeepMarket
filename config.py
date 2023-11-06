@@ -16,7 +16,7 @@ class Configuration:
         self.IS_AUGMENTATION_COND = True
 
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
 
         self.SPLIT_RATES = (.65, .05, .3)
 
