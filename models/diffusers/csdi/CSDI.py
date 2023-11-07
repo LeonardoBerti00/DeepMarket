@@ -43,7 +43,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
     
         whole_input = torch.cat([cond, input], dim=1)
         
-        cond_mask = torch.zeros(whole_input.shape)
+        cond_mask = torch.zeros(whole_input.shape, device=cst.DEVICE)
         cond_mask[:, :self.cond_seq_size + 1, :] = 1
                         
         x_t, noise = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)

@@ -7,8 +7,8 @@ import scipy.stats as stats
 
 class JSDCalculator:
     def __init__(self, historical_data, generated_data, bins=10):
-        self.p_1 = np.mean(historical_data.numpy(), axis=0)
-        self.q_1 = np.mean(generated_data.numpy(), axis=0)
+        self.p_1 = np.mean(historical_data, axis=0)
+        self.q_1 = np.mean(generated_data, axis=0)
         self.bins = bins
     
     # to calculate the JSD between two probability distributions
@@ -34,8 +34,8 @@ class JSDCalculator:
 
 class KSCalculator:
     def __init__(self, historical_data, generated_data):
-        self.p_1 = np.mean(historical_data.numpy(), axis=0)
-        self.q_1 = np.mean(generated_data.numpy(), axis=0)
+        self.p_1 = np.mean(historical_data, axis=0)
+        self.q_1 = np.mean(generated_data, axis=0)
 
     def calculate_ks(self):
         ks_stat, p_value = stats.ks_2samp(self.p_1, self.q_1)

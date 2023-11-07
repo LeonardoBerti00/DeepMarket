@@ -1,6 +1,8 @@
 from typing import Dict, Tuple
 import numpy as np
 import torch
+from einops import rearrange, repeat
+
 from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
@@ -23,14 +25,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.type = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE]
-        self.input_size = cst.LEN_EVENT
         self.mse_losses = []
         self.vlb_losses = []
         if config.IS_AUGMENTATION_X:
-            self.hidden_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
-            self.input_size = self.hidden_size
+            self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         else:
-            self.hidden_size = self.input_size
+            self.input_size =  cst.LEN_EVENT
 
         if config.IS_AUGMENTATION_COND:
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
@@ -40,7 +40,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.NN = DiT(
             self.input_size,
             self.cond_seq_size,
-            self.hidden_size,
             self.cond_size,
             self.num_timesteps,
             self.depth,
@@ -95,28 +94,29 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         beta_t = self.betas[t]
         alpha_t = 1 - beta_t
         alpha_cumprod_t = self.alphas_cumprod[t]
-        # Get the posterior variance of q(x_{t-1} | x_t, x_0) for the current time step
-        beta_tilde_t = self.posterior_var[t]
-
+        beta_t = repeat(beta_t, 'b -> b 1 d', d=self.input_size)
+        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=self.input_size)
+        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=self.input_size)
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t, cond, t)
         assert v.shape == noise_t.shape == x_t.shape
-
+ 
         # Compute the variance for the current time step using the formula from the IDDPM paper
         frac = (v + 1) / 2
         max_log = torch.log(beta_t)
         min_log = self.posterior_log_var_clipped[t]
+        min_log = repeat(min_log, 'b -> b 1 d', d=self.input_size)
         log_var_t = frac * max_log + (1 - frac) * min_log
         var_t = torch.exp(log_var_t)
         # Sample a standard normal random variable z
-        z = torch.distributions.Normal(0, 1).sample(x_t.shape)
+        z = torch.distributions.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE)
         # Compute x_{t-1} from x_t the reverse diffusion process for the current time step
         x_t = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (var_t * z)
 
         # Compute the mean squared error loss between the noise and the true noise
-        L_mse = self._mse_loss(noise_t, noise_true)
+        #L_mse = self._mse_loss(noise_t, noise_true)
         # Append the loss to the mse_losses list
-        self.mse_losses.append(L_mse)
+        #self.mse_losses.append(L_mse)
         # Compute the variational lower bound loss for the current time step
         L_vlb = self._vlb_loss(
             noise_t=noise_t.detach(),
@@ -138,7 +138,10 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         """Computes the loss taken from IDDPM."""
-        L_simple = self.simple_losses[-1]
+        assert 'noise' in kwargs
+        assert 'noise_true' in kwargs
+        L_simple = self._mse_loss(kwargs['noise'], kwargs['noise_true'])
+        self.mse_losses.append(L_simple)
         L_vlb = self.vbl_losses[-1]
         #compute in media la differenza di ordini di grandezza tra L_simple e L_vlb
         L_hybrid = L_simple + self.lambda_*L_vlb

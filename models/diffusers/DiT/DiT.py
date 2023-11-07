@@ -4,6 +4,7 @@ from einops import rearrange
 from timm.models.vision_transformer import Mlp, Attention
 from models.diffusers.DiT.Embedders import TimestepEmbedder, ConditionEmbedder
 from utils.utils import sinusoidal_positional_embedding
+import constants as cst
 
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
@@ -13,17 +14,18 @@ class adaLN_Zero(nn.Module):
     """
     A DiT block with adaptive layer norm zero (adaLN-Zero) conditioning.
     """
-    def __init__(self, hidden_size, num_heads, cond_len, mlp_ratio=4.0):
+    def __init__(self, input_size, num_heads, cond_len, mlp_ratio=4.0):
         super().__init__()
-        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.attn = nn.MultiheadAttention(hidden_size, num_heads=num_heads, bias=True, batch_first=True)
-        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        mlp_hidden_dim = int(hidden_size * mlp_ratio)
+        self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
+        if input_size == cst.LEN_EVENT: num_heads = 1
+        self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True)
+        self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
+        mlp_hidden_dim = int(input_size * mlp_ratio)
         approx_gelu = lambda: nn.GELU(approximate="tanh")
-        self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
+        self.mlp = Mlp(in_features=input_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
         self.adaLN_modulation = nn.Sequential(               #it's the MLP in the figure 3 of the paper
             nn.SiLU(),
-            nn.Linear(hidden_size*cond_len, 6 * hidden_size, bias=True)
+            nn.Linear(input_size*cond_len, 6 * input_size, bias=True)
         )
         nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
         nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
@@ -32,8 +34,8 @@ class adaLN_Zero(nn.Module):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
         normalized_x = modulate(self.norm1(x), shift_msa, scale_msa)
         attn_output, _ = self.attn(normalized_x, normalized_x, normalized_x)
-        gated_msa = rearrange(gate_msa, 'n d -> n 1 d')
-        gated_attn_output = torch.einsum('n l d, n l d -> n l d', attn_output, gated_msa)
+        gate_msa = rearrange(gate_msa, 'n d -> n 1 d')
+        gated_attn_output = torch.einsum('n l d, n l d -> n l d', attn_output, gate_msa)
         x = x + gated_attn_output
         normalized_x = modulate(self.norm2(x), shift_mlp, scale_mlp)
         x = x + gate_mlp.unsqueeze(1) * self.mlp(normalized_x)
@@ -44,13 +46,14 @@ class FinalLayer_adaLN_Zero(nn.Module):
     """
     The final layer of DiT.
     """
-    def __init__(self, hidden_size, input_size, cond_size):
+    def __init__(self, input_size, cond_size):
         super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(hidden_size, 2 * input_size, bias=True)
+        self.input_size = input_size
+        self.norm_final = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
+        self.linear = nn.Linear(input_size, 2 * input_size, bias=True)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
-            nn.Linear(hidden_size*cond_size, 2 * hidden_size, bias=True)
+            nn.Linear(input_size*cond_size, 2 * input_size, bias=True)
         )
         # Zero-out output layers:
         nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
@@ -62,7 +65,7 @@ class FinalLayer_adaLN_Zero(nn.Module):
         shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
         x = modulate(self.norm_final(x), shift, scale)
         out = self.linear(x)
-        out = rearrange(out, 'n l d -> n l c m', c=2)
+        out = rearrange(out, 'n l (c m) -> n l c m', c=2, m=self.input_size)
         # it gives in output the noise and the variances
         noise, var = out[:, :, 0], out[:, :, 1]
         return noise, var
@@ -76,7 +79,6 @@ class DiT(nn.Module):
         self,
         input_size,
         cond_seq_len,
-        hidden_size,
         cond_size,
         num_timesteps,
         depth,
@@ -88,18 +90,19 @@ class DiT(nn.Module):
     ):
         super().__init__()
         self.num_heads = num_heads
-        self.t_embedder = TimestepEmbedder(hidden_size, hidden_size//4, num_timesteps)
-        self.c_embedder = ConditionEmbedder(cond_seq_len, cond_size, cond_dropout_prob, hidden_size)
+        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_timesteps)
+        self.c_embedder = ConditionEmbedder(cond_seq_len, cond_size, cond_dropout_prob, input_size)
         if (token_sequence_size != 1):
-            self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, hidden_size)
+            self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, input_size)
         if (cond_type == 'adaln_zero'):
             self.blocks = nn.ModuleList([
-                adaLN_Zero(hidden_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
+                adaLN_Zero(input_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
             ])
-            self.final_layer = FinalLayer_adaLN_Zero(hidden_size, input_size, cond_seq_len+1)
+            self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1)
             self.initialize_weights()
         elif (cond_type == 'crossattention'):
-            pass
+            if (cond_size != input_size):
+                raise ValueError('Cross-attention conditioning requires cond_size == input_size')
         elif (cond_type == 'concatenate'):
             pass
         else:

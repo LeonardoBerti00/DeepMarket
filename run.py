@@ -119,6 +119,10 @@ def train(config, trainer):
 
     model = NNEngine(
         config=config,
+        val_num_steps=val_set.__len__(),
+        test_num_steps=test_set.__len__(),
+        val_data=val_set.data,
+        test_data=test_set.data
     ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)

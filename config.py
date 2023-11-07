@@ -12,14 +12,14 @@ class Configuration:
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION_X = False
-        self.IS_AUGMENTATION_COND = False
+        self.IS_AUGMENTATION_X = True
+        self.IS_AUGMENTATION_COND = True
 
         self.IS_DATA_PREPROCESSED = True
 
         self.SPLIT_RATES = (.65, .05, .3)
 
-        self.CHOSEN_MODEL = cst.Models.DiT
+        self.CHOSEN_MODEL = cst.Models.CSDI
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
