@@ -242,13 +242,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 + ((mean1 - mean2) ** 2) * torch.exp(-logvar2)
         )
 
-    def _approx_standard_normal_cdf(self, x):
-        """
-        A fast approximation of the cumulative distribution function of the
-        standard normal.
-        """
-        return 0.5 * (1.0 + torch.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * torch.pow(x, 3))))
 
+    '''
     def _discretized_gaussian_log_likelihood(self, x, means, log_scales):
         """
         Compute the log-likelihood of a Gaussian distribution discretizing to a
@@ -278,6 +273,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         assert log_probs.shape == x.shape
         return log_probs
 
+    def _approx_standard_normal_cdf(self, x):
+        """
+        A fast approximation of the cumulative distribution function of the
+        standard normal.
+        """
+        return 0.5 * (1.0 + torch.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * torch.pow(x, 3))))
+    '''
     def _mean_flat(self, tensor):
         """
         Take the mean over all non-batch dimensions.

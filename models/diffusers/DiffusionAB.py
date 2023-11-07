@@ -22,9 +22,12 @@ class DiffusionAB(ABC):
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         """Computes the loss given the true and predicted values."""
         pass
-    
+
     def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-        # Reparametrization trick for the diffusion process taken from DDPM paper
+        """
+        Reparametrized forward diffusion process, takes in input x_0 and returns x_t after t steps of noise
+        x_t(x_0, ϵ) = √(α̅_t)x_0 + √(1 - α̅_t)ϵ
+        """
         noise = torch.distributions.normal.Normal(0, 1).sample(x_0.shape).to(cst.DEVICE)
         first_term = torch.einsum('bld, b -> bld', x_0, torch.sqrt(self.alphas_cumprod[t]))
         second_term = torch.einsum('bld, b -> bld', noise, torch.sqrt(1 - self.alphas_cumprod[t]))

@@ -80,7 +80,6 @@ class NNEngine(L.LightningModule):
         return recon, reverse_context
 
 
-    # TODO: optimize (vectorized code)
     def deaugment(self, input: torch.Tensor):
         if self.IS_AUGMENTATION_X:
             input = self.feature_augmenter.deaugment(input)
