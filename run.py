@@ -61,7 +61,7 @@ def run_wandb(config, wandb_config, accelerator, wandb_logger):
             precision=cst.PRECISION,
             max_epochs=wandb_config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             profiler="advanced",
-            callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True), checkpoint_callback],
+            callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)],
             num_sanity_val_steps=0,
             logger=wandb_logger,
         )
@@ -122,7 +122,8 @@ def train(config, trainer):
         val_num_steps=val_set.__len__(),
         test_num_steps=test_set.__len__(),
         val_data=val_set.data,
-        test_data=test_set.data
+        test_data=test_set.data,
+        trainer=trainer
     ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)

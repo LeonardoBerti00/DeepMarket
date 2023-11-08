@@ -1,5 +1,4 @@
 import copy
-
 import numpy
 
 from config import Configuration
@@ -9,6 +8,7 @@ import constants as cst
 from constants import LearningHyperParameter
 import time
 
+import wandb
 from evaluation.evaluation_utils import JSDCalculator, KSCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
@@ -21,11 +21,12 @@ from models.diffusers.DiT.Sampler import LossSecondMomentResampler
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int, val_data, test_data):
+    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int, val_data, test_data, trainer):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
         """
+        self.trainer = trainer
         self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
@@ -133,7 +134,16 @@ class NNEngine(L.LightningModule):
             cond = self.feature_augmenter.augment(cond)
         return x_0, cond
 
+    def _define_log_metrics(self):
+        wandb.define_metric("val_loss", summary="min")
+        wandb.define_metric("val_ema_loss", summary="min")
+        wandb.define_metric("test_loss", summary="min")
+        wandb.define_metric("test_ema_loss", summary="min")
+
+
     def training_step(self, input, batch_idx):
+        if self.gloabl_step == 0:
+            self._define_log_metrics()
         x_0 = input[1]
         cond = input[0]
         recon, reverse_context = self.forward(cond, x_0, is_train=True)
@@ -211,6 +221,8 @@ class NNEngine(L.LightningModule):
         print(f"\n train loss {loss}\n")
 
     def on_validation_epoch_end(self) -> None:
+
+
         loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
         jsd_val = JSDCalculator(self.val_data, self.val_ema_reconstructions)

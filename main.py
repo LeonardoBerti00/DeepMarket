@@ -46,11 +46,11 @@ if __name__ == "__main__":
             sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME)
             wandb.agent(sweep_id, run_wandb(config, sweep_config, accelerator, wandb_logger), count=sweep_config["run_cap"])
         else:
-            wandb_logger = WandbLogger(project="MMLM", log_model=True, save_dir=cst.WANDB_DIR)
+            wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model=True, save_dir=cst.WANDB_DIR)
             run_wandb(config, None, accelerator, wandb_logger)
 
     elif(config.IS_TESTING):
-        #TODO load pre trained model and test
+        # TODO load pre trained model and test
         pass
 
     # training without using wandb
