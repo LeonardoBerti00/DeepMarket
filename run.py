@@ -1,6 +1,8 @@
 import lightning as L
 import torch
 import wandb
+from lightning.pytorch.callbacks import ModelCheckpoint
+
 import constants as cst
 from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
@@ -55,13 +57,23 @@ def run_wandb(config, wandb_config, accelerator, wandb_logger):
                 config.HYPER_PARAMETERS[param] = model_params[param.value]
 
         config.wandb_config_setup()
+        print("model_"+str(config.CHOSEN_MODEL)+"-epoch_{epoch}-val_loss_{val_loss:.2f}-"+str(config.HYPER_PARAMETERS[:]))
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=cst.DIR_SAVED_MODEL,
+            monitor="val_loss",
+            mode="max",
+            filename="model_"+str(config.CHOSEN_MODEL)+"-epoch_{epoch}-val_loss_{val_loss:.2f}-"+str(config.HYPER_PARAMETERS[:]),
+        )
 
         trainer = L.Trainer(
             accelerator=accelerator,
             precision=cst.PRECISION,
             max_epochs=wandb_config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             profiler="advanced",
-            callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)],
+            callbacks=[
+                EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True),
+                checkpoint_callback,
+            ],
             num_sanity_val_steps=0,
             logger=wandb_logger,
         )
@@ -86,7 +98,6 @@ def sweep_init(config):
         'run_cap': 20,
         'parameters': {**HP_DICT_MODEL[config.CHOSEN_MODEL].sweep}
     }
-
     return sweep_config
 
 
@@ -131,8 +142,7 @@ def train(config, trainer):
 
 
 def print_setup(config):
-    print("Is augmented x: ", config.IS_AUGMENTATION_X)
-    print("Is augmented conditional: ", config.IS_AUGMENTATION_COND)
+    print("Is augmented: ", config.IS_AUGMENTATION)
     print("Conditioning type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE])
     if config.CHOSEN_MODEL.name == "DiT":
         print("Conditioning DiT type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DiT_TYPE])

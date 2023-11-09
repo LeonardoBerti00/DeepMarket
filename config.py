@@ -12,8 +12,8 @@ class Configuration:
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION_X = True
-        self.IS_AUGMENTATION_COND = True
+        self.IS_AUGMENTATION = True
+
 
         self.IS_DATA_PREPROCESSED = False
 
@@ -44,6 +44,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
+        self.COND_SEQ_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
@@ -56,7 +57,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE] = "adaln_zero"
-        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "full"    #it can be full or 'only_event'
+        self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] = "only_event"    #it can be full or 'only_event'
         self.ALPHAS_CUMPROD, self.BETAS = None, None
         self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT if self.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE] == 'full' else cst.LEN_EVENT
 
