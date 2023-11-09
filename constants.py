@@ -113,7 +113,7 @@ SEED = 0
 PRECISION = 32
 N_LOB_LEVELS = 3
 LEN_LEVEL = 4
-LEN_EVENT = 5
+LEN_EVENT = 9
 
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'

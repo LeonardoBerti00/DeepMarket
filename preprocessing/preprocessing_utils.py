@@ -27,8 +27,6 @@ def z_score_orderbook(data, mean_vol=None, mean_prices=None, std_vol=None,  std_
 
 
 def normalize_messages(data, mean_vol=None, mean_prices=None, std_vol=None,  std_prices=None):
-    #divide by 1000 the time column of data that is call time
-    #data["time"] = data["time"] / 1000
 
     #apply z score to prices and volume column
     if (mean_vol is None) or (std_vol is None):
@@ -46,4 +44,6 @@ def normalize_messages(data, mean_vol=None, mean_prices=None, std_vol=None,  std
     if data.isnull().values.any():
         raise ValueError("data contains null value")
 
+    data["direction"] = data["direction"].replace(-1.0, 0.0)
+    data["event_type"] = data["event_type"]-1.0
     return data, mean_vol, mean_prices, std_vol,  std_prices
