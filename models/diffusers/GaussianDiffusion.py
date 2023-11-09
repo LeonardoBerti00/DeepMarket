@@ -27,10 +27,10 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.type = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE]
         self.mse_losses = []
         self.vlb_losses = []
-        if config.IS_AUGMENTATION_X:
+        if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         else:
-            self.input_size =  cst.LEN_EVENT
+            self.input_size = cst.LEN_EVENT
 
         if config.IS_AUGMENTATION_COND:
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]

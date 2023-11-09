@@ -82,8 +82,8 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
             for set_t in range(self.num_steps):
                 t = (torch.ones(B) * set_t).long().to(self.device)
                 recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
-                
-        return recon, {'cond_mask': cond_augmenter.deaugment(cond_mask)}
+        context.update({'cond_mask': cond_augmenter.deaugment(cond_mask)})
+        return recon, context
         
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """
@@ -111,10 +111,8 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         assert 'cond_mask' in kwargs
-        assert 'conditioning' in kwargs
         cond_mask: torch.Tensor = kwargs['cond_mask']
-        real_cond: torch.Tensor = kwargs['conditioning']
-        noise = torch.rand_like(torch.cat([real_cond, true], dim=1))
+        noise: torch.Tensor = kwargs['noise']
         target_mask = torch.ones(cond_mask.shape) - cond_mask
         loss_sum = 0
         for t in range(recon.shape[0]):

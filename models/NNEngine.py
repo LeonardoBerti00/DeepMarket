@@ -27,6 +27,7 @@ class NNEngine(L.LightningModule):
         This is the skeleton of the diffusion models.
         """
         self.trainer = trainer
+        self.IS_WANDB = config.IS_WANDB
         self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
@@ -36,24 +37,26 @@ class NNEngine(L.LightningModule):
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.cond_type = config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
+        self.cond_seq_size = config.COND_SEQ_SIZE
         self.val_data, self.test_data = val_data, test_data
         self.val_num_batches = int(val_num_steps / self.batch_size) + 1
         self.test_num_batches = int(test_num_steps / self.batch_size) + 1
         self.train_losses, self.val_losses, self.test_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
-        self.val_reconstructions, self.test_reconstructions = numpy.zeros(val_num_steps, cst.LEN_EVENT), numpy.zeros(test_num_steps, cst.LEN_EVENT)
-        self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros(val_num_steps, cst.LEN_EVENT), numpy.zeros(test_num_steps, cst.LEN_EVENT)
+        self.val_reconstructions, self.test_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
+        self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
         self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
-        self.IS_AUGMENTATION_X = config.IS_AUGMENTATION_X
-        self.IS_AUGMENTATION_COND = config.IS_AUGMENTATION_COND
+        self.IS_AUGMENTATION = config.IS_AUGMENTATION
 
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
-        if (self.IS_AUGMENTATION_X):
+        if (self.IS_AUGMENTATION):
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
-        if (self.IS_AUGMENTATION_COND and self.cond_type == 'full'):
+        if (self.IS_AUGMENTATION and self.cond_type == 'full'):
             self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE)
+        elif (self.IS_AUGMENTATION and self.cond_type == 'only_event'):
+            self.conditioning_augmenter = self.feature_augmenter
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.sampler = LossSecondMomentResampler(self.num_timesteps)
@@ -64,7 +67,7 @@ class NNEngine(L.LightningModule):
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
         # augment
-        x_0, cond, = self.augment(x_0, cond)
+        x_0, cond = self.augment(x_0, cond)
 
         self.t = self.num_timesteps - 1
         if isinstance(self.diffuser, CSDIDiffuser):
@@ -84,18 +87,18 @@ class NNEngine(L.LightningModule):
             'cond_augmenter': self.conditioning_augmenter,
             't': self.t,
             'x_0': x_0,
-            'conditioning': cond,
         })
 
-        recon, reverse_context = self.diffuser(x_t, context)
+        noise_recon, reverse_context = self.diffuser(x_t, context)
 
-        #if isinstance(self.diffuser, GaussianDiffusion):
+
         # de-augment the denoised input (recon)
-        recon = self.deaugment(recon)
+        noise_true = reverse_context['noise']
+        noise_recon, noise_true = self.deaugment(noise_recon, noise_true)
 
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
-        return recon, reverse_context
+        return noise_recon, reverse_context
 
     '''
     def deaugment(self, input: torch.Tensor, noise: torch.Tensor):
@@ -119,19 +122,23 @@ class NNEngine(L.LightningModule):
 
 
     def deaugment(self, input: torch.Tensor):
-        if self.IS_AUGMENTATION_X:
-            input = self.feature_augmenter.deaugment(input)
-        return input
+        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], cst.LEN_EVENT), device=cst.DEVICE)
+        if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
+            for i in range(input.shape[0]):
+                final_output[i] = self.feature_augmenter.deaugment(input[i])
+        return final_output
 
     def augment(self, x_0: torch.Tensor, cond: torch.Tensor):
-        if self.IS_AUGMENTATION_X:
-            x_0 = self.feature_augmenter.augment(x_0)
+        if self.IS_AUGMENTATION and self.cond_type == 'only_event':
+            full_input = torch.cat([cond, x_0], dim=1)
+            full_input_aug = self.feature_augmenter.augment(full_input)
+            cond = full_input_aug[:, :self.cond_seq_size, :]
+            x_0 = full_input_aug[:, self.cond_seq_size:, :]
         # x_0.shape = (batch_size, K, latent_dim)
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
+        if self.IS_AUGMENTATION and self.cond_type == 'full':
             cond = self.conditioning_augmenter.augment(cond)
+            x_0 = self.feature_augmenter.augment(x_0)
         # cond.shape = (batch_size, cond_size, latent_dim)
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
-            cond = self.feature_augmenter.augment(cond)
         return x_0, cond
 
     def _define_log_metrics(self):
@@ -140,9 +147,8 @@ class NNEngine(L.LightningModule):
         wandb.define_metric("test_loss", summary="min")
         wandb.define_metric("test_ema_loss", summary="min")
 
-
     def training_step(self, input, batch_idx):
-        if self.gloabl_step == 0:
+        if self.global_step == 0 and self.IS_WANDB:
             self._define_log_metrics()
         x_0 = input[1]
         cond = input[0]
