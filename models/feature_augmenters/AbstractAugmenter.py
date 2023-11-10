@@ -12,5 +12,5 @@ class AugmenterAB(ABC):
     
     
     @abstractmethod
-    def deaugment(self, input: torch.Tensor):
+    def deaugment(self, input: torch.Tensor, context: dict):
         pass

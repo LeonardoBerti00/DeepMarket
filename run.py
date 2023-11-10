@@ -9,7 +9,6 @@ from preprocessing.LOB.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
-
 from models.diffusers.DiT.DiT_hparam import HP_DiT
 
 
@@ -25,7 +24,9 @@ def run(config, accelerator):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         profiler="advanced",
-        callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)],
+        callbacks=[
+            EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)
+        ],
         num_sanity_val_steps=0,
     )
     train(config, trainer)

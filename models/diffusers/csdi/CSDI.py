@@ -15,13 +15,13 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 """
 class CSDIDiffuser(nn.Module, DiffusionAB):
     
-    def __init__(self, config: Configuration):
+    def __init__(self, config: Configuration, feature_augmenter):
         DiffusionAB.__init__(self, config)
         super(CSDIDiffuser, self).__init__()
-        
+        self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.device = cst.DEVICE
         self.target_dim = cst.LEN_EVENT
-        
+        self.feature_augmenter = feature_augmenter
         self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_TIMESTEPS]
         self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
         self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
@@ -50,16 +50,16 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         x_t = x_t * (1 - cond_mask)
 
         cond = whole_input * cond_mask
-        return x_t, {'noise': noise, 'conditioning': cond, 'cond_mask': cond_mask, 'whole_input': whole_input}
+        return x_t, {'noise_true': noise, 'conditioning': cond, 'whole_input': whole_input}
         
         
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
-        assert 'conditioning' in context
+        assert 'conditioning_aug' in context
         assert 'cond_mask' in context
         assert 'whole_input' in context
         assert 'cond_augmenter' in context
         
-        cond = context['conditioning']
+        cond = context['conditioning_aug']
         whole_input = context['whole_input']
         cond_mask = context['cond_mask']
         is_train = context.get('is_train', True)
@@ -82,9 +82,19 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
             for set_t in range(self.num_steps):
                 t = (torch.ones(B) * set_t).long().to(self.device)
                 recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
-        context.update({'cond_mask': cond_augmenter.deaugment(cond_mask)})
+        cond_mask, _ = cond_augmenter.deaugment(cond_mask)
+        context.update({'cond_mask': cond_mask})
+        if (self.IS_AUGMENTATION):
+            recon = self.deaugment(recon)
         return recon, context
-        
+
+    def deaugment(self, input: torch.Tensor):
+        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], cst.LEN_EVENT), device=cst.DEVICE)
+        if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
+            for i in range(input.shape[0]):
+                final_output[i], _ = self.feature_augmenter.deaugment(input[i], {})
+        return final_output
+
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """
             Time embedding as Eq. 13 in the paper
@@ -113,7 +123,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         assert 'cond_mask' in kwargs
         cond_mask: torch.Tensor = kwargs['cond_mask']
         noise: torch.Tensor = kwargs['noise']
-        target_mask = torch.ones(cond_mask.shape) - cond_mask
+        target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
         loss_sum = 0
         for t in range(recon.shape[0]):
             residual = (noise - recon[t]) * target_mask

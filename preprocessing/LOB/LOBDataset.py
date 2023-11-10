@@ -39,7 +39,7 @@ class LOBDataset(data.Dataset):
         else:
             raise ValueError(f"Unknown cond_type {self.cond_type}")
 
-        return cond, x_0
+        return cond, x_0#cond.requires_grad_(True), x_0.requires_grad_(True)
 
 
     def _get_data(self):
@@ -59,6 +59,7 @@ class LOBDataset(data.Dataset):
         one_hot_order_direction = torch.nn.functional.one_hot(self.data[:, 4].to(torch.int64), num_classes=2).to(torch.float32)
         self.encoded_data[:, 7:9] = one_hot_order_direction
         self.encoded_data[:, 9:] = self.data[:, 5:]
+
 
 
 

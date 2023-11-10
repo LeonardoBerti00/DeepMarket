@@ -28,7 +28,6 @@ class NNEngine(L.LightningModule):
         """
         self.trainer = trainer
         self.IS_WANDB = config.IS_WANDB
-        self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL)
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
@@ -52,9 +51,12 @@ class NNEngine(L.LightningModule):
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if (self.IS_AUGMENTATION):
-            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT)
+            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT).to(device=cst.DEVICE)
+            self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
+        else:
+            self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
         if (self.IS_AUGMENTATION and self.cond_type == 'full'):
-            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE)
+            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(device=cst.DEVICE)
         elif (self.IS_AUGMENTATION and self.cond_type == 'only_event'):
             self.conditioning_augmenter = self.feature_augmenter
 
@@ -62,12 +64,10 @@ class NNEngine(L.LightningModule):
         self.sampler = LossSecondMomentResampler(self.num_timesteps)
 
 
+
     def forward(self, cond, x_0, is_train=True):
         # save the real input for future
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
-
-        # augment
-        x_0, cond = self.augment(x_0, cond)
 
         self.t = self.num_timesteps - 1
         if isinstance(self.diffuser, CSDIDiffuser):
@@ -77,9 +77,10 @@ class NNEngine(L.LightningModule):
 
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
-
+        context.update({'x_t': copy.deepcopy(x_t)})
+        x_t.requires_grad=True
         # augment
-        #x_0_aug, x_t_aug, cond, = self.augment(x_0, x_t, cond)
+        x_t, cond = self.augment(x_t, cond)
 
         # reverse
         context.update({
@@ -87,59 +88,27 @@ class NNEngine(L.LightningModule):
             'cond_augmenter': self.conditioning_augmenter,
             't': self.t,
             'x_0': x_0,
+            'conditioning_aug': cond,
         })
 
         noise_recon, reverse_context = self.diffuser(x_t, context)
-
-
-        # de-augment the denoised input (recon)
-        noise_true = reverse_context['noise']
-        noise_recon, noise_true = self.deaugment(noise_recon, noise_true)
 
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
         return noise_recon, reverse_context
 
-    '''
-    def deaugment(self, input: torch.Tensor, noise: torch.Tensor):
-        if self.IS_AUGMENTATION_X:
-            input = self.feature_augmenter.deaugment(input)
-            noise = self.feature_augmenter.deaugment(noise)
-        return input, noise
-        
-    def augment(self, x_0: torch.Tensor, x_t: torch.Tensor, cond: torch.Tensor):
-        if self.IS_AUGMENTATION_X:
-            x_0 = self.feature_augmenter.augment(x_0)
-            x_t = self.feature_augmenter.augment(x_t)
-        # x_0.shape = (batch_size, K, latent_dim)
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'full':
-            cond = self.conditioning_augmenter.augment(cond)
-        # cond.shape = (batch_size, cond_size, latent_dim)
-        if self.IS_AUGMENTATION_COND and self.cond_type == 'only_event':
-            cond = self.feature_augmenter.augment(cond)
-        return x_0, x_t, cond
-    '''
-
-
-    def deaugment(self, input: torch.Tensor):
-        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], cst.LEN_EVENT), device=cst.DEVICE)
-        if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
-            for i in range(input.shape[0]):
-                final_output[i] = self.feature_augmenter.deaugment(input[i])
-        return final_output
-
-    def augment(self, x_0: torch.Tensor, cond: torch.Tensor):
+    def augment(self, x_t: torch.Tensor, cond: torch.Tensor):
         if self.IS_AUGMENTATION and self.cond_type == 'only_event':
-            full_input = torch.cat([cond, x_0], dim=1)
+            full_input = torch.cat([cond, x_t], dim=1)
             full_input_aug = self.feature_augmenter.augment(full_input)
             cond = full_input_aug[:, :self.cond_seq_size, :]
-            x_0 = full_input_aug[:, self.cond_seq_size:, :]
+            x_t = full_input_aug[:, self.cond_seq_size:, :]
         # x_0.shape = (batch_size, K, latent_dim)
         if self.IS_AUGMENTATION and self.cond_type == 'full':
             cond = self.conditioning_augmenter.augment(cond)
-            x_0 = self.feature_augmenter.augment(x_0)
+            x_t = self.feature_augmenter.augment(x_t)
         # cond.shape = (batch_size, cond_size, latent_dim)
-        return x_0, cond
+        return x_t, cond
 
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")
@@ -157,7 +126,7 @@ class NNEngine(L.LightningModule):
         loss = self.loss(x_0, recon, **reverse_context)
         self.train_losses.append(loss)
         self.sampler.update_losses(self.t, loss)
-        return loss
+        return torch.mean(loss)
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
@@ -227,8 +196,6 @@ class NNEngine(L.LightningModule):
         print(f"\n train loss {loss}\n")
 
     def on_validation_epoch_end(self) -> None:
-
-
         loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
         jsd_val = JSDCalculator(self.val_data, self.val_ema_reconstructions)

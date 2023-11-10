@@ -2,6 +2,8 @@ import math
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 import torch
+from torch import nn
+
 from config import Configuration
 import constants as cst
 from models.feature_augmenters.AbstractAugmenter import AugmenterAB
@@ -11,6 +13,7 @@ class DiffusionAB(ABC):
     """An abstract class for loss functions."""
 
     def __init__(self, config: Configuration):
+        super().__init__()
         self.config = config
         self.alphas_cumprod = config.ALPHAS_CUMPROD
         self.betas = config.BETAS

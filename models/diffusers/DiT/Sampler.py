@@ -49,7 +49,7 @@ class LossSecondMomentResampler(ScheduleSampler):
         self._loss_history = np.zeros(
             [num_timesteps, history_per_term], dtype=np.float64
         )
-        self._loss_counts = np.zeros([num_timesteps])
+        self._loss_counts = np.zeros([num_timesteps], dtype=np.int64)
 
     def weights(self):
         if not self._warmed_up():
@@ -62,14 +62,14 @@ class LossSecondMomentResampler(ScheduleSampler):
 
     def update_losses(self, ts, losses):
         for i in range(len(losses)):
-            t = ts[i]
-            loss = losses[i]
+            t = ts[i].item()
+            loss = losses[i].item()
             if self._loss_counts[t] == self.history_per_term:
                 # Shift out the oldest loss term.
                 self._loss_history[t, :-1] = self._loss_history[t, 1:]
                 self._loss_history[t, -1] = loss
             else:
-                self._loss_history[t, self._loss_counts[t]] = loss
+                self._loss_history[t, int(self._loss_counts[t])] = loss
                 self._loss_counts[t] += 1
 
     def _warmed_up(self):

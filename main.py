@@ -13,12 +13,14 @@ def set_torch():
     torch.set_default_dtype(torch.float32)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
+    torch.autograd.set_detect_anomaly(True)
     torch.set_float32_matmul_precision('high')
 
 
 
 if __name__ == "__main__":
     set_torch()
+    torch.autograd.set_detect_anomaly(True)
     config = Configuration()
     config.ALPHAS_CUMPROD, config.BETAS = noise_scheduler(
         num_timesteps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_TIMESTEPS],
