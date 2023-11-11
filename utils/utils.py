@@ -11,7 +11,7 @@ def noise_scheduler(num_timesteps, s):
         alphas_cumprod.append(f_t / f_0)
     betas = [1 - (alphas_cumprod[i]/alphas_cumprod[i-1]) for i in range(1, len(alphas_cumprod))]
     betas.insert(0, 1)
-    return torch.Tensor(alphas_cumprod).to(cst.DEVICE), torch.Tensor(betas).to(cst.DEVICE)
+    return torch.Tensor(alphas_cumprod).to(cst.DEVICE), torch.clamp(torch.Tensor(betas).to(cst.DEVICE), max=0.999)
 
 #formula taken from "Denoising Diffusion Probabilistic Models"
 def compute_mean_tilde_t(x_0, x_T, alpha_cumprod_t, alpha_cumprod_t_1, beta_t, alpha_t):

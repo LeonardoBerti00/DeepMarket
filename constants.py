@@ -25,7 +25,6 @@ class LearningHyperParameter(str, Enum):
     DiT_MLP_RATIO = "dit_mlp_ratio"
     DiT_NUM_HEADS = "dit_num_heads"
     DiT_HIDDEN_SIZE = "dit_hidden_size"
-    DiT_TYPE = "dit_type"
 
 
 

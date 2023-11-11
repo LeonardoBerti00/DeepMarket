@@ -107,21 +107,21 @@ def train(config, trainer):
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
+        cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
@@ -146,6 +146,6 @@ def print_setup(config):
     print("Is augmented: ", config.IS_AUGMENTATION)
     print("Conditioning type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE])
     if config.CHOSEN_MODEL.name == "DiT":
-        print("Conditioning DiT type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DiT_TYPE])
+        print("Conditioning method: ", config.CONDITIONING_METHOD)
         print("Masked sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE])
 

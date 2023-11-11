@@ -1,3 +1,4 @@
+import math
 from typing import Dict, Tuple
 import numpy as np
 import torch
@@ -8,7 +9,8 @@ from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from models.diffusers.DiT.DiT import DiT
+from models.diffusers.DiT.DiT import DiT, CDT
+
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
@@ -25,7 +27,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS]
         self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.type = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_TYPE]
+        self.type = config.CONDITIONING_METHOD
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.mse_losses = []
         self.vlb_losses = []
@@ -36,19 +38,34 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         else:
             self.input_size = cst.LEN_EVENT
             self.cond_size = config.COND_SIZE
-
-        self.NN = DiT(
-            self.input_size,
-            self.cond_seq_size,
-            self.cond_size,
-            self.num_timesteps,
-            self.depth,
-            self.num_heads,
-            self.x_seq_size,
-            self.mlp_ratio,
-            self.cond_dropout_prob,
-            self.type
-        )
+        if (self.type == 'adaln_zero'):
+            self.NN = DiT(
+                self.input_size,
+                self.cond_seq_size,
+                self.cond_size,
+                self.num_timesteps,
+                self.depth,
+                self.num_heads,
+                self.x_seq_size,
+                self.mlp_ratio,
+                self.cond_dropout_prob,
+            )
+        elif (self.type == 'concatenation'):
+            self.NN = CDT(
+                self.input_size,
+                self.cond_seq_size,
+                self.cond_size,
+                self.num_timesteps,
+                self.depth,
+                self.num_heads,
+                self.x_seq_size,
+                self.mlp_ratio,
+                self.cond_dropout_prob,
+            )
+        elif (self.type == 'crossattention'):
+            pass
+        else:
+            raise ValueError("Invalid conditioning type")
         self.alphas_cumprod = config.ALPHAS_CUMPROD
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
@@ -66,6 +83,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas)
             / (1.0 - self.alphas_cumprod)
         )
+        # if we use concatenation or crossattention, we need to use the feature augmentation or cond type full
+        assert config.COND_TYPE == 'only_event' or self.IS_AUGMENTATION or self.type == 'adaln_zero'
+
 
     def forward(self, x_t_aug: torch.Tensor, context: Dict):
         assert 'x_t' in context
@@ -135,7 +155,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
-
         # Return the reverse diffusion output and an empty dictionary
         return noise_t, {}
 
@@ -151,9 +170,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         L_simple = self.mse_losses[-1]
         L_vlb = self.vlb_losses[-1]
         #compute average differences in orders of magnitude between L_simple e L_vlb
-        print("L_simple: ", L_simple)
-        print("L_vlb: ", L_vlb)
-        print("L_simple/L_vlb: ", L_simple/L_vlb)
         L_hybrid = L_simple + L_vlb
         return L_hybrid
 
@@ -165,7 +181,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         """
         Get a term for the variational lower-bound.
 
-        The resulting units are bits (rather than nats, as one might expect).
+        The resulting units are bits.
         This allows for comparison to other papers.
 
         :return: a dict with the following keys:
@@ -176,12 +192,21 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         pred_mean = self._p_mean(
             noise_t, x_t, t, beta_t, alpha_t, alpha_cumprod_t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
+        #check if there is nan value in pred_mean
         kl = self._normal_kl(
             true_mean, true_log_variance_clipped, pred_mean, pred_log_var
         )
         kl = self._mean_flat(kl) / np.log(2.0)
+        decoder_nll = -self._gaussian_log_likelihood(
+            x_0, means=pred_mean, log_scales=0.5 * pred_log_var
+        )
+        assert decoder_nll.shape == x_0.shape
+        decoder_nll = self._mean_flat(decoder_nll) / np.log(2.0)
 
-        return kl
+        # At the first timestep return the decoder NLL,
+        # otherwise return KL(q(x_{t-1}|x_t,x_0) || p(x_{t-1}|x_t))
+        output = torch.where((t == 0), decoder_nll, kl)
+        return output
 
     def _p_mean(self, noise_t, x_t, t,  beta_t, alpha_t, alpha_cumprod_t, clip_denoised=True, model_kwargs=None):
         '''
@@ -219,23 +244,16 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         Shapes are automatically broadcasted, so batches can be compared to
         scalars, among other use cases.
         """
-        return 0.5 * (
-                -1.0
-                + logvar2
-                - logvar1
-                + torch.exp(logvar1 - logvar2)
-                + ((mean1 - mean2) ** 2) * torch.exp(-logvar2)
-        )
+        output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
+        return output
 
 
-    '''
-    def _discretized_gaussian_log_likelihood(self, x, means, log_scales):
+
+    def _gaussian_log_likelihood(self, x, means, log_scales):
         """
-        Compute the log-likelihood of a Gaussian distribution discretizing to a
-        given image.
-
-        :param x: the target images. It is assumed that this was uint8 values,
-                  rescaled to the range [-1, 1].
+        It computes the log-likelihood log(p(x_0)) that is the probability that x was generated by the predicted distribution.
+        We need it when t = 0.
+        :param x: the target.
         :param means: the Gaussian mean Tensor.
         :param log_scales: the Gaussian log stddev Tensor.
         :return: a tensor like x of log probabilities (in nats).
@@ -243,18 +261,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         assert x.shape == means.shape == log_scales.shape
         centered_x = x - means
         inv_stdv = torch.exp(-log_scales)
-        plus_in = inv_stdv * (centered_x + 1.0 / 255.0)
-        cdf_plus = self._approx_standard_normal_cdf(plus_in)
-        min_in = inv_stdv * (centered_x - 1.0 / 255.0)
-        cdf_min = self._approx_standard_normal_cdf(min_in)
-        log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-12))
-        log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-12))
-        cdf_delta = cdf_plus - cdf_min
-        log_probs = torch.where(
-            x < -0.999,
-            log_cdf_plus,
-            torch.where(x > 0.999, log_one_minus_cdf_min, torch.log(cdf_delta.clamp(min=1e-12))),
-        )
+        log_probs = -((inv_stdv * centered_x ** 2) / 2) + (-2 * log_scales) - (math.log(2 * math.pi)/2)
         assert log_probs.shape == x.shape
         return log_probs
 
@@ -264,7 +271,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         standard normal.
         """
         return 0.5 * (1.0 + torch.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * torch.pow(x, 3))))
-    '''
+
     def _mean_flat(self, tensor):
         """
         Take the mean over all non-batch dimensions.

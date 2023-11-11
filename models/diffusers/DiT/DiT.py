@@ -86,7 +86,6 @@ class DiT(nn.Module):
         token_sequence_size,
         mlp_ratio,
         cond_dropout_prob,
-        cond_type
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -94,19 +93,12 @@ class DiT(nn.Module):
         self.c_embedder = ConditionEmbedder(cond_seq_len, cond_size, cond_dropout_prob, input_size)
         if (token_sequence_size != 1):
             self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, input_size)
-        if (cond_type == 'adaln_zero'):
-            self.blocks = nn.ModuleList([
-                adaLN_Zero(input_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
-            ])
-            self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1)
-            self.initialize_weights()
-        elif (cond_type == 'crossattention'):
-            if (cond_size != input_size):
-                raise ValueError('Cross-attention conditioning requires cond_size == input_size')
-        elif (cond_type == 'concatenate'):
-            pass
-        else:
-            raise ValueError(f'Unknown type: {cond_type}')
+        self.blocks = nn.ModuleList([
+            adaLN_Zero(input_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
+        ])
+        self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1)
+        self.initialize_weights()
+
 
 
     def initialize_weights(self):
@@ -160,4 +152,72 @@ class DiT(nn.Module):
         return torch.cat([eps, rest], dim=1)
 
 
+class CDT(nn.Module):
+    """
+    Diffusion model with a Transformer backbone.
+    """
+    def __init__(
+        self,
+        input_size,
+        cond_seq_len,
+        cond_size,
+        num_timesteps,
+        depth,
+        num_heads,
+        masked_sequence_size,
+        mlp_ratio,
+        cond_dropout_prob,
+    ):
+        super().__init__()
+        assert cond_size == input_size
+        self.num_heads = num_heads
+        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_timesteps)
+        self.seq_size = masked_sequence_size + cond_seq_len
+        self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
+        self.blocks = nn.ModuleList([
+            adaLN_Zero(input_size, num_heads, 1, mlp_ratio=mlp_ratio) for _ in range(depth)
+        ])
+        self.final_layer = FinalLayer_adaLN_Zero(input_size, 1)
+        self.initialize_weights()
 
+    def initialize_weights(self):
+        # Initialize transformer layers:
+        def _basic_init(module):
+            if isinstance(module, nn.Linear):
+                torch.nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+        self.apply(_basic_init)
+
+        # Initialize timestep embedding MLP:
+        nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
+        nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
+
+    def forward(self, x, cond, t):
+        """
+        Forward pass of DiT.
+        x: (N, K, F) tensor of time series
+        t: (N,) tensor of diffusion timesteps
+        cond: (N, P, C) tensor of past history
+        """
+        full_input = torch.cat([cond, x], dim=1)
+        full_input[:] = full_input[:] + self.pos_embed
+        t = self.t_embedder(t)
+        for block in self.blocks:
+            full_input = block(full_input, t)
+        noise, var = self.final_layer(full_input, t)
+        return noise, var
+
+    #TODO: implement forward_with_cfg
+    def forward_with_cfg(self, x, t, y, cfg_scale):
+        """
+        Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.
+        """
+        half = x[: len(x) // 2]
+        combined = torch.cat([half, half], dim=0)
+        model_out = self.forward(combined, t, y)
+        noise, rest = model_out[:, :3], model_out[:, 3:]
+        cond_noise, uncond_noise = torch.split(noise, len(noise) // 2, dim=0)
+        half_noise = uncond_noise + cfg_scale * (cond_noise - uncond_eps)
+        eps = torch.cat([half_eps, half_eps], dim=0)
+        return torch.cat([eps, rest], dim=1)

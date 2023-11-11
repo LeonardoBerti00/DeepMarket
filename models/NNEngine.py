@@ -34,7 +34,8 @@ class NNEngine(L.LightningModule):
         self.training = config.IS_TRAINING
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
-        self.cond_type = config.HYPER_PARAMETERS[LearningHyperParameter.COND_TYPE]
+        self.IS_AUGMENTATION = config.IS_AUGMENTATION
+        self.cond_type = config.COND_TYPE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
         self.val_data, self.test_data = val_data, test_data
@@ -46,7 +47,7 @@ class NNEngine(L.LightningModule):
         self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
         self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
-        self.IS_AUGMENTATION = config.IS_AUGMENTATION
+
 
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
@@ -69,23 +70,25 @@ class NNEngine(L.LightningModule):
         # save the real input for future
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
-        self.t = self.num_timesteps - 1
+        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_timesteps - 1)
         if isinstance(self.diffuser, CSDIDiffuser):
             self.t = torch.randint(low=0, high=self.num_timesteps - 1, size=(x_0.shape[0],), device=cst.DEVICE) if is_train else self.t
         elif isinstance(self.diffuser, GaussianDiffusion):
             self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
+            # fill t with 999
+            self.t = torch.full_like(self.t, 999)
 
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
         context.update({'x_t': copy.deepcopy(x_t)})
-        x_t.requires_grad=True
+        x_t.requires_grad = True
+
         # augment
         x_t, cond = self.augment(x_t, cond)
 
         # reverse
         context.update({
             'is_train': is_train,
-            'cond_augmenter': self.conditioning_augmenter,
             't': self.t,
             'x_0': x_0,
             'conditioning_aug': cond,
