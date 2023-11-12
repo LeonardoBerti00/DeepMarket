@@ -18,7 +18,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
+        self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
@@ -29,8 +29,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.type = config.CONDITIONING_METHOD
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
-        self.mse_losses = []
-        self.vlb_losses = []
+        self.init_losses()
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
@@ -43,7 +42,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.input_size,
                 self.cond_seq_size,
                 self.cond_size,
-                self.num_timesteps,
+                self.num_diffusionsteps,
                 self.depth,
                 self.num_heads,
                 self.x_seq_size,
@@ -55,7 +54,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.input_size,
                 self.cond_seq_size,
                 self.cond_size,
-                self.num_timesteps,
+                self.num_diffusionsteps,
                 self.depth,
                 self.num_heads,
                 self.x_seq_size,
@@ -96,11 +95,10 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         cond = context['conditioning_aug']
         assert 't' in context
         t = context['t']
-        assert 'is_train' in context
-        is_train = context['is_train']
         assert 'x_0' in context
         x_0 = context['x_0']
-        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond, noise_true, is_train)
+        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond, noise_true)
+
 
     def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         assert 'conditioning' in kwargs
@@ -108,7 +106,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         x_t, noise = super().forward_reparametrized(x_0, t)
         return x_t, {'noise_true': noise, 'conditioning': cond}
 
-    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond, noise_true, is_train):
+    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond, noise_true):
         '''
         Compute the reverse diffusion process for the current time step
         '''
@@ -134,7 +132,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         # Sample a standard normal random variable z
         z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE)
         # Compute x_{t-1} from x_t the reverse diffusion process for the current time step
-        x_t = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (var_t * z)
+        x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (var_t * z)
 
         # Compute the mean squared error loss between the noise and the true noise
         L_mse = self._mse_loss(noise_t, noise_true)
@@ -156,7 +154,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
         # Return the reverse diffusion output and an empty dictionary
-        return noise_t, {}
+        return x_recon, {}
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
         noise, v = self.feature_augmenter.deaugment(noise, v)
@@ -167,8 +165,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         """Computes the loss taken from IDDPM."""
-        L_simple = self.mse_losses[-1]
-        L_vlb = self.vlb_losses[-1]
+        L_simple = torch.stack(self.mse_losses)
+        L_vlb = torch.stack(self.vlb_losses)
         #compute average differences in orders of magnitude between L_simple e L_vlb
         L_hybrid = L_simple + L_vlb
         return L_hybrid
@@ -277,3 +275,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         Take the mean over all non-batch dimensions.
         """
         return tensor.mean(dim=list(range(1, len(tensor.shape))))
+
+    def init_losses(self):
+        self.mse_losses = []
+        self.vlb_losses = []

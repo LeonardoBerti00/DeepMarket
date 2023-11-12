@@ -36,7 +36,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
+        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 1
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.01
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
@@ -49,7 +49,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 32
-        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS] = 1000
+        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 1000
         self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.008           #value taken from the papre IDDPM
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12

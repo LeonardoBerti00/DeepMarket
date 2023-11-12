@@ -24,7 +24,7 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
     config = Configuration()
     config.ALPHAS_CUMPROD, config.BETAS = noise_scheduler(
-        num_timesteps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_TIMESTEPS],
+        num_diffusionsteps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS],
         s=config.HYPER_PARAMETERS[cst.LearningHyperParameter.S]
     )
     if (cst.DEVICE == "cpu"):

@@ -4,7 +4,7 @@ import wandb
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 import constants as cst
-from evaluation.evaluation_utils import jsd
+from evaluation.evaluation_utils import JSD, KS
 from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -130,8 +130,6 @@ def train(config, trainer):
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
 
-    jsd(val_set.data, val_set.data)
-    exit()
 
     model = NNEngine(
         config=config,
@@ -142,7 +140,7 @@ def train(config, trainer):
         trainer=trainer
     ).to(cst.DEVICE, torch.float32)
 
-    trainer.fit(model, train_dataloader, val_dataloader)
+    #trainer.fit(model, train_dataloader, val_dataloader)
     trainer.test(model, dataloaders=test_dataloader)
 
 

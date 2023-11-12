@@ -7,9 +7,9 @@ class TimestepEmbedder(nn.Module):
     """
     Embeds scalar timesteps into vector representations.
     """
-    def __init__(self, hidden_size, frequency_embedding_size, num_timesteps):
+    def __init__(self, hidden_size, frequency_embedding_size, num_diffusionsteps):
         super().__init__()
-        self.num_timesteps = num_timesteps
+        self.num_diffusionsteps = num_diffusionsteps
         self.mlp = nn.Sequential(
             nn.Linear(frequency_embedding_size, hidden_size, bias=True),
             nn.SiLU(),
@@ -38,7 +38,7 @@ class TimestepEmbedder(nn.Module):
         return embedding
 
     def forward(self, t):
-        t_freq = self.timestep_embedding(t, self.frequency_embedding_size, max_period=self.num_timesteps)
+        t_freq = self.timestep_embedding(t, self.frequency_embedding_size, max_period=self.num_diffusionsteps)
         t_emb = self.mlp(t_freq)
         return t_emb
 

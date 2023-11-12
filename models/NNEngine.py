@@ -10,7 +10,7 @@ from constants import LearningHyperParameter
 import time
 
 import wandb
-from evaluation.evaluation_utils import KSCalculator, jsd, JSD
+from evaluation.evaluation_utils import JSD
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 from utils.utils_models import pick_diffuser
@@ -46,7 +46,7 @@ class NNEngine(L.LightningModule):
         self.val_ema_losses, self.test_ema_losses = [], []
         self.val_reconstructions, self.test_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
-        self.num_timesteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_TIMESTEPS]
+        self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
 
 
@@ -63,29 +63,42 @@ class NNEngine(L.LightningModule):
             self.conditioning_augmenter = self.feature_augmenter
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
-        self.sampler = LossSecondMomentResampler(self.num_timesteps)
+        self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.lstm = nn.LSTM(config.COND_SIZE, config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM], num_layers=1, batch_first=True, dropout=0.1)
 
 
-
-
-    def forward(self, cond, x_0, is_train=True):
+    def forward(self, cond, x_0, is_train):
         # save the real input for future
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
-        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_timesteps - 1)
-        if isinstance(self.diffuser, CSDIDiffuser):
-            self.t = torch.randint(low=0, high=self.num_timesteps - 1, size=(x_0.shape[0],), device=cst.DEVICE) if is_train else self.t
-        elif isinstance(self.diffuser, GaussianDiffusion):
-            self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
+        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps - 1, device=cst.DEVICE)
+        if isinstance(self.diffuser, CSDIDiffuser) and is_train:
+            self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE)
+        elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
+            self.t, _ = self.sampler.sample(self.batch_size)
 
+        if is_train:
+            recon, context = self.single_step(cond, x_0, is_train, real_cond)
+        else:
+            for i in range(self.num_diffusionsteps):
+                if i == 0 and self.IS_AUGMENTATION and self.cond_type == 'full':
+                    cond = self.conditioning_augmenter.augment(cond)
+                if i == self.num_diffusionsteps - 1:
+                    pass
+                recon, context = self.single_step(cond, x_0, is_train, real_cond)
+                self.t -= 1
+
+        return recon, context
+
+
+    def single_step(self, cond, x_0, is_train, real_cond):
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
         context.update({'x_t': copy.deepcopy(x_t)})
         x_t.requires_grad = True
 
         # augment
-        x_t, cond = self.augment(x_t, cond)
+        x_t, cond = self.augment(x_t, cond, is_train)
 
         context.update({
             'is_train': is_train,
@@ -94,30 +107,28 @@ class NNEngine(L.LightningModule):
             'conditioning_aug': cond,
         })
 
-        noise_recon, reverse_context = self.diffuser(x_t, context)
+        x_recon, reverse_context = self.diffuser(x_t, context)
 
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
-        return noise_recon, reverse_context
+        return x_recon, reverse_context
 
-    def augment(self, x_t: torch.Tensor, cond: torch.Tensor):
+    def augment(self, x_t: torch.Tensor, cond: torch.Tensor, is_train: bool):
         if self.IS_AUGMENTATION and self.cond_type == 'only_event':
             full_input = torch.cat([cond, x_t], dim=1)
             full_input_aug = self.feature_augmenter.augment(full_input)
             cond = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-        # x_0.shape = (batch_size, K, latent_dim)
-        if self.IS_AUGMENTATION and self.cond_type == 'full':
+        if self.IS_AUGMENTATION and self.cond_type == 'full' and is_train:
             cond = self.conditioning_augmenter.augment(cond)
             x_t = self.feature_augmenter.augment(x_t)
-        # cond.shape = (batch_size, cond_size, latent_dim)
+        elif self.IS_AUGMENTATION and self.cond_type == 'full' and not is_train:
+            # if we are in test mode and cond type is full, we augment the conditioning only for the first step directly in forward
+            x_t = self.feature_augmenter.augment(x_t)
         return x_t, cond
 
-    def _define_log_metrics(self):
-        wandb.define_metric("val_loss", summary="min")
-        wandb.define_metric("val_ema_loss", summary="min")
-        wandb.define_metric("test_loss", summary="min")
-        wandb.define_metric("test_ema_loss", summary="min")
+    def loss(self, real, recon, **kwargs):
+        return self.diffuser.loss(real, recon, **kwargs)
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
@@ -126,56 +137,94 @@ class NNEngine(L.LightningModule):
         cond = input[0]
         recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': True})
-        loss = self.loss(x_0, recon, **reverse_context)
-        self.train_losses.append(loss)
-        self.sampler.update_losses(self.t, loss)
-        return torch.mean(loss)
+        batch_losses = self.loss(x_0, recon, **reverse_context)
+        batch_loss_mean = torch.mean(batch_losses)
+        self.train_losses.append(batch_loss_mean.item())
+        self.sampler.update_losses(self.t, batch_losses)
+        if isinstance(self.diffuser, GaussianDiffusion):
+            self.diffuser.init_losses()
+        return batch_loss_mean
+
+    def on_train_epoch_end(self) -> None:
+        loss = sum(self.train_losses) / len(self.train_losses)
+        self.log('train_loss', loss)
+        print(f'train loss on epoch {self.current_epoch} is {loss}')
+
+
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
         cond = input[0]
         recon, reverse_context = self.forward(cond, x_0, is_train=False)
         reverse_context.update({'is_train': False})
-        loss = self.loss(x_0, recon, **reverse_context)
-        self.val_losses.append(loss)
-        if batch_idx != self.val_num_batches - 1:
-            self.val_reconstructions[batch_idx * self.batch_size:(batch_idx + 1) * self.batch_size] = recon.cpu().detach().numpy()
-        else:
-            self.val_reconstructions[batch_idx * self.batch_size:] = recon.cpu().detach().numpy()
+        batch_losses = self.loss(x_0, recon, **reverse_context)
+        batch_loss_mean = torch.mean(batch_losses)
+        self.val_losses.append(batch_loss_mean.item())
+        if isinstance(self.diffuser, GaussianDiffusion):
+            self.diffuser.init_losses()
         # Validation: with EMA
         with self.ema.average_parameters():
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
-            ema_loss = self.loss(x_0, recon, **reverse_context)
+            batch_ema_losses = self.loss(x_0, recon, **reverse_context)
+            ema_loss = torch.mean(batch_ema_losses)
             self.val_ema_losses.append(ema_loss)
-            if batch_idx != self.val_num_batches - 1:
-                self.val_ema_reconstructions[batch_idx * self.batch_size:(batch_idx + 1) * self.batch_size] = recon.cpu().detach().numpy()
-            else:
-                self.val_ema_reconstructions[batch_idx * self.batch_size:] = recon.cpu().detach().numpy()
-        return loss
+        if isinstance(self.diffuser, GaussianDiffusion):
+            self.diffuser.init_losses()
+        return batch_loss_mean
+
+    def on_validation_epoch_end(self) -> None:
+        loss = sum(self.val_losses) / len(self.val_losses)
+        loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
+        self.log('val_loss', loss)
+        self.log('val_ema_loss', loss_ema)
+        print(f"\n val loss on epoch {self.current_epoch} is {loss}")
+        print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}")
+
 
     def test_step(self, input, batch_idx):
         x_0 = input[1]
         cond = input[0]
         recon, reverse_context = self.forward(cond, x_0, is_train=False)
         reverse_context.update({'is_train': False})
-        loss = self.loss(x_0, recon, **reverse_context)
-        self.test_losses.append(loss)
+        batch_losses = self.loss(x_0, recon, **reverse_context)
+        batch_loss_mean = torch.mean(batch_losses)
+        self.test_losses.append(batch_loss_mean.item())
+        recon = self._to_original_dim(recon)
         if batch_idx != self.test_num_batches - 1:
             self.test_reconstructions[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size] = recon.cpu().detach().numpy()
         else:
             self.test_reconstructions[batch_idx*self.batch_size:] = recon.cpu().detach().numpy()
+        if isinstance(self.diffuser, GaussianDiffusion):
+            self.diffuser.init_losses()
         # Testing: with EMA
         with self.ema.average_parameters():
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
-            ema_loss = self.loss(x_0, recon, **reverse_context)
-            self.val_ema_losses.append(ema_loss)
+            batch_ema_losses = self.loss(x_0, recon, **reverse_context)
+            ema_loss = torch.mean(batch_ema_losses)
+            self.test_ema_losses.append(ema_loss.item())
+            recon = self._to_original_dim(recon)
             if batch_idx != self.test_num_batches - 1:
                 self.test_ema_reconstructions[batch_idx * self.batch_size:(batch_idx + 1) * self.batch_size] = recon.cpu().detach().numpy()
             else:
                 self.test_ema_reconstructions[batch_idx * self.batch_size:] = recon.cpu().detach().numpy()
-        return loss
+        if isinstance(self.diffuser, GaussianDiffusion):
+            self.diffuser.init_losses()
+        return batch_loss_mean
+
+    def on_test_end(self) -> None:
+        loss = sum(self.test_losses) / len(self.test_losses)
+        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
+        jsd_test = JSD(self.test_data, self.test_ema_reconstructions)
+        jsd_test_ema = JSD(self.test_data, self.test_reconstructions)
+        self.log('test_jsd_ema', jsd_test_ema)
+        self.log('test_jsd', jsd_test.jsd_for_each_feature())
+        self.log('test_loss', loss)
+        self.log('test_ema_loss', loss_ema)
+        print(f"\n test loss on epoch {self.current_epoch} is {loss}")
+        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}")
+
 
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
@@ -189,54 +238,6 @@ class NNEngine(L.LightningModule):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)
         return {"optimizer": self.optimizer, "lr_scheduler": scheduler}
 
-    def loss(self, input, recon, **kwargs):
-        # Reconstruction loss is the mse between the input and the reconstruction
-        return self.diffuser.loss(input, recon, **kwargs)
-
-    def on_train_epoch_end(self) -> None:
-        loss = sum(self.train_losses) / len(self.train_losses)
-        self.log('train_loss', loss)
-        print(f"\n train loss {loss}\n")
-
-    def on_validation_epoch_end(self) -> None:
-        loss = sum(self.val_losses) / len(self.val_losses)
-        loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
-        jsd_val_ema = JSD(self.val_data, self.val_ema_reconstructions)
-        jsd_val = JSD(self.val_data, self.val_reconstructions)
-        ks_val = KSCalculator(self.val_data, self.val_ema_reconstructions)
-        self.log('val_jsd', jsd_val)
-        self.log('val_jsd_ema', jsd_val_ema)
-        self.log('val_ks', ks_val.calculate_ks())
-        self.log('val_loss', loss)
-        self.log('val_ema_loss', loss_ema)
-        print(f"\n val loss {loss}")
-        print(f"\n val ema loss {loss_ema}")
-        print(f"\n val jsd for offset: {jsd_val.jsd_for_each_feature()[0]}")
-        print(f"\n val jsd for type: {jsd_val.jsd_for_each_feature()[1]}")
-        print(f"\n val jsd for size: {jsd_val.jsd_for_each_feature()[2]}")
-        print(f"\n val jsd for direction: {jsd_val.jsd_for_each_feature()[4]}")
-        print(f"\n val jsd for price: {jsd_val.jsd_for_each_feature()[3]}")
-        print(f"\n val ks {ks_val.calculate_ks()}")
-
-
-    def on_test_epoch_end(self) -> None:
-        loss = sum(self.test_losses) / len(self.test_losses)
-        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
-        jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
-        ks_test = KSCalculator(self.test_data, self.test_ema_reconstructions)
-        self.log('test_jsd', jsd_test.jsd_for_each_feature())
-        self.log('test_ks', ks_test.calculate_ks())
-        self.log('test_loss', loss)
-        self.log('test_ema_loss', loss_ema)
-        print(f"\n test loss {loss}")
-        print(f"\n test ema loss {loss_ema}")
-        print(f"\n test jsd for offset: {jsd_test.jsd_for_each_feature()[0]}")
-        print(f"\n test jsd for type: {jsd_test.jsd_for_each_feature()[1]}")
-        print(f"\n test jsd for size: {jsd_test.jsd_for_each_feature()[2]}")
-        print(f"\n test jsd for direction: {jsd_test.jsd_for_each_feature()[4]}")
-        print(f"\n test jsd for price: {jsd_test.jsd_for_each_feature()[3]}")
-        print(f"\n test ks {ks_test.calculate_ks()}")
-
     def inference_time(self, cond, x):
         t0 = time.time()
         _ = self(cond, x)
@@ -248,3 +249,22 @@ class NNEngine(L.LightningModule):
 
     def on_before_zero_grad(self, *args, **kwargs):
         self.ema.update()
+
+    def _define_log_metrics(self):
+        wandb.define_metric("val_loss", summary="min")
+        wandb.define_metric("val_ema_loss", summary="min")
+        wandb.define_metric("test_loss", summary="min")
+        wandb.define_metric("test_ema_loss", summary="min")
+
+    def _to_original_dim(self, recon):
+        out = torch.zeros((recon.shape[0], recon.shape[1], 5), device=cst.DEVICE)
+        type = torch.argmax(recon[:, :, 1:5], dim=2)
+        # type == 0 is add, type == 1 is cancel, type == 2 is deletion, type == 3 is execution
+        direction = torch.argmax(recon[:, :, 7:9], dim=2)
+        # direction == 1 is buy, direction == 0 is sell
+        out[:, :, 0] = recon[:, :, 0]
+        out[:, :, 1] = type
+        out[:, :, 2] = recon[:, :, 5]
+        out[:, :, 3] = recon[:, :, 6]
+        out[:, :, 4] = direction
+        return out

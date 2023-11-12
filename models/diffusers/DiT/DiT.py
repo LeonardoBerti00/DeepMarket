@@ -86,7 +86,7 @@ class DiT(nn.Module):
         input_size,
         cond_seq_len,
         cond_size,
-        num_timesteps,
+        num_diffusionsteps,
         depth,
         num_heads,
         token_sequence_size,
@@ -95,7 +95,7 @@ class DiT(nn.Module):
     ):
         super().__init__()
         self.num_heads = num_heads
-        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_timesteps)
+        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.c_embedder = ConditionEmbedder(cond_seq_len, cond_size, cond_dropout_prob, input_size)
         if (token_sequence_size != 1):
             self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, input_size)
@@ -167,7 +167,7 @@ class CDT(nn.Module):
         input_size,
         cond_seq_len,
         cond_size,
-        num_timesteps,
+        num_diffusionsteps,
         depth,
         num_heads,
         masked_sequence_size,
@@ -177,7 +177,7 @@ class CDT(nn.Module):
         super().__init__()
         assert cond_size == input_size
         self.num_heads = num_heads
-        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_timesteps)
+        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
         self.blocks = nn.ModuleList([

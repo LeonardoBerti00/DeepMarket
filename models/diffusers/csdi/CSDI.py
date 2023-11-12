@@ -22,7 +22,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         self.device = cst.DEVICE
         self.target_dim = cst.LEN_EVENT
         self.feature_augmenter = feature_augmenter
-        self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_TIMESTEPS]
+        self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
         self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
         self.embedding_time_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_TIME_DIM]

@@ -25,20 +25,30 @@ def JSD(q, p):
 ######################### Kolmogorov-Smironov statistic (test) #########################
 # It is used to measure the similarity between two probability distributions #
 
-class KSCalculator:
-    def __init__(self, historical_data, generated_data):
-        self.p_1 = np.mean(historical_data, axis=0)
-        self.q_1 = np.mean(generated_data, axis=0)
-
-    def calculate_ks(self):
-        ks_stat, p_value = stats.ks_2samp(self.p_1, self.q_1)
+def KS(q, p):
+    ks_list = []
+    p_values = []
+    if (type(q) != np.ndarray):
+        q = np.array(q)
+    if (type(p) != np.ndarray):
+        p = np.array(p)
+    for i in range(p.shape[1]):
+        p_i = p[:, i]
+        p_i /= np.sum(p_i)
+        q_i = q[:, i]
+        q_i /= np.sum(q_i)
+        stat = stats.ks_2samp(q_i, p_i)
+        ks_list.append(stat.statistic)
+        p_values.append(stat.pvalue)
+        '''
         print(f"Test statistic is {ks_stat:.4f}")
         print(f"Test value si{p_value:.4f}")
         if p_value < 0.05:
             print("We reject the null hypothesis that the two datasets come from the same distribution")
         else:
             print("We do not reject the null hypothesis that the two datasets come from the same distribution")
-        return ks_stat, p_value
+        '''
+    return ks_list, p_values
     
 
 

@@ -3,11 +3,11 @@ import torch
 import constants as cst
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
-def noise_scheduler(num_timesteps, s):
+def noise_scheduler(num_diffusionsteps, s):
     alphas_cumprod = []
     f_0 = math.cos((s/(1+s) * (math.pi/2)))**2
-    for t in range(1, num_timesteps+1):
-        f_t = math.cos(((t/num_timesteps+s)/(s+1) * (math.pi/2)))**2
+    for t in range(1, num_diffusionsteps+1):
+        f_t = math.cos(((t/num_diffusionsteps+s)/(s+1) * (math.pi/2)))**2
         alphas_cumprod.append(f_t / f_0)
     betas = [1 - (alphas_cumprod[i]/alphas_cumprod[i-1]) for i in range(1, len(alphas_cumprod))]
     betas.insert(0, 1)
