@@ -10,7 +10,7 @@ from constants import LearningHyperParameter
 import time
 
 import wandb
-from evaluation.evaluation_utils import JSD
+from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 from utils.utils_models import pick_diffuser
@@ -216,10 +216,10 @@ class NNEngine(L.LightningModule):
     def on_test_end(self) -> None:
         loss = sum(self.test_losses) / len(self.test_losses)
         loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
-        jsd_test = JSD(self.test_data, self.test_ema_reconstructions)
-        jsd_test_ema = JSD(self.test_data, self.test_reconstructions)
-        self.log('test_jsd_ema', jsd_test_ema)
-        self.log('test_jsd', jsd_test.jsd_for_each_feature())
+        jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
+        jsd_test_ema = JSDCalculator(self.test_data, self.test_reconstructions)
+        self.log('test_jsd_ema', jsd_test_ema.calculate_jsd())
+        self.log('test_jsd', jsd_test.calculate_jsd())
         self.log('test_loss', loss)
         self.log('test_ema_loss', loss_ema)
         print(f"\n test loss on epoch {self.current_epoch} is {loss}")
