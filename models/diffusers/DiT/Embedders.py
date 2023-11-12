@@ -63,9 +63,10 @@ class ConditionEmbedder(nn.Module):
             drop_ids = torch.rand(cond.shape[0], device=cond.device) < self.dropout_prob
         else:
             drop_ids = force_drop_ids == 1
-        for i in range(cond.shape[0]):
-            if drop_ids[i]:
-                cond[i] = torch.zeros((cond.shape[1], cond.shape[2]), device=cond.device)
+        #create a mask of zeros for the rows to drop
+        mask = torch.ones((cond.shape), device=cond.device)
+        mask[drop_ids] = 0
+        cond = torch.einsum('bld, bld -> bld', cond, mask)
         return cond
 
     def forward(self, cond, train, force_drop_ids=None):

@@ -5,28 +5,21 @@ import scipy.stats as stats
 ######################### Jensen-Shannon Divergence #########################
 # It is used to measure the similarity between two probability distributions ---> 0: same distribution, 1: different distribution #
 
-class JSDCalculator:
-    def __init__(self, historical_data, generated_data, bins=10):
-        self.p_1 = np.mean(historical_data, axis=0)
-        self.q_1 = np.mean(generated_data, axis=0)
-        self.bins = bins
-    
-    # to calculate the JSD between two probability distributions
-    def jsd(self):
-        m = 0.5 * (self.p_1 + self.q_1)
-        jsd = np.sqrt(0.5 * (entropy(self.p_1, m) + entropy(self.q_1, m)))
-        return jsd
 
-    # to calculate the JSD between two probability distributions for each feature
-    def jsd_for_each_feature(self):
-        jsd_list = []
-        for i in range(self.p_1.shape[0]):
-            p_i = self.p_1[i]
-            q_i = self.q_1[i]
-            m_i = 0.5 * (p_i + q_i)
-            jsd_i = np.sqrt(0.5 * (entropy(p_i, m_i) + entropy(q_i, m_i)))
-            jsd_list.append(jsd_i)
-        return jsd_list
+def JSD(q, p):
+    jsd_list = []
+    if (type(q) != np.ndarray):
+        q = np.array(q)
+    if (type(p) != np.ndarray):
+        p = np.array(p)
+    for i in range(p.shape[1]):
+        p_i = p[:, i]
+        p_i /= np.sum(p_i)
+        q_i = q[:, i]
+        q_i /= np.sum(q_i)
+        jsd_list.append(np.sqrt(0.5 * (entropy(p_i, q_i) + entropy(q_i, p_i))))
+    return jsd_list
+
 
 
 ######################### Kolmogorov-Smironov statistic (test) #########################

@@ -1,5 +1,6 @@
 import copy
 import numpy
+from torch import nn
 
 from config import Configuration
 import torch
@@ -9,7 +10,7 @@ from constants import LearningHyperParameter
 import time
 
 import wandb
-from evaluation.evaluation_utils import JSDCalculator, KSCalculator
+from evaluation.evaluation_utils import KSCalculator, jsd, JSD
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
 from utils.utils_models import pick_diffuser
@@ -63,6 +64,8 @@ class NNEngine(L.LightningModule):
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.sampler = LossSecondMomentResampler(self.num_timesteps)
+        self.lstm = nn.LSTM(config.COND_SIZE, config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM], num_layers=1, batch_first=True, dropout=0.1)
+
 
 
 
@@ -75,8 +78,6 @@ class NNEngine(L.LightningModule):
             self.t = torch.randint(low=0, high=self.num_timesteps - 1, size=(x_0.shape[0],), device=cst.DEVICE) if is_train else self.t
         elif isinstance(self.diffuser, GaussianDiffusion):
             self.t, _ = self.sampler.sample(self.batch_size) if is_train else self.t
-            # fill t with 999
-            self.t = torch.full_like(self.t, 999)
 
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
@@ -86,7 +87,6 @@ class NNEngine(L.LightningModule):
         # augment
         x_t, cond = self.augment(x_t, cond)
 
-        # reverse
         context.update({
             'is_train': is_train,
             't': self.t,
@@ -201,9 +201,11 @@ class NNEngine(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
-        jsd_val = JSDCalculator(self.val_data, self.val_ema_reconstructions)
+        jsd_val_ema = JSD(self.val_data, self.val_ema_reconstructions)
+        jsd_val = JSD(self.val_data, self.val_reconstructions)
         ks_val = KSCalculator(self.val_data, self.val_ema_reconstructions)
-        self.log('val_jsd', jsd_val.jsd_for_each_feature())
+        self.log('val_jsd', jsd_val)
+        self.log('val_jsd_ema', jsd_val_ema)
         self.log('val_ks', ks_val.calculate_ks())
         self.log('val_loss', loss)
         self.log('val_ema_loss', loss_ema)

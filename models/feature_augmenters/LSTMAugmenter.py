@@ -22,17 +22,17 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
 
 
     def forward(self, input):
-        x, (h_n, c_n) = self.fwd_lstm(input)
-        return x
+        out, (h_n, c_n) = self.fwd_lstm(input)
+        return out
     
     def augment(self, input):
         return self.forward(input)
     
     def deaugment(self, input, v=None):
-        x, (h_n, c_n) = self.bck_lstm(input)
+        input, (_, _) = self.bck_lstm(input)
         if self.chosen_model == cst.Models.DiT.value:
-            v, (h_n, c_n) = self.v_lstm(v)
-        return x, v
+            v, (_, _) = self.v_lstm(v)
+        return input, v
 
 
         

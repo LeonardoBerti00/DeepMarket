@@ -19,6 +19,7 @@ def set_torch():
 
 
 if __name__ == "__main__":
+
     set_torch()
     torch.autograd.set_detect_anomaly(True)
     config = Configuration()
