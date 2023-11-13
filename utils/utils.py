@@ -1,5 +1,7 @@
 import math
 import torch
+from matplotlib import pyplot as plt
+
 import constants as cst
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
@@ -10,7 +12,10 @@ def noise_scheduler(num_diffusionsteps, s):
         f_t = math.cos(((t/num_diffusionsteps+s)/(s+1) * (math.pi/2)))**2
         alphas_cumprod.append(f_t / f_0)
     betas = [1 - (alphas_cumprod[i]/alphas_cumprod[i-1]) for i in range(1, len(alphas_cumprod))]
-    betas.insert(0, 1)
+    betas.insert(0, betas[0])
+    #plot the alphas with respect to t
+    plt.plot(alphas_cumprod)
+    plt.show()
     return torch.Tensor(alphas_cumprod).to(cst.DEVICE), torch.clamp(torch.Tensor(betas).to(cst.DEVICE), max=0.999)
 
 #formula taken from "Denoising Diffusion Probabilistic Models"

@@ -4,7 +4,6 @@ import wandb
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 import constants as cst
-from evaluation.evaluation_utils import JSD, KS
 from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping

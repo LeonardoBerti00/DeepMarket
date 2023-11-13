@@ -1,7 +1,9 @@
 1. Diffusion models
     1.1. fix CSDI @bardh
 2. function to do the quantitative evaluation and plot the metrics: (https://proceedings.neurips.cc/paper_files/paper/2019/file/c9efe5f26cd17ba6216bbe2a7d26d490-Paper.pdf)
-    2.1. predictive score @marco
+    2.1. predictive score @marco -> si potrebbe fare una classificazione, quindi label, del trend prendendo i valori di esecuzioni degli ordini, poi trainare
+    una lstm su dati normali, e un'altra su dati generati testando entrambe su dati reali e vedere la differenza di performance, se la differenza
+    è bassa vuol dire che i dati generati sono simili a quelli reali perchè riescono ad allenare una lstm a classificare dati reali.
     2.2. discriminative score @marco
 3. function to plot the results and do the qualitative evaluation as in the coletta paper, you can find the plot to do in overleaf @marco
 4. hyperparameters search
@@ -9,7 +11,7 @@
 6. Integrate ABIDES to do a full trading financial simulation as in the coletta paper
 7. train with one stock and check the performance with another one
 8. experiment with latent representation of market state, so the input conditioning, using a VQ-VAE or RQ-VAE
-9. Implementing StockGAN (coletta) and maybe TimeGAN
+9. Implementing StockGAN (coletta)
 10. Speed-up tricks @leo
 
 (qui mettere solo major to do mentre per minor usare il classico to do)

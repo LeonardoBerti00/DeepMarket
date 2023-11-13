@@ -55,7 +55,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
-        self.CONDITIONING_METHOD = "concatenation"
+        self.CONDITIONING_METHOD = "adaln_zero"
 
         self.COND_TYPE = "only_event"  # it can be full or 'only_event'
         self.ALPHAS_CUMPROD, self.BETAS = None, None
