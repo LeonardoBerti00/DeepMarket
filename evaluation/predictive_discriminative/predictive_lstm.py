@@ -5,18 +5,13 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 
-# REFERENCE: Time-series Generative Adversarial Networks
-
-# merge gen and not gen datased adding a binary label column
-# train a lstm model to predict the binary label
-# test the model on the test set
-# if the accuracy is high, the model is able to discriminate between generated and not generated data (the dataset are different) otherwise the model is not able to discriminate between
-#    the two datasets (the dataset are similar)
-# ho fatto una prova con solo il dataset non generato e l'accuracy è ovviamente di circa il 50% (TODELETE)
+# given real data and generated data
+# train a lstm with real data, train a lstm with generated data
+# test the two lstm on real data test set
 
 
 class Preprocessor:
-    def __init__(self, df): # df in input is the merged dataset with the binary label "generated"
+    def __init__(self, df): # df can be real data or generated data
         self.df = df
 
     def preprocess(self):
@@ -27,10 +22,10 @@ class Preprocessor:
         return self.df
 
     def _rename_columns(self):
-        self.df.columns = ["time", "event_type", "size", "price", "direction", "generated"]
+        self.df.columns = ["time", "event_type", "size", "price", "direction"]
 
     def _one_hot_encode(self):
-        self.df = pd.get_dummies(self.df, columns=['direction', 'event_type'])
+        self.df = pd.get_dummies(self.df, columns=['event_type'])
 
     def _normalize(self):
         self.df['price'] = (self.df['price'] - self.df['price'].min()) / (self.df['price'].max() - self.df['price'].min())
@@ -93,40 +88,70 @@ class Trainer:
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def merge_dataframes_with_labels(d1, d2):
-    d1['label'] = 0
-    d2['label'] = 1
-    merged_df = pd.concat([d1, d2])
-    return merged_df
+df_r = pd.read_csv('data/merged.csv') ######################### TO DELETE ######################### insert real data
+df_g = pd.read_csv('data/merged.csv') ######################### TO DELETE ######################### insert generated data
 
-df1 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert real data
-df2 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert generated data
-df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
+df_r = Preprocessor(df_r).preprocess()
+df_g = Preprocessor(df_g).preprocess()
+
+############ TEST "real" lstm on "real" test set ############
 
 # Assuming df is already preprocessed
-features = df.drop('generated', axis=1).values
-labels = df['generated'].values
+features_r = df_r.drop('direction', axis=1).values
+labels_r = df_r['direction'].values
 
 # Reshape input to be 3D [samples, timesteps, features]
-features = features.reshape((features.shape[0], 1, features.shape[1]))
+features_r = features_r.reshape((features_r.shape[0], 1, features_r.shape[1]))
 
 # Split the data into training and test sets
-train_X, test_X, train_y, test_y = train_test_split(features, labels, test_size=0.2, random_state=42)
+train_X_r, test_X_r, train_y_r, test_y_r = train_test_split(features_r, labels_r, test_size=0.2, random_state=42)
 
 # Convert to PyTorch tensors
-train_X = torch.tensor(train_X, dtype=torch.float32)
-train_y = torch.tensor(train_y, dtype=torch.float32)
-test_X = torch.tensor(test_X, dtype=torch.float32)
-test_y = torch.tensor(test_y, dtype=torch.float32)
+train_X_r = torch.tensor(train_X_r, dtype=torch.float32)
+train_y_r = torch.tensor(train_y_r, dtype=torch.float32)
+test_X_r = torch.tensor(test_X_r, dtype=torch.float32)
+test_y_r = torch.tensor(test_y_r, dtype=torch.float32)
 
 # Create data loaders
-train_data = TensorDataset(train_X, train_y)
-train_loader = DataLoader(train_data, batch_size=72)
-test_data = TensorDataset(test_X, test_y)
-test_loader = DataLoader(test_data, batch_size=72)
+train_data_r = TensorDataset(train_X_r, train_y_r)
+train_loader_r = DataLoader(train_data_r, batch_size=72)
+test_data_r = TensorDataset(test_X_r, test_y_r)
+test_loader_r = DataLoader(test_data_r, batch_size=72)
 
-model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1, device=device)
+model_r = LSTMModel(input_size=train_X_r.shape[2], hidden_size=128, num_layers=2, output_size=1, device=device)
 
-trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-trainer.train(epochs=10)
-print(trainer.test())
+trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
+trainer_r.train(epochs=10)
+print("Real data:")
+print(trainer_r.test())
+
+############ TEST "generated" lstm on "real" test set ############
+
+# Assuming df is already preprocessed
+features_g = df_r.drop('direction', axis=1).values
+labels_g = df_r['direction'].values
+
+# Reshape input to be 3D [samples, timesteps, features]
+features_g = features_g.reshape((features_g.shape[0], 1, features_g.shape[1]))
+
+# Split the data into training and test sets
+train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
+
+# Convert to PyTorch tensors
+train_X_g = torch.tensor(train_X_g, dtype=torch.float32)
+train_y_g = torch.tensor(train_y_g, dtype=torch.float32)
+test_X_g = torch.tensor(test_X_g, dtype=torch.float32)
+test_y_g = torch.tensor(test_y_g, dtype=torch.float32)
+
+# Create data loaders
+train_data_g = TensorDataset(train_X_g, train_y_g)
+train_loader_g = DataLoader(train_data_g, batch_size=72)
+test_data_g = TensorDataset(test_X_g, test_y_g)
+test_loader_g = DataLoader(test_data_g, batch_size=72)
+
+model_g = LSTMModel(input_size=train_X_g.shape[2], hidden_size=128, num_layers=2, output_size=1, device=device)
+
+trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
+trainer_g.train(epochs=10)
+print("Generated data:")
+print(trainer_g.test())

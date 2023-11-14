@@ -3,7 +3,7 @@ from scipy.stats import entropy
 import scipy.stats as stats
 
 ######################### Jensen-Shannon Divergence #########################
-# It is used to measure the similarity between two probability distributions ---> 0: same distribution, 1: different distribution #
+# It is used to measure the similarity between two probability distributions ---> 0: same distribution, 1: different distribution ---> [0,1] range #
 
 class JSDCalculator:
     def __init__(self, dataset_1, dataset_2):
