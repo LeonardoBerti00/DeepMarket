@@ -4,27 +4,19 @@ import torch
 
 class LearningHyperParameter(str, Enum):
     NUM_DIFFUSIONSTEPS = "num_diffusionsteps"
-    BACKWARD_SEQ_SIZE = "backward_seq_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
-    WEIGHT_DECAY = "weight_decay"
-    MOMENTUM = "momentum"
     EPOCHS = "epochs"
-    IS_SHUFFLE_TRAIN_SET = "is_shuffle"
     BATCH_SIZE = "batch_size"
     CONDITIONAL_DROPOUT = "conditional_dropout"
     DROPOUT = "dropout"
-    SEQ_SIZE = "SEQ_size"          #it's the sequence length
-    MASKED_SEQ_SIZE = "masked_SEQ_size"
+    SEQ_SIZE = "seq_size"          #it's the sequence length
+    MASKED_SEQ_SIZE = "masked_seq_size"
     AUGMENT_DIM = "augment_dim"
-    S = "s"
     LAMBDA = "lambda"
-    COND_TYPE = "event_only"                    #or event_only or full
-    EMB_T_DIM = "emb_t_dim"
     DiT_DEPTH = "dit_depth"
     DiT_MLP_RATIO = "dit_mlp_ratio"
     DiT_NUM_HEADS = "dit_num_heads"
-    DiT_HIDDEN_SIZE = "dit_hidden_size"
 
 
 

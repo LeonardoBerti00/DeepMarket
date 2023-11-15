@@ -35,6 +35,7 @@ class Configuration:
         self.NUM_WORKERS = 4
 
         self.EARLY_STOPPING_METRIC = None
+        self.IS_SHUFFLE_TRAIN_SET = True
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -46,7 +47,6 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
         self.COND_SEQ_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
-        self.HYPER_PARAMETERS[LearningHyperParameter.IS_SHUFFLE_TRAIN_SET] = True
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1

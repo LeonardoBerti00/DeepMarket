@@ -25,7 +25,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    train_set.data = train_set.data[:256]
+
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
