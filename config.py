@@ -6,9 +6,11 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = False
-        self.IS_SWEEP = False
+        self.IS_SWEEP = True
         self.IS_TESTING = False
         self.IS_TRAINING = True
+
+        assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
 
         self.VALIDATE_EVERY = 1
 
@@ -36,7 +38,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.01
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
@@ -50,15 +52,14 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 32
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 1000
-        self.HYPER_PARAMETERS[LearningHyperParameter.S] = 0.008           #value taken from the papre IDDPM
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
-        self.CONDITIONING_METHOD = "adaln_zero"
+        self.COND_METHOD = "concatenation"
 
         self.COND_TYPE = "only_event"  # it can be full or 'only_event'
-        self.ALPHAS_CUMPROD, self.BETAS = None, None
+        self.BETAS = None
         self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT if self.COND_TYPE == 'full' else cst.LEN_EVENT
 
         #da cmbiare come per DiT
@@ -73,11 +74,9 @@ class Configuration:
         self.CSDI_HYPERPARAMETERS[CSDIParameters.LAYERS] = 1
 
     def wandb_config_setup(self):
-        self.WANDB_SWEEP_NAME = self.cf_name_format().format(
-            self.CHOSEN_MODEL.name,
-            self.CHOSEN_STOCK.name,
-            self.HYPER_PARAMETERS[cst.LearningHyperParameter.COND_TYPE],
-        )
+        self.WANDB_SWEEP_NAME = f"{self.CHOSEN_MODEL.name}_{self.CHOSEN_STOCK.name}_{self.COND_TYPE}_{self.COND_METHOD}"
+
+
 
 
 

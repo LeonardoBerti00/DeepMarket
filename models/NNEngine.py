@@ -13,7 +13,7 @@ import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
-from utils.utils_models import pick_diffuser
+from utils.utils import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
@@ -31,7 +31,6 @@ class NNEngine(L.LightningModule):
         self.IS_WANDB = config.IS_WANDB
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
-        self.momentum = config.HYPER_PARAMETERS[LearningHyperParameter.MOMENTUM]
         self.training = config.IS_TRAINING
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
@@ -47,7 +46,7 @@ class NNEngine(L.LightningModule):
         self.val_reconstructions, self.test_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-        self.alphas_cumprod, self.betas = config.ALPHAS_CUMPROD, config.BETAS
+        self.betas = config.BETAS
 
 
         # TODO: Why not choose this augmenter from the config?
@@ -71,11 +70,11 @@ class NNEngine(L.LightningModule):
         # save the real input for future
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
-        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps - 1, device=cst.DEVICE)
+        self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int)
         if isinstance(self.diffuser, CSDIDiffuser) and is_train:
             self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE)
         elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
-            self.t, _ = self.sampler.sample(self.batch_size)
+            self.t, _ = self.sampler.sample(x_0.shape[0])
 
         if is_train:
             recon, context = self.single_step(cond, x_0, is_train, real_cond)
@@ -86,7 +85,7 @@ class NNEngine(L.LightningModule):
                 if i == self.num_diffusionsteps - 1:
                     pass
                 recon, context = self.single_step(cond, x_0, is_train, real_cond)
-                self.t -= 1
+                self.t += 1
 
         return recon, context
 
@@ -137,20 +136,19 @@ class NNEngine(L.LightningModule):
         cond = input[0]
         recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': True})
-        batch_losses = self.loss(x_0, recon, **reverse_context)
+        batch_losses = self.loss(x_0, recon, **reverse_context)[0]
         batch_loss_mean = torch.mean(batch_losses)
         self.train_losses.append(batch_loss_mean.item())
         self.sampler.update_losses(self.t, batch_losses)
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
+        self.ema.update()
         return batch_loss_mean
 
     def on_train_epoch_end(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
         self.log('train_loss', loss)
         print(f'train loss on epoch {self.current_epoch} is {loss}')
-
-
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
@@ -232,7 +230,7 @@ class NNEngine(L.LightningModule):
         elif self.optimizer == 'RMSprop':
             self.optimizer = torch.optim.RMSprop(self.parameters(), lr=self.lr)
         elif self.optimizer == 'SGD':
-            self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum)
+            self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
         elif self.optimizer == 'LION':
             self.optimizer = Lion(self.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)

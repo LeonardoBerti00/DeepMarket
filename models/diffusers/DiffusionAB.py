@@ -26,7 +26,7 @@ class DiffusionAB(ABC):
         """Computes the loss given the true and predicted values."""
         pass
 
-    def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    def forward_reparametrized(self, x_0: torch.Tensor, t:  torch.Tensor, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Reparametrized forward diffusion process, takes in input x_0 and returns x_t after t steps of noise
         x_t(x_0, ϵ) = √(α̅_t)x_0 + √(1 - α̅_t)ϵ
@@ -37,7 +37,7 @@ class DiffusionAB(ABC):
         x_t = first_term + second_term
         return x_t, noise
 
-    def forward_process(self, x_0: torch.Tensor, t: int):
+    def forward_process(self, x_0: torch.Tensor, t: torch.Tensor):
         # Standard forward process, takes in input x_0 and returns x_t after t steps of noise
         cov_matrix = torch.eye(x_0.shape)
         mean = torch.mul(x_0, torch.sqrt(self.alphas_cumprod[t]))

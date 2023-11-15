@@ -39,7 +39,7 @@ class LOBDataset(data.Dataset):
         else:
             raise ValueError(f"Unknown cond_type {self.cond_type}")
 
-        return cond, x_0#cond.requires_grad_(True), x_0.requires_grad_(True)
+        return cond, x_0
 
 
     def _get_data(self):

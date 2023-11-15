@@ -176,6 +176,7 @@ class CDT(nn.Module):
     ):
         super().__init__()
         assert cond_size == input_size
+        self.cond_dropout_prob = cond_dropout_prob
         self.num_heads = num_heads
         self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
@@ -206,6 +207,7 @@ class CDT(nn.Module):
         t: (N,) tensor of diffusion timesteps
         cond: (N, P, C) tensor of past history
         """
+        cond = self.token_drop(cond)
         full_input = torch.cat([cond, x], dim=1)
         full_input = full_input.add(self.pos_embed)
         t = self.t_embedder(t)
@@ -213,6 +215,17 @@ class CDT(nn.Module):
             full_input = block(full_input, t)
         noise, var = self.final_layer(full_input, t)
         return noise, var
+
+    def token_drop(self, cond, force_drop_ids=None):
+        if force_drop_ids is None:
+            drop_ids = torch.rand(cond.shape[0], device=cond.device) < self.cond_dropout_prob
+        else:
+            drop_ids = force_drop_ids == 1
+        #create a mask of zeros for the rows to drop
+        mask = torch.ones((cond.shape), device=cond.device)
+        mask[drop_ids] = 0
+        cond = torch.einsum('bld, bld -> bld', cond, mask)
+        return cond
 
     #TODO: implement forward_with_cfg
     def forward_with_cfg(self, x, t, y, cfg_scale):

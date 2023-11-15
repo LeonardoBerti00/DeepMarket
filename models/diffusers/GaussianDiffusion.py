@@ -2,7 +2,7 @@ import math
 from typing import Dict, Tuple
 import numpy as np
 import torch
-from einops import rearrange, repeat
+from einops import rearrange, repeat, reduce
 
 from config import Configuration
 from models.diffusers.DiffusionAB import DiffusionAB
@@ -27,7 +27,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS]
         self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.type = config.CONDITIONING_METHOD
+        self.type = config.COND_METHOD
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         if config.IS_AUGMENTATION:
@@ -65,13 +65,14 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             pass
         else:
             raise ValueError("Invalid conditioning type")
-        self.alphas_cumprod = config.ALPHAS_CUMPROD
+
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
-        self.alphas_cumprod_prev = torch.cat([torch.ones(1, device=cst.DEVICE), self.alphas_cumprod[:-1]])
+        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
+        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(device=cst.DEVICE), self.alphas_cumprod[:-1]])
 
         #calculation for posterior q(x_{t-1} | x_t, x_0)
-        self.posterior_var = (1.0 - self.alphas_cumprod) / (1.0 - self.alphas_cumprod) * self.betas
+        self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
         self.posterior_log_var_clipped = torch.log(
             torch.cat([self.posterior_var[:1], self.posterior_var[1:]])
         )
@@ -190,13 +191,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         pred_mean = self._p_mean(
             noise_t, x_t, t, beta_t, alpha_t, alpha_cumprod_t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
-        #check if there is nan value in pred_mean
+
         kl = self._normal_kl(
             true_mean, true_log_variance_clipped, pred_mean, pred_log_var
         )
         kl = self._mean_flat(kl) / np.log(2.0)
         decoder_nll = -self._gaussian_log_likelihood(
-            x_0, means=pred_mean, log_scales=0.5 * pred_log_var
+            x_0, means=pred_mean, log_scales=pred_log_var*0.5
         )
         assert decoder_nll.shape == x_0.shape
         decoder_nll = self._mean_flat(decoder_nll) / np.log(2.0)
@@ -210,7 +211,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         '''
         Get the mean of the prior p(x_{t-1} | x_t).
         '''
-        pred_mean = 1/torch.sqrt(alpha_t) * (x_t - beta_t*noise_t/torch.sqrt(1-alpha_cumprod_t))
+        pred_mean = 1/torch.sqrt(alpha_t) * (x_t - (beta_t*noise_t/torch.sqrt(1-alpha_cumprod_t)))
         return pred_mean
 
     def _q_posterior_mean_var(self, x_0, x_t, t):
@@ -243,6 +244,18 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         scalars, among other use cases.
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
+        '''
+        k = torch.full((mean1.shape), cst.LEN_EVENT, dtype=torch.float32).to(cst.DEVICE)
+        #create a tensor matrices with the value of logvar1 as the diagonal
+        diag_ar1 = torch.diag_embed(torch.exp(logvar1))
+        diag_ar2 = torch.diag_embed(torch.exp(logvar2))
+        tmp = (torch.einsum('blmn, blgh -> blmh', torch.inverse(diag_ar1), diag_ar2))
+        mask = torch.zeros(diag_ar1.shape).to(cst.DEVICE)
+        mask[:, :, torch.arange(0, diag_ar1.shape[2]), torch.arange(0, diag_ar1.shape[3])] = 1.0  # This will mask all non-diagonal values.
+        tmp_masked = tmp * mask
+        trace_term = reduce(tmp_masked, 'b l m n -> b l m', 'sum')  # output will will contain the trace of each batch matrices.
+        output3 = 0.5 * ((logvar2 - logvar1) - k + (mean1 - mean2) * torch.exp(logvar2) * (mean1 - mean2) + trace_term)
+        '''
         return output
 
 
@@ -253,14 +266,34 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         We need it when t = 0.
         :param x: the target.
         :param means: the Gaussian mean Tensor.
-        :param log_scales: the Gaussian log stddev Tensor.
+        :param log_scales: the Gaussian log var Tensor.
         :return: a tensor like x of log probabilities (in nats).
         """
+        '''
         assert x.shape == means.shape == log_scales.shape
         centered_x = x - means
-        inv_stdv = torch.exp(-log_scales)
-        log_probs = -((inv_stdv * centered_x ** 2) / 2) + (-2 * log_scales) - (math.log(2 * math.pi)/2)
+        var = torch.exp(log_scales)
+        first_term = - ((centered_x ** 2) / (2*var))
+        second_term = - log_scales*0.5
+        third_term = - (math.log(2*math.pi)/2)
+        log_probs = -((centered_x ** 2) / (2*var)) - (0.5 * log_scales) - (math.log(2 * math.pi)/2)
         assert log_probs.shape == x.shape
+        '''
+        assert x.shape == means.shape == log_scales.shape
+        centered_x = x - means
+        inv_stdv = torch.exp(log_scales)
+        plus_in = inv_stdv * (centered_x + 1.0)
+        cdf_plus = self._approx_standard_normal_cdf(plus_in)
+        min_in = inv_stdv * (centered_x - 1.0)
+        cdf_min = self._approx_standard_normal_cdf(min_in)
+        log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-12))
+        log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-12))
+        cdf_delta = cdf_plus - cdf_min
+        log_probs = torch.where(
+            x < -0.999,
+            log_cdf_plus,
+            torch.where(x > 0.999, log_one_minus_cdf_min, torch.log(cdf_delta.clamp(min=1e-12))),
+        )
         return log_probs
 
     def _approx_standard_normal_cdf(self, x):

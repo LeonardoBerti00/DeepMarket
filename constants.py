@@ -4,7 +4,7 @@ import torch
 
 class LearningHyperParameter(str, Enum):
     NUM_DIFFUSIONSTEPS = "num_diffusionsteps"
-    BACKWARD_SEQ_SIZE = "backward_SEQ_size"
+    BACKWARD_SEQ_SIZE = "backward_seq_size"
     OPTIMIZER = "optimizer_name"
     LEARNING_RATE = "lr"
     WEIGHT_DECAY = "weight_decay"
@@ -16,7 +16,7 @@ class LearningHyperParameter(str, Enum):
     DROPOUT = "dropout"
     SEQ_SIZE = "SEQ_size"          #it's the sequence length
     MASKED_SEQ_SIZE = "masked_SEQ_size"
-    AUGMENT_DIM = "AUGMENT_DIM"
+    AUGMENT_DIM = "augment_dim"
     S = "s"
     LAMBDA = "lambda"
     COND_TYPE = "event_only"                    #or event_only or full
@@ -118,7 +118,6 @@ LEN_EVENT = 9
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
-WANDB_DIR = "data/wandb"
 DATA_DIR = "data"
 
 PROJECT_NAME = "CDTS"
