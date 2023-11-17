@@ -10,7 +10,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.DiT.DiT_hparam import HP_DiT
-
+from utils.utils import check_constraints
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
@@ -39,6 +39,13 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
+    if config.IS_DEBUG:
+        train_set.data = train_set.data[:128]
+        val_set.data = val_set.data[:128]
+        test_set.data = test_set.data[:128]
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS] = 1
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE] = 1
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 2
 
     data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
 
@@ -55,6 +62,8 @@ def train(config, trainer):
 
     trainer.fit(model, train_dataloader, val_dataloader)
     trainer.test(model, dataloaders=test_dataloader)
+    check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy")
+
 
 def test(config, trainer, model):
     print_setup(config)

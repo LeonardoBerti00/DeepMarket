@@ -36,6 +36,9 @@ class LOBDataset(data.Dataset):
         elif self.cond_type == 'only_event':
             cond = self.encoded_data[index:index_cond, :cst.LEN_EVENT]
             x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT]
+        elif self.cond_type == 'only_lob':
+            cond = self.encoded_data[index:index_cond, cst.LEN_EVENT:]
+            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT]
         else:
             raise ValueError(f"Unknown cond_type {self.cond_type}")
 

@@ -1,10 +1,10 @@
 import math
+
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
 import constants as cst
-from models.diffusers.GaussianDiffusion import GaussianDiffusion
-from models.diffusers.csdi.CSDI import CSDIDiffuser
 
 
 #noise scheduler taken from "Improved Denoising Diffusion Probabilistic Models"
@@ -58,11 +58,36 @@ def Conv1d_with_init(in_channels, out_channels, kernel_size):
     return layer
 
 
-def pick_diffuser(config, model_name, augmenter):
-    if model_name == "DiT":
-        return GaussianDiffusion(config, augmenter).to(device=cst.DEVICE)
-    elif model_name == 'CSDI':
-        return CSDIDiffuser(config, augmenter).to(device=cst.DEVICE)
-    else:
-        raise ValueError("Diffuser not found")
-    return "fai un diffuser al posto di cazzeggiare"
+def check_constraints(file_recon, file_lob):
+    generated_orders = np.load(file_recon)
+    lob = np.load(file_lob)
+    generated_orders[:, 3] = unnormalize(generated_orders[:, 3], cst.ORDER_MEAN_PRICE_10, cst.ORDER_STD_PRICE_10)
+    generated_orders[:, 2] = unnormalize(generated_orders[:, 2], cst.ORDER_MEAN_VOLUME_10, cst.ORDER_STD_VOLUME_10)
+    lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.LOB_MEAN_PRICE_10, cst.LOB_STD_PRICE_10)
+    lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.LOB_MEAN_VOLUME_10, cst.LOB_STD_VOLUME_10)
+
+
+def unnormalize(x, mean, std):
+    return x * std + mean
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

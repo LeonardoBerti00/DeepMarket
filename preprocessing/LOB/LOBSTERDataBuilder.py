@@ -54,6 +54,8 @@ class LOBSTERDataBuilder:
                 self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices = z_score_orderbook(self.dataframes[i][1])
             else:
                 self.dataframes[i][1], _, _, _, _ = z_score_orderbook(self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices)
+        self.means_orderbook = [mean_vol, mean_prices]
+        self.stds_orderbook = [std_vol, std_prices]
 
         #apply z-score to vol and prices of messages
         for i in range(len(self.dataframes)):
@@ -61,8 +63,9 @@ class LOBSTERDataBuilder:
                 self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices = normalize_messages(self.dataframes[i][0])
             else:
                 self.dataframes[i][0], _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices)
+        self.means_messages = [mean_vol, mean_prices]
+        self.stds_messages = [std_vol, std_prices]
 
-        #
 
 
     def _save(self, path_where_to_save):
@@ -140,8 +143,8 @@ class LOBSTERDataBuilder:
         for i, filename in enumerate(os.listdir(path)):
             f = os.path.join(path, filename)
             if os.path.isfile(f):
-
-                if i < split_days[0]:  # then we are creating the df for the training set
+                # then we create the df for the training set
+                if i < split_days[0]:
                     if (i % 2) == 0:
                         if i == 0:
                             train_messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])

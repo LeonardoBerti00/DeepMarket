@@ -13,7 +13,7 @@ import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
-from utils.utils import pick_diffuser
+from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
@@ -35,7 +35,9 @@ class NNEngine(L.LightningModule):
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
+        self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
+        self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
         self.val_data, self.test_data = val_data, test_data
@@ -63,16 +65,15 @@ class NNEngine(L.LightningModule):
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
-        self.lstm = nn.LSTM(config.COND_SIZE, config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM], num_layers=1, batch_first=True, dropout=0.1)
 
 
     def forward(self, cond, x_0, is_train):
         # save the real input for future
         real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
 
-        self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int)
+        self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
         if isinstance(self.diffuser, CSDIDiffuser) and is_train:
-            self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE)
+            self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
         elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
             self.t, _ = self.sampler.sample(x_0.shape[0])
 
@@ -118,12 +119,15 @@ class NNEngine(L.LightningModule):
             full_input_aug = self.feature_augmenter.augment(full_input)
             cond = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-        if self.IS_AUGMENTATION and self.cond_type == 'full' and is_train:
+        elif self.IS_AUGMENTATION and self.cond_type == 'full' and is_train:
             cond = self.conditioning_augmenter.augment(cond)
             x_t = self.feature_augmenter.augment(x_t)
         elif self.IS_AUGMENTATION and self.cond_type == 'full' and not is_train:
             # if we are in test mode and cond type is full, we augment the conditioning only for the first step directly in forward
             x_t = self.feature_augmenter.augment(x_t)
+        elif self.IS_AUGMENTATION and self.cond_type == 'only_lob':
+            x_t = self.feature_augmenter.augment(x_t)
+            assert self.augment_dim == self.cond_size
         return x_t, cond
 
     def loss(self, real, recon, **kwargs):
@@ -222,6 +226,8 @@ class NNEngine(L.LightningModule):
         self.log('test_ema_loss', loss_ema)
         print(f"\n test loss on epoch {self.current_epoch} is {loss}")
         print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}")
+        numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
+        numpy.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
 
 
     def configure_optimizers(self):
