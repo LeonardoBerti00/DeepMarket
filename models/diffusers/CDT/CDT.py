@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 from timm.models.vision_transformer import Mlp, Attention
-from models.diffusers.DiT.Embedders import TimestepEmbedder, ConditionEmbedder
+from models.diffusers.CDT.Embedders import TimestepEmbedder, ConditionEmbedder
 from utils.utils import sinusoidal_positional_embedding
 import constants as cst
 
@@ -12,12 +12,12 @@ def modulate(x, shift, scale):
 
 class adaLN_Zero(nn.Module):
     """
-    A DiT block with adaptive layer norm zero (adaLN-Zero) conditioning.
+    A CDT block with adaptive layer norm zero (adaLN-Zero) conditioning.
     """
     def __init__(self, input_size, num_heads, cond_len, mlp_ratio=4.0):
         super().__init__()
         self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
-        if input_size == cst.LEN_EVENT: num_heads = 1
+        if input_size == cst.LEN_EVENT_ONE_HOT: num_heads = 1
         self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True)
         self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(input_size * mlp_ratio)
@@ -45,7 +45,7 @@ class adaLN_Zero(nn.Module):
 
 class FinalLayer_adaLN_Zero(nn.Module):
     """
-    The final layer of DiT.
+    The final layer of CDT.
     """
     def __init__(self, input_size, cond_size, input_seq_len):
         super().__init__()
@@ -123,7 +123,7 @@ class DiT(nn.Module):
 
     def forward(self, x, cond, t):
         """
-        Forward pass of DiT.
+        Forward pass of CDT.
         x: (N, K, F) tensor of time series
         t: (N,) tensor of diffusion timesteps
         cond: (N, P, C) tensor of past history
@@ -146,7 +146,7 @@ class DiT(nn.Module):
     #TODO: implement forward_with_cfg
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
-        Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.
+        Forward pass of CDT, but also batches the unconditional forward pass for classifier-free guidance.
         """
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)
@@ -202,7 +202,7 @@ class CDT(nn.Module):
 
     def forward(self, x, cond, t):
         """
-        Forward pass of DiT.
+        Forward pass of CDT.
         x: (N, K, F) tensor of time series
         t: (N,) tensor of diffusion timesteps
         cond: (N, P, C) tensor of past history
@@ -230,7 +230,7 @@ class CDT(nn.Module):
     #TODO: implement forward_with_cfg
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
-        Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.
+        Forward pass of CDT, but also batches the unconditional forward pass for classifier-free guidance.
         """
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)

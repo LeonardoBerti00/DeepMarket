@@ -1,11 +1,8 @@
 import os
 from preprocessing.preprocessing_utils import z_score_orderbook, normalize_messages
 import pandas as pd
-
 import numpy as np
-from config import Configuration
 import constants as cst
-
 
 
 class LOBSTERDataBuilder:
@@ -51,21 +48,16 @@ class LOBSTERDataBuilder:
         #apply z score to orderbooks
         for i in range(len(self.dataframes)):
             if (i == 0):
-                self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices = z_score_orderbook(self.dataframes[i][1])
+                self.dataframes[i][1], mean_size, mean_prices, std_size, std_prices = z_score_orderbook(self.dataframes[i][1])
             else:
-                self.dataframes[i][1], _, _, _, _ = z_score_orderbook(self.dataframes[i][1], mean_vol, mean_prices, std_vol, std_prices)
-        self.means_orderbook = [mean_vol, mean_prices]
-        self.stds_orderbook = [std_vol, std_prices]
+                self.dataframes[i][1], _, _, _, _ = z_score_orderbook(self.dataframes[i][1], mean_size, mean_prices, std_size, std_prices)
 
-        #apply z-score to vol and prices of messages
+        #apply z-score to size and prices of messages with the statistics of the train set
         for i in range(len(self.dataframes)):
             if (i == 0):
-                self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices = normalize_messages(self.dataframes[i][0])
+                self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time = normalize_messages(self.dataframes[i][0])
             else:
-                self.dataframes[i][0], _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_vol, mean_prices, std_vol, std_prices)
-        self.means_messages = [mean_vol, mean_prices]
-        self.stds_messages = [std_vol, std_prices]
-
+                self.dataframes[i][0], _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time)
 
 
     def _save(self, path_where_to_save):
@@ -86,7 +78,7 @@ class LOBSTERDataBuilder:
                                        "sell8", "vsell8", "buy8", "vbuy8",
                                        "sell9", "vsell9", "buy9", "vbuy9",
                                        "sell10", "vsell10", "buy10", "vbuy10"],
-                         "message": ["time", "event_type", "order_id", "volume", "price", "direction"]}
+                         "message": ["time", "event_type", "order_id", "size", "price", "direction"]}
 
         self.num_trading_days = len(os.listdir(path))//2
         split_days = self._split_days()
@@ -128,6 +120,13 @@ class LOBSTERDataBuilder:
             self.dataframes[i][0]["time"].iloc[0] = 0
 
         self._reset_indexes()
+
+        for i in range(len(self.dataframes)):
+            self.dataframes[i][0]["size"] = self.dataframes[i][0]["size"] * self.dataframes[i][0]["direction"]
+
+        # drop the direction column
+        for i in range(len(self.dataframes)):
+            self.dataframes[i][0] = self.dataframes[i][0].drop(columns=["direction"])
 
 
     def _split_days(self):

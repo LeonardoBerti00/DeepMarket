@@ -14,9 +14,9 @@ class LearningHyperParameter(str, Enum):
     MASKED_SEQ_SIZE = "masked_seq_size"
     AUGMENT_DIM = "augment_dim"
     LAMBDA = "lambda"
-    DiT_DEPTH = "dit_depth"
-    DiT_MLP_RATIO = "dit_mlp_ratio"
-    DiT_NUM_HEADS = "dit_num_heads"
+    CDT_DEPTH = "CDT_depth"
+    CDT_MLP_RATIO = "CDT_mlp_ratio"
+    CDT_NUM_HEADS = "CDT_num_heads"
 
 
 
@@ -35,7 +35,7 @@ class Metrics(Enum):      #Quantitative evaluation
     kolmogorov_smirnov = 'kolmogorov_smirnov'
 
 class Models(str, Enum):
-    DiT = "DiT"
+    CDT = "CDT"
     CSDI = "CSDI"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
@@ -99,22 +99,25 @@ class CSDIParameters(Enum):
     LAYERS = 1
 
 
-LOB_MEAN_VOLUME_10 = 166.30953649243466
-LOB_STD_VOLUME_10 = 504.06824347178383
+LOB_MEAN_SIZE_10 = 166.30953649243466
+LOB_STD_SIZE_10 = 504.06824347178383
 LOB_MEAN_PRICE_10 = 2019441.963735062
 LOB_STD_PRICE_10 = 86751.57157762564
 
-ORDER_MEAN_VOLUME_10 = 88.29309539010794
-ORDER_STD_VOLUME_10 = 504.06824347178383
-ORDER_MEAN_PRICE_10 = 2019249.3560175144
-ORDER_STD_PRICE_10 = 86751.57157762564
+EVENT_MEAN_SIZE = 7.223659859967962
+EVENT_STD_SIZE = 124.45374263781343
+EVENT_MEAN_PRICE = 2019249.3560175144
+EVENT_STD_PRICE = 86641.41068006848
+EVENT_MEAN_TIME = 0.006584290788104395
+EVENT_STD_TIME = 42.99986459166484
 
 SEED = 0
 
 PRECISION = 32
 N_LOB_LEVELS = 10
 LEN_LEVEL = 4
-LEN_EVENT = 9
+LEN_EVENT_ONE_HOT = 7
+LEN_EVENT = 4
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIR_EXPERIMENTS = "data/experiments"

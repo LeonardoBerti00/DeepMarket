@@ -9,7 +9,7 @@ from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from models.diffusers.DiT.DiT import DiT, CDT
+from models.diffusers.CDT.CDT import CDT, CDT
 
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
@@ -23,9 +23,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.type = config.COND_METHOD
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
@@ -35,7 +35,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
         else:
-            self.input_size = cst.LEN_EVENT
+            self.input_size = cst.LEN_EVENT_ONE_HOT
             self.cond_size = config.COND_SIZE
         if (self.type == 'adaln_zero'):
             self.NN = DiT(
@@ -115,9 +115,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         beta_t = self.betas[t]
         alpha_t = 1 - beta_t
         alpha_cumprod_t = self.alphas_cumprod[t]
-        beta_t = repeat(beta_t, 'b -> b 1 d', d=cst.LEN_EVENT)
-        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=cst.LEN_EVENT)
-        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=cst.LEN_EVENT)
+        beta_t = repeat(beta_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t_aug, cond, t)
         if self.IS_AUGMENTATION:
@@ -126,7 +126,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         frac = (v + 1) / 2
         max_log = torch.log(beta_t)
         min_log = self.posterior_log_var_clipped[t]
-        min_log = repeat(min_log, 'b -> b 1 d', d=cst.LEN_EVENT)
+        min_log = repeat(min_log, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
         log_var_t = frac * max_log + (1 - frac) * min_log
         var_t = torch.exp(log_var_t)
 
@@ -223,13 +223,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         :param t: the timestep.
         :return: a tuple (mean, variance).
         """
-        posterior_mean_coef1 = repeat(self.posterior_mean_coef1[t], 'b -> b 1 d', d=cst.LEN_EVENT)
-        posterior_mean_coef2 = repeat(self.posterior_mean_coef2[t], 'b -> b 1 d', d=cst.LEN_EVENT)
+        posterior_mean_coef1 = repeat(self.posterior_mean_coef1[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        posterior_mean_coef2 = repeat(self.posterior_mean_coef2[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
         true_mean = (
                 posterior_mean_coef1 * x_0
                 + posterior_mean_coef2 * x_t
         )
-        true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=cst.LEN_EVENT)
+        true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
         return true_mean, true_log_var_clipped
 
     """
@@ -245,7 +245,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
         '''
-        k = torch.full((mean1.shape), cst.LEN_EVENT, dtype=torch.float32).to(cst.DEVICE)
+        k = torch.full((mean1.shape), cst.LEN_EVENT_ONE_HOT, dtype=torch.float32).to(cst.DEVICE)
         #create a tensor matrices with the value of logvar1 as the diagonal
         diag_ar1 = torch.diag_embed(torch.exp(logvar1))
         diag_ar2 = torch.diag_embed(torch.exp(logvar2))

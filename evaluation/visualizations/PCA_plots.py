@@ -29,7 +29,7 @@ def preprocess_data(df):
     # One hot encoding for the feature event_type
     df = pd.get_dummies(df, columns=['event_type'])
 
-    # Standardization on price and volume
+    # Standardization on price and size
     df['price'] = (df['price'] - df['price'].mean())/df['price'].std()
     df['size'] = (df['size'] - df['size'].mean())/df['size'].std()
 

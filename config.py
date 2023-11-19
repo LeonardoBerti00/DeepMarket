@@ -5,11 +5,11 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
-        self.IS_SWEEP = False
+        self.IS_WANDB = True
+        self.IS_SWEEP = True
         self.IS_TESTING = False
-        self.IS_TRAINING = True
-        self.IS_DEBUG = True
+        self.IS_TRAINING = False
+        self.IS_DEBUG = False
 
         assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
 
@@ -21,7 +21,7 @@ class Configuration:
 
         self.SPLIT_RATES = (.65, .05, .3)
 
-        self.CHOSEN_MODEL = cst.Models.DiT
+        self.CHOSEN_MODEL = cst.Models.CDT
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
         self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
@@ -39,9 +39,9 @@ class Configuration:
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 32
+        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.01
-        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
@@ -51,23 +51,25 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40
-        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
+        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
-        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_DEPTH] = 12
-        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.DiT_NUM_HEADS] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 12
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
         self.COND_METHOD = "concatenation"
 
         self.COND_TYPE = "only_lob"  # it can be full or only_event or only_lob
         self.BETAS = None
         if self.COND_TYPE == "full":
-            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT
+            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
+            self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 44
         elif self.COND_TYPE == "only_event":
-            self.COND_SIZE = cst.LEN_EVENT
+            self.COND_SIZE = cst.LEN_EVENT_ONE_HOT
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
+            self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40
 
-        #da cmbiare come per DiT
+        #da cmbiare come per CDT
         self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}
         
         self.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS] = 2
@@ -78,8 +80,6 @@ class Configuration:
         self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_FEATURE_DIM] = 16
         self.CSDI_HYPERPARAMETERS[CSDIParameters.LAYERS] = 1
 
-    def wandb_config_setup(self):
-        self.WANDB_SWEEP_NAME = f"{self.CHOSEN_MODEL.name}_{self.CHOSEN_STOCK.name}_{self.COND_TYPE}_{self.COND_METHOD}"
 
 
 

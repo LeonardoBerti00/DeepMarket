@@ -17,7 +17,7 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
         self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=1, batch_first=True, dropout=dropout)
         self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=1, batch_first=True, dropout=dropout)
         self.chosen_model = config.CHOSEN_MODEL
-        if config.CHOSEN_MODEL == cst.Models.DiT.value:
+        if config.CHOSEN_MODEL == cst.Models.CDT.value:
             self.v_lstm = nn.LSTM(augment_dim, input_size, num_layers=1, batch_first=True, dropout=dropout)
 
 
@@ -30,7 +30,7 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
     
     def deaugment(self, input, v=None):
         input, (_, _) = self.bck_lstm(input)
-        if self.chosen_model == cst.Models.DiT.value:
+        if self.chosen_model == cst.Models.CDT.value:
             v, (_, _) = self.v_lstm(v)
         return input, v
 

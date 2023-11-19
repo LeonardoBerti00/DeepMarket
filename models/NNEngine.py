@@ -17,12 +17,12 @@ from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-from models.diffusers.DiT.Sampler import LossSecondMomentResampler
+from models.diffusers.CDT.Sampler import LossSecondMomentResampler
 
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int, val_data, test_data, trainer):
+    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int, trainer):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
@@ -40,7 +40,6 @@ class NNEngine(L.LightningModule):
         self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
-        self.val_data, self.test_data = val_data, test_data
         self.val_num_batches = int(val_num_steps / self.batch_size) + 1
         self.test_num_batches = int(test_num_steps / self.batch_size) + 1
         self.train_losses, self.val_losses, self.test_losses = [], [], []
@@ -50,11 +49,10 @@ class NNEngine(L.LightningModule):
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.betas = config.BETAS
 
-
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if (self.IS_AUGMENTATION):
-            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT).to(device=cst.DEVICE)
+            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT_ONE_HOT).to(device=cst.DEVICE)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
@@ -151,7 +149,8 @@ class NNEngine(L.LightningModule):
 
     def on_train_epoch_end(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
-        self.log('train_loss', loss)
+        if self.IS_WANDB:
+            wandb.log({'train_loss': loss}, step=self.current_epoch+1)
         print(f'train loss on epoch {self.current_epoch} is {loss}')
 
     def validation_step(self, input, batch_idx):
@@ -176,11 +175,12 @@ class NNEngine(L.LightningModule):
         return batch_loss_mean
 
     def on_validation_epoch_end(self) -> None:
-        loss = sum(self.val_losses) / len(self.val_losses)
+        self.val_loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
-        self.log('val_loss', loss)
-        self.log('val_ema_loss', loss_ema)
-        print(f"\n val loss on epoch {self.current_epoch} is {loss}")
+        self.log('val_loss', self.val_loss)
+        if self.IS_WANDB:
+            wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch)
+        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}")
 
 
@@ -192,6 +192,7 @@ class NNEngine(L.LightningModule):
         batch_losses = self.loss(x_0, recon, **reverse_context)
         batch_loss_mean = torch.mean(batch_losses)
         self.test_losses.append(batch_loss_mean.item())
+        recon = recon[:, 0, :]
         recon = self._to_original_dim(recon)
         if batch_idx != self.test_num_batches - 1:
             self.test_reconstructions[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size] = recon.cpu().detach().numpy()
@@ -206,6 +207,7 @@ class NNEngine(L.LightningModule):
             batch_ema_losses = self.loss(x_0, recon, **reverse_context)
             ema_loss = torch.mean(batch_ema_losses)
             self.test_ema_losses.append(ema_loss.item())
+            recon = recon[:, 0, :]
             recon = self._to_original_dim(recon)
             if batch_idx != self.test_num_batches - 1:
                 self.test_ema_reconstructions[batch_idx * self.batch_size:(batch_idx + 1) * self.batch_size] = recon.cpu().detach().numpy()
@@ -220,10 +222,17 @@ class NNEngine(L.LightningModule):
         loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
         jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
         jsd_test_ema = JSDCalculator(self.test_data, self.test_reconstructions)
-        self.log('test_jsd_ema', jsd_test_ema.calculate_jsd())
-        self.log('test_jsd', jsd_test.calculate_jsd())
-        self.log('test_loss', loss)
-        self.log('test_ema_loss', loss_ema)
+        if self.IS_WANDB:
+            wandb.log({'test_jsd_ema_time': jsd_test_ema.calculate_jsd()[0]})
+            wandb.log({'test_jsd_time': jsd_test.calculate_jsd()[0]})
+            wandb.log({'test_jsd_ema_type': jsd_test_ema.calculate_jsd()[1]})
+            wandb.log({'test_jsd_type': jsd_test.calculate_jsd()[1]})
+            wandb.log({'test_jsd_ema_price': jsd_test_ema.calculate_jsd()[3]})
+            wandb.log({'test_jsd_price': jsd_test.calculate_jsd()[3]})
+            wandb.log({'test_jsd_ema_size': jsd_test_ema.calculate_jsd()[2]})
+            wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
+            wandb.log({'test_loss': loss})
+            wandb.log({'test_ema_loss': loss_ema})
         print(f"\n test loss on epoch {self.current_epoch} is {loss}")
         print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}")
         numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
@@ -244,7 +253,7 @@ class NNEngine(L.LightningModule):
 
     def inference_time(self, cond, x):
         t0 = time.time()
-        _ = self(cond, x)
+        _ = self.forward(cond, x)
         torch.cuda.current_stream().synchronize()
         t1 = time.time()
         elapsed = t1 - t0
@@ -261,14 +270,11 @@ class NNEngine(L.LightningModule):
         wandb.define_metric("test_ema_loss", summary="min")
 
     def _to_original_dim(self, recon):
-        out = torch.zeros((recon.shape[0], recon.shape[1], 5), device=cst.DEVICE)
-        type = torch.argmax(recon[:, :, 1:5], dim=2)
+        out = torch.zeros((recon.shape[0], cst.LEN_EVENT), device=cst.DEVICE)
+        type = torch.argmax(recon[:, 1:5], dim=1)
         # type == 0 is add, type == 1 is cancel, type == 2 is deletion, type == 3 is execution
-        direction = torch.argmax(recon[:, :, 7:9], dim=2)
-        # direction == 1 is buy, direction == 0 is sell
-        out[:, :, 0] = recon[:, :, 0]
-        out[:, :, 1] = type
-        out[:, :, 2] = recon[:, :, 5]
-        out[:, :, 3] = recon[:, :, 6]
-        out[:, :, 4] = direction
+        out[:, 0] = recon[:, 0]
+        out[:, 1] = type
+        out[:, 2] = recon[:, 5]
+        out[:, 3] = recon[:, 6]
         return out

@@ -19,7 +19,6 @@ def set_torch():
     torch.set_float32_matmul_precision('high')
 
 
-
 if __name__ == "__main__":
 
     set_torch()
@@ -42,33 +41,31 @@ if __name__ == "__main__":
         )
         data_builder.prepare_save_datasets()
 
-    if (config.IS_WANDB):
-        config.wandb_config_setup()
-        if (config.IS_SWEEP):
-            wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model="all", save_dir=cst.DIR_SAVED_MODEL)
+    if config.IS_WANDB:
+        wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model="all", save_dir=cst.DIR_SAVED_MODEL)
+        if config.IS_SWEEP:
             sweep_config = sweep_init(config)
             sweep_config.update({"name": f"model_{config.CHOSEN_MODEL.name}_stock_{config.CHOSEN_STOCK.name}_cond_type_{config.COND_TYPE}_cond_method_{config.COND_METHOD}_is_augmentation_{config.IS_AUGMENTATION}"})
             sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME)
             wandb.agent(sweep_id, run_wandb(config, accelerator, wandb_logger), count=sweep_config["run_cap"])
         else:
-            wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model="all", save_dir=cst.DIR_SAVED_MODEL)
-            run_wandb(config, accelerator, wandb_logger)
+            start_wandb = run_wandb(config, accelerator, wandb_logger)
+            start_wandb()
 
-    elif(config.IS_TESTING):
-        # reference can be retrieved in artifacts panel
-        # "VERSION" can be a version (ex: "v2") or an alias ("latest or "best")
-        checkpoint_reference = "USER/PROJECT/MODEL-RUN_ID:VERSION"
-
-        # download checkpoint locally (if not already cached)
-        wandb_run = wandb.init(project=cst.PROJECT_NAME)
-        artifact = wandb_run.use_artifact(checkpoint_reference, type="model")
-        artifact_dir = artifact.download()
+    elif config.IS_TESTING:
+        dir = Path(cst.DIR_SAVED_MODEL+"/"+str(config.CHOSEN_MODEL.name))
+        best_val_loss = 100000
+        for file in dir.iterdir():
+            val_loss = float(file.name.split("=")[1].split("_")[0])
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                checkpoint_reference = file
 
         # load checkpoint
-        model = NNEngine.load_from_checkpoint(Path(artifact_dir) / "model.ckpt")
+        model = NNEngine.load_from_checkpoint(checkpoint_reference)
         run(config, accelerator, model)
 
     # training without using wandb
-    elif(config.IS_TRAINING):
+    elif config.IS_TRAINING:
         run(config, accelerator)
 

@@ -32,13 +32,13 @@ class LOBDataset(data.Dataset):
         index_x = self.cond_seq_size + index + self.x_seq_size
         if self.cond_type == 'full':
             cond = self.encoded_data[index:index_cond, :]
-            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT]
+            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT_ONE_HOT]
         elif self.cond_type == 'only_event':
-            cond = self.encoded_data[index:index_cond, :cst.LEN_EVENT]
-            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT]
+            cond = self.encoded_data[index:index_cond, :cst.LEN_EVENT_ONE_HOT]
+            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT_ONE_HOT]
         elif self.cond_type == 'only_lob':
-            cond = self.encoded_data[index:index_cond, cst.LEN_EVENT:]
-            x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT]
+            cond = self.encoded_data[index:index_cond, cst.LEN_EVENT_ONE_HOT:]
+            x_0 = self.encoded_data[index_cond:index_x, :cst.LEN_EVENT_ONE_HOT]
         else:
             raise ValueError(f"Unknown cond_type {self.cond_type}")
 
@@ -51,18 +51,14 @@ class LOBDataset(data.Dataset):
 
     def _one_hot_encode(self):
         ''' one hot encode the second and final column'''
-        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 4)
+        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 3)
         self.encoded_data[:, 0] = self.data[:, 0]
         #encoding order type
         one_hot_order_type = torch.nn.functional.one_hot((self.data[:, 1]).to(torch.int64), num_classes=4).to(torch.float32)
         self.encoded_data[:, 1:5] = one_hot_order_type
         self.encoded_data[:, 5] = self.data[:, 2]
         self.encoded_data[:, 6] = self.data[:, 3]
-        #encoding order direction
-        one_hot_order_direction = torch.nn.functional.one_hot(self.data[:, 4].to(torch.int64), num_classes=2).to(torch.float32)
-        self.encoded_data[:, 7:9] = one_hot_order_direction
-        self.encoded_data[:, 9:] = self.data[:, 5:]
-
+        self.encoded_data[:, 7:] = self.data[:, 4:]
 
 
 
