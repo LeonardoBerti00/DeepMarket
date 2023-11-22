@@ -5,11 +5,11 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
-        self.IS_SWEEP = True
+        self.IS_WANDB = False
+        self.IS_SWEEP = False
         self.IS_TESTING = False
-        self.IS_TRAINING = False
-        self.IS_DEBUG = False
+        self.IS_TRAINING = True
+        self.IS_DEBUG = True
 
         assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
 

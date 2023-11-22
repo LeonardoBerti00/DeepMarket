@@ -41,10 +41,10 @@ def train(config, trainer):
     )
 
     if config.IS_DEBUG:
-        train_set.data = train_set.data[:128]
-        val_set.data = val_set.data[:128]
-        test_set.data = test_set.data[:128]
-        config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 2
+        train_set.data = train_set.data[:256]
+        val_set.data = val_set.data[:256]
+        test_set.data = test_set.data[:256]
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 5
 
     data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
 
@@ -57,6 +57,7 @@ def train(config, trainer):
     ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)
+    print("Starting test")
     trainer.test(model, dataloaders=test_dataloader)
     check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy", seq_size)
 
@@ -88,7 +89,7 @@ def run(config, accelerator, model=None):
             EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)
         ],
         num_sanity_val_steps=0,
-        detect_anomaly=True
+        detect_anomaly=False
     )
     if (config.IS_TESTING):
         test(config, trainer, model)
@@ -149,6 +150,7 @@ def run_wandb(config, accelerator, wandb_logger):
                 detect_anomaly=False
             )
             train(config, trainer)
+
     return wandb_sweep_callback
 
 def sweep_init(config):

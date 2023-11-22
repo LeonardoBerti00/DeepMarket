@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import wandb
 from lightning.pytorch.loggers import WandbLogger
 from run import run_wandb, run, sweep_init
@@ -20,7 +19,6 @@ def set_torch():
 
 
 if __name__ == "__main__":
-
     set_torch()
     torch.autograd.set_detect_anomaly(True)
     config = Configuration()

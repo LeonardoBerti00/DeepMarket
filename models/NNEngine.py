@@ -50,14 +50,14 @@ class NNEngine(L.LightningModule):
 
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
-        if (self.IS_AUGMENTATION):
+        if self.IS_AUGMENTATION:
             self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT_ONE_HOT).to(device=cst.DEVICE)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
-        if (self.IS_AUGMENTATION and self.cond_type == 'full'):
+        if self.IS_AUGMENTATION and self.cond_type == 'full':
             self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(device=cst.DEVICE)
-        elif (self.IS_AUGMENTATION and self.cond_type == 'only_event'):
+        elif self.IS_AUGMENTATION and self.cond_type == 'only_event':
             self.conditioning_augmenter = self.feature_augmenter
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
@@ -150,7 +150,7 @@ class NNEngine(L.LightningModule):
         loss = sum(self.train_losses) / len(self.train_losses)
         if self.IS_WANDB:
             wandb.log({'train_loss': loss}, step=self.current_epoch+1)
-        print(f'train loss on epoch {self.current_epoch} is {loss}')
+        print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
@@ -179,8 +179,8 @@ class NNEngine(L.LightningModule):
         self.log('val_loss', self.val_loss)
         if self.IS_WANDB:
             wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch)
-        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
-        print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}")
+        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}\n")
+        print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
 
 
     def test_step(self, input, batch_idx):
@@ -232,8 +232,8 @@ class NNEngine(L.LightningModule):
             wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
             wandb.log({'test_loss': loss})
             wandb.log({'test_ema_loss': loss_ema})
-        print(f"\n test loss on epoch {self.current_epoch} is {loss}")
-        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}")
+        print(f"\n test loss on epoch {self.current_epoch} is {loss}\n")
+        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
         numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
         numpy.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
 
