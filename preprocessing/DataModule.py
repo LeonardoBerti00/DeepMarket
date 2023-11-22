@@ -6,7 +6,7 @@ import constants as cst
 class DataModule(pl.LightningDataModule):
     """ Splits the datasets in TRAIN, VALIDATION_MODEL, TEST. """
 
-    def __init__(self, train_set, val_set, test_set, batch_size,  is_shuffle_train=True, num_workers=16):
+    def   __init__(self, train_set, val_set, test_set, batch_size,  is_shuffle_train=True, num_workers=16):
         super().__init__()
 
         self.train_set = train_set

@@ -22,12 +22,11 @@ from models.diffusers.CDT.Sampler import LossSecondMomentResampler
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int, trainer):
+    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
         """
-        self.trainer = trainer
         self.IS_WANDB = config.IS_WANDB
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
@@ -44,8 +43,8 @@ class NNEngine(L.LightningModule):
         self.test_num_batches = int(test_num_steps / self.batch_size) + 1
         self.train_losses, self.val_losses, self.test_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
-        self.val_reconstructions, self.test_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
-        self.val_ema_reconstructions, self.test_ema_reconstructions = numpy.zeros((val_num_steps, cst.LEN_EVENT)), numpy.zeros((test_num_steps, cst.LEN_EVENT))
+        self.test_reconstructions = numpy.zeros((test_num_steps, cst.LEN_EVENT))
+        self.test_ema_reconstructions = numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.betas = config.BETAS
 

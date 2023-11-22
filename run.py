@@ -54,7 +54,6 @@ def train(config, trainer):
         config=config,
         val_num_steps=val_set.__len__(),
         test_num_steps=test_set.__len__(),
-        trainer=trainer
     ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)
@@ -89,6 +88,7 @@ def run(config, accelerator, model=None):
             EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)
         ],
         num_sanity_val_steps=0,
+        detect_anomaly=True
     )
     if (config.IS_TESTING):
         test(config, trainer, model)
@@ -146,10 +146,9 @@ def run_wandb(config, accelerator, wandb_logger):
                 ],
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
+                detect_anomaly=False
             )
             train(config, trainer)
-
-        wandb.finish()
     return wandb_sweep_callback
 
 def sweep_init(config):
