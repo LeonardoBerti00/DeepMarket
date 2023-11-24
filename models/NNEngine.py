@@ -22,29 +22,27 @@ from models.diffusers.CDT.Sampler import LossSecondMomentResampler
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config: Configuration, val_num_steps: int, test_num_steps: int):
+    def __init__(self, config: Configuration, test_num_steps: int, test_data):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
         """
+        self.test_num_steps = test_num_steps
+        self.test_data = test_data
         self.IS_WANDB = config.IS_WANDB
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.training = config.IS_TRAINING
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
+        self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
         self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
-        self.val_num_batches = int(val_num_steps / self.batch_size) + 1
-        self.test_num_batches = int(test_num_steps / self.batch_size) + 1
         self.train_losses, self.val_losses, self.test_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
-        self.test_reconstructions = numpy.zeros((test_num_steps, cst.LEN_EVENT))
-        self.test_ema_reconstructions = numpy.zeros((test_num_steps, cst.LEN_EVENT))
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.betas = config.BETAS
 
@@ -146,10 +144,10 @@ class NNEngine(L.LightningModule):
         self.ema.update()
         return batch_loss_mean
 
-    def on_train_epoch_end(self) -> None:
+    def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
         if self.IS_WANDB:
-            wandb.log({'train_loss': loss}, step=self.current_epoch+1)
+            wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
         print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
 
     def validation_step(self, input, batch_idx):
@@ -179,9 +177,13 @@ class NNEngine(L.LightningModule):
         self.log('val_loss', self.val_loss)
         if self.IS_WANDB:
             wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch)
-        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}\n")
+        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
 
+    def on_test_start(self) -> None:
+        self.test_reconstructions = numpy.zeros((self.test_num_steps, cst.LEN_EVENT))
+        self.test_ema_reconstructions = numpy.zeros((self.test_num_steps, cst.LEN_EVENT))
+        self.test_num_batches = int(self.test_num_steps / self.test_batch_size) + 1
 
     def test_step(self, input, batch_idx):
         x_0 = input[1]
@@ -194,12 +196,13 @@ class NNEngine(L.LightningModule):
         recon = recon[:, 0, :]
         recon = self._to_original_dim(recon)
         if batch_idx != self.test_num_batches - 1:
-            self.test_reconstructions[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size] = recon.cpu().detach().numpy()
+            self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon.cpu().detach().numpy()
         else:
-            self.test_reconstructions[batch_idx*self.batch_size:] = recon.cpu().detach().numpy()
+            self.test_reconstructions[batch_idx*self.test_batch_size:] = recon.cpu().detach().numpy()
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         # Testing: with EMA
+        '''
         with self.ema.average_parameters():
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
@@ -209,16 +212,17 @@ class NNEngine(L.LightningModule):
             recon = recon[:, 0, :]
             recon = self._to_original_dim(recon)
             if batch_idx != self.test_num_batches - 1:
-                self.test_ema_reconstructions[batch_idx * self.batch_size:(batch_idx + 1) * self.batch_size] = recon.cpu().detach().numpy()
+                self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon.cpu().detach().numpy()
             else:
-                self.test_ema_reconstructions[batch_idx * self.batch_size:] = recon.cpu().detach().numpy()
+                self.test_ema_reconstructions[batch_idx * self.test_batch_size:] = recon.cpu().detach().numpy()
+        '''
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean
 
     def on_test_end(self) -> None:
         loss = sum(self.test_losses) / len(self.test_losses)
-        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
+        #loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
         jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
         jsd_test_ema = JSDCalculator(self.test_data, self.test_reconstructions)
         if self.IS_WANDB:
@@ -231,9 +235,9 @@ class NNEngine(L.LightningModule):
             wandb.log({'test_jsd_ema_size': jsd_test_ema.calculate_jsd()[2]})
             wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
             wandb.log({'test_loss': loss})
-            wandb.log({'test_ema_loss': loss_ema})
+            #wandb.log({'test_ema_loss': loss_ema})
         print(f"\n test loss on epoch {self.current_epoch} is {loss}\n")
-        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+        #print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
         numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
         numpy.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
 

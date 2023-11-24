@@ -17,7 +17,7 @@ class LearningHyperParameter(str, Enum):
     CDT_DEPTH = "CDT_depth"
     CDT_MLP_RATIO = "CDT_mlp_ratio"
     CDT_NUM_HEADS = "CDT_num_heads"
-
+    TEST_BATCH_SIZE = "test_batch_size"
 
 
 class Optimizers(Enum):

@@ -2,7 +2,7 @@ import lightning as L
 import torch
 import wandb
 from lightning.pytorch.callbacks import ModelCheckpoint
-
+from torch.utils.data import DataLoader
 import constants as cst
 from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
@@ -46,14 +46,21 @@ def train(config, trainer):
         test_set.data = test_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 5
 
-    data_module = DataModule(train_set, val_set, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
+    data_module = DataModule(
+        train_set=train_set,
+        val_set=val_set,
+        test_set=test_set,
+        batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE],
+        test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
+        num_workers=16
+    )
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
     seq_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
     model = NNEngine(
         config=config,
-        val_num_steps=val_set.__len__(),
         test_num_steps=test_set.__len__(),
+        test_data=test_set.data,
     ).to(cst.DEVICE, torch.float32)
 
     trainer.fit(model, train_dataloader, val_dataloader)
@@ -71,14 +78,20 @@ def test(config, trainer, model):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-
-    data_module = DataModule(None, None, test_set, batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE], num_workers=16)
-
-    test_dataloader = data_module.test_dataloader()
-
+    model.test_num_steps = test_set.__len__()
+    test_dataloader = DataLoader(
+            dataset=test_set,
+            batch_size=1024,
+            shuffle=False,
+            pin_memory=True,
+            drop_last=False,
+            num_workers=16,
+            persistent_workers=True
+        )
     model.to(cst.DEVICE, torch.float32)
-
+    model.test_data = test_set.data
     trainer.test(model, dataloaders=test_dataloader)
+
 
 def run(config, accelerator, model=None):
     trainer = L.Trainer(

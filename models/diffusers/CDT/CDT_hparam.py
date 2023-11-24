@@ -6,7 +6,7 @@ HP_CDT = {
     cst.LearningHyperParameter.DROPOUT.value: {'values': [0, 0.1]},
     cst.LearningHyperParameter.LEARNING_RATE.value: {'values': [0.0001, 0.0003, 0.003, 0.001]},
     cst.LearningHyperParameter.OPTIMIZER.value: {'values': [cst.Optimizers.ADAM.value, cst.Optimizers.LION.value]},
-    cst.LearningHyperParameter.CDT_DEPTH.value: {'values': [2, 4, 6, 8, 12]},
+    cst.LearningHyperParameter.CDT_DEPTH.value: {'values': [2, 4, 6, 8]},
     cst.LearningHyperParameter.CDT_NUM_HEADS.value: {'values': [4, 8]},
 }
 
