@@ -9,7 +9,7 @@ class Configuration:
         self.IS_SWEEP = False
         self.IS_TESTING = False
         self.IS_TRAINING = True
-        self.IS_DEBUG = False
+        self.IS_DEBUG = True
 
         assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
 
@@ -42,7 +42,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
         self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 1024
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.01
-        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 20
+        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 1
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length

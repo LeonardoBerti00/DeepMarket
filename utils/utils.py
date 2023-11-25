@@ -56,26 +56,28 @@ def Conv1d_with_init(in_channels, out_channels, kernel_size):
     return layer
 
 
-def return_to_original(generated_events, event_and_lob, seq_size):
-    real_events = event_and_lob[:, :cst.LEN_EVENT]
-    lob = event_and_lob[:, cst.LEN_EVENT:]
+def to_original(event_and_lob, recon, seq_size):
+    generated_events = np.zeros((recon.shape[0], cst.LEN_EVENT))
+    type = np.argmax(recon[:, 1:4], axis=1)
+    # type == 0 is add, type == 1 is cancel, type == 2 is deletion, type == 3 is execution
+    generated_events[:, 0] = recon[:, 0]
+    generated_events[:, 1] = type
+    generated_events[:, 2] = recon[:, 5]
+    generated_events[:, 3] = recon[:, 6]
+
     generated_events[:, 3] = unnormalize(generated_events[:, 3], cst.EVENT_MEAN_PRICE, cst.EVENT_STD_PRICE)
     generated_events[:, 2] = unnormalize(generated_events[:, 2], cst.EVENT_MEAN_SIZE, cst.EVENT_STD_SIZE)
     generated_events[:, 0] = unnormalize(generated_events[:, 0], cst.EVENT_MEAN_TIME, cst.EVENT_STD_TIME)
 
-    real_events[:, 3] = unnormalize(real_events[:, 3], cst.EVENT_MEAN_PRICE, cst.EVENT_STD_PRICE)
-    real_events[:, 2] = unnormalize(real_events[:, 2], cst.EVENT_MEAN_SIZE, cst.EVENT_STD_SIZE)
-    real_events[:, 0] = unnormalize(real_events[:, 0], cst.EVENT_MEAN_TIME, cst.EVENT_STD_TIME)
-
+    # we extract the last snapshot of the LOB before the event, that is i-1 in the sequence, if the event is at i
+    lob = event_and_lob[:, -1, cst.LEN_EVENT_ONE_HOT:]
     lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.LOB_MEAN_PRICE_10, cst.LOB_STD_PRICE_10)
     lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.LOB_MEAN_SIZE_10, cst.LOB_STD_SIZE_10)
-    lob = lob[seq_size - 2:, :]
-    #assert (generated_events.shape[0]+1 == lob.shape[0])
+
+    # assert (generated_events.shape[0]+1 == lob.shape[0])
     # round price and size
     generated_events[:, 2] = np.around(generated_events[:, 2], decimals=0)
     generated_events[:, 3] = np.around(generated_events[:, 3], decimals=0)
-    real_events[:, 2] = np.around(real_events[:, 2], decimals=0)
-    real_events[:, 3] = np.around(real_events[:, 3], decimals=0)
     lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
     lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
 
@@ -85,37 +87,24 @@ def return_to_original(generated_events, event_and_lob, seq_size):
     generated_events[:, 4] = np.where(generated_events[:, 2] < 0, -1, generated_events[:, 4])
     generated_events[:, 2] = np.abs(generated_events[:, 2])
 
-    real_events[:, 1] += 1
-    real_events = np.concatenate((real_events, np.ones((real_events.shape[0], 1))), axis=1)
-    real_events[:, 4] = np.where(real_events[:, 2] < 0, -1, real_events[:, 4])
-    real_events[:, 2] = np.abs(real_events[:, 2])
-    return lob, generated_events, real_events
+    best_ask = lob[:, 0]
+    best_bid = lob[:, 1]
 
-def check_constraints(file_recon, file_lob, seq_size):
-    generated_events = np.load(file_recon)
-    event_and_lob = np.load(file_lob)
-    lob, generated_events, real_events = return_to_original(generated_events, event_and_lob, seq_size)
-    print()
-    print("numbers of lob ", lob.shape[0])
-    print("numbers of gen events ", generated_events.shape[0])
-    num_violations_price = 0
-    num_violations_size = 0
     for i in range(generated_events.shape[0]):
-        price = generated_events[i, 3]
-        size_event = generated_events[i, 2]
-        type = generated_events[i, 1]
-        if (type == 2 or type == 3 or type == 4):    #it is a cancellation
-            #take the index of the lob with the same value of the price
-            index = np.where(lob[i, :] == price)[0]
-            if (index.shape[0] == 0):
-                num_violations_price += 1
-            else:
-                size_limit_order = lob[i, index+1]
-                if (size_limit_order < size_event):
-                    num_violations_size += 1
-    print("Number of price violations: ", num_violations_price)
-    print("Number of size violations: ", num_violations_size)
-    print()
+        # if it is an add buy order that is above the best ask, it means that we are willing to execute an ask limit order
+        # so we transform it into an execution of an ask limit order
+        if generated_events[i, 4] == 1 and generated_events[i, 1] == 1 and generated_events[i, 2] >= best_ask:
+            generated_events[i, 1] = 4
+            generated_events[i, 4] = -1
+            generated_events[i, 2] = np.min(lob[i, 0::4][lob[i, 0::4] <= [generated_events[i, 2]]])
+
+        elif generated_events[i, 4] == -1 and generated_events[i, 1] == 1 and generated_events[i, 2] <= best_bid:
+            generated_events[i, 1] = 4
+            generated_events[i, 4] = 1
+            generated_events[i, 2] = np.max(lob[i, 1::4][lob[i, 1::4] >= [generated_events[i, 2]]])
+
+    return lob, generated_events
+
 
 def unnormalize(x, mean, std):
     return x * std + mean

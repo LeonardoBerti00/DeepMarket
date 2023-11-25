@@ -128,6 +128,12 @@ class LOBSTERDataBuilder:
         for i in range(len(self.dataframes)):
             self.dataframes[i][0] = self.dataframes[i][0].drop(columns=["direction"])
 
+        # divide all the price, both of lob and messages, by 100
+        for i in range(len(self.dataframes)):
+            self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
+            self.dataframes[i][1].loc[:, ::2] /= 100
+
+
 
     def _split_days(self):
         train = int(self.num_trading_days * self.split_rates[0])

@@ -13,6 +13,7 @@ import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
+from utils.utils import to_original
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
@@ -45,7 +46,8 @@ class NNEngine(L.LightningModule):
         self.val_ema_losses, self.test_ema_losses = [], []
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.betas = config.BETAS
-
+        self.num_violations_price = 0
+        self.num_violations_size = 0
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
@@ -132,7 +134,8 @@ class NNEngine(L.LightningModule):
         if self.global_step == 0 and self.IS_WANDB:
             self._define_log_metrics()
         x_0 = input[1]
-        cond = input[0]
+        full_cond = input[0]
+        cond = self._select_cond(full_cond, self.cond_type)
         recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': True})
         batch_losses = self.loss(x_0, recon, **reverse_context)[0]
@@ -152,10 +155,13 @@ class NNEngine(L.LightningModule):
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
-        cond = input[0]
+        full_cond = input[0]
+        cond = self._select_cond(full_cond, self.cond_type)
         recon, reverse_context = self.forward(cond, x_0, is_train=False)
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
+        recon = recon[:, 0, :]
+        recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
         batch_loss_mean = torch.mean(batch_losses)
         self.val_losses.append(batch_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -165,6 +171,7 @@ class NNEngine(L.LightningModule):
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
             batch_ema_losses = self.loss(x_0, recon, **reverse_context)
+            recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
             ema_loss = torch.mean(batch_ema_losses)
             self.val_ema_losses.append(ema_loss)
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -179,6 +186,10 @@ class NNEngine(L.LightningModule):
             wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch)
         print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+        print(f"\n violations price on epoch {self.current_epoch} is {self.num_violations_price}\n")
+        print(f"\n violations size on epoch {self.current_epoch} is {self.num_violations_size}\n")
+        self.num_violations_price = 0
+        self.num_violations_size = 0
 
     def on_test_start(self) -> None:
         self.test_reconstructions = numpy.zeros((self.test_num_steps, cst.LEN_EVENT))
@@ -187,14 +198,15 @@ class NNEngine(L.LightningModule):
 
     def test_step(self, input, batch_idx):
         x_0 = input[1]
-        cond = input[0]
+        full_cond = input[0]
+        cond = self._select_cond(full_cond, self.cond_type)
         recon, reverse_context = self.forward(cond, x_0, is_train=False)
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
         batch_loss_mean = torch.mean(batch_losses)
         self.test_losses.append(batch_loss_mean.item())
         recon = recon[:, 0, :]
-        recon = self._to_original_dim(recon)
+        recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
         if batch_idx != self.test_num_batches - 1:
             self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon.cpu().detach().numpy()
         else:
@@ -210,7 +222,7 @@ class NNEngine(L.LightningModule):
             ema_loss = torch.mean(batch_ema_losses)
             self.test_ema_losses.append(ema_loss.item())
             recon = recon[:, 0, :]
-            recon = self._to_original_dim(recon)
+            recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
             if batch_idx != self.test_num_batches - 1:
                 self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon.cpu().detach().numpy()
             else:
@@ -236,8 +248,12 @@ class NNEngine(L.LightningModule):
             wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
             wandb.log({'test_loss': loss})
             #wandb.log({'test_ema_loss': loss_ema})
+            wandb.log({'test_violations_price': self.num_violations_price})
+            wandb.log({'test_violations_size': self.num_violations_size})
         print(f"\n test loss on epoch {self.current_epoch} is {loss}\n")
         #print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+        print(f"\n violations price on epoch {self.current_epoch} is {self.num_violations_price}\n")
+        print(f"\n violations size on epoch {self.current_epoch} is {self.num_violations_size}\n")
         numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
         numpy.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
 
@@ -272,12 +288,30 @@ class NNEngine(L.LightningModule):
         wandb.define_metric("test_loss", summary="min")
         wandb.define_metric("test_ema_loss", summary="min")
 
-    def _to_original_dim(self, recon):
-        out = torch.zeros((recon.shape[0], cst.LEN_EVENT), device=cst.DEVICE)
-        type = torch.argmax(recon[:, 1:5], dim=1)
-        # type == 0 is add, type == 1 is cancel, type == 2 is deletion, type == 3 is execution
-        out[:, 0] = recon[:, 0]
-        out[:, 1] = type
-        out[:, 2] = recon[:, 5]
-        out[:, 3] = recon[:, 6]
-        return out
+    def _select_cond(self, cond, cond_type):
+        if cond_type == 'only_event':
+            cond = cond[:, :, :cst.LEN_EVENT_ONE_HOT]
+        elif cond_type == 'only_lob':
+            cond = cond[:, :, cst.LEN_EVENT_ONE_HOT:]
+        return cond
+
+    def _check_constraints(self, event_and_lob, recon, seq_size):
+        event_and_lob = event_and_lob.cpu().detach().numpy()
+        recon = recon.cpu().detach().numpy()
+        lob, generated_events = to_original(event_and_lob, recon, seq_size)
+        for i in range(generated_events.shape[0]):
+            price = generated_events[i, 3]
+            size_event = generated_events[i, 2]
+            type = generated_events[i, 1]
+            if (type == 2 or type == 3):  # it is a deletion, execution or cancel
+                # take the index of the lob with the same value of the price
+                index = torch.where(lob[i, :] == price)[0]
+                # check if the price is in the lob so it is valid
+                if (index.shape[0] == 0):
+                    self.num_violations_price += 1
+
+                # check if the size is bigger than the size of the limit order
+                size_limit_order = lob[i, index + 1]
+                if (size_limit_order < size_event):
+                    self.num_violations_size += 1
+        return generated_events
