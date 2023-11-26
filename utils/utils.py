@@ -23,7 +23,7 @@ def noise_scheduler(num_diffusion_timesteps, max_beta=0.99):
         t1 = i / num_diffusion_timesteps
         t2 = (i + 1) / num_diffusion_timesteps
         betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
-    return torch.tensor(betas, dtype=torch.float32).to(cst.DEVICE)
+    return torch.tensor(betas, dtype=torch.float32).to(cst.DEVICE, non_blocking=True)
 
 
 #formula taken from "Denoising Diffusion Probabilistic Models"
@@ -47,7 +47,7 @@ def sinusoidal_positional_embedding(token_sequence_size, token_embedding_dim, n=
     embeddings[:, 0::2] = torch.sin(positions/denominators) # sin(pos/10000^(2i/d_model))
     embeddings[:, 1::2] = torch.cos(positions/denominators) # cos(pos/10000^(2i/d_model))
 
-    return embeddings.to(cst.DEVICE)
+    return embeddings.to(cst.DEVICE, non_blocking=True)
 
 
 def Conv1d_with_init(in_channels, out_channels, kernel_size):
@@ -56,62 +56,69 @@ def Conv1d_with_init(in_channels, out_channels, kernel_size):
     return layer
 
 
-def to_original(event_and_lob, recon, seq_size):
-    generated_events = np.zeros((recon.shape[0], cst.LEN_EVENT))
-    type = np.argmax(recon[:, 1:4], axis=1)
-    # type == 0 is add, type == 1 is cancel, type == 2 is deletion, type == 3 is execution
-    generated_events[:, 0] = recon[:, 0]
-    generated_events[:, 1] = type
-    generated_events[:, 2] = recon[:, 5]
-    generated_events[:, 3] = recon[:, 6]
 
-    generated_events[:, 3] = unnormalize(generated_events[:, 3], cst.EVENT_MEAN_PRICE, cst.EVENT_STD_PRICE)
-    generated_events[:, 2] = unnormalize(generated_events[:, 2], cst.EVENT_MEAN_SIZE, cst.EVENT_STD_SIZE)
-    generated_events[:, 0] = unnormalize(generated_events[:, 0], cst.EVENT_MEAN_TIME, cst.EVENT_STD_TIME)
-
-    # we extract the last snapshot of the LOB before the event, that is i-1 in the sequence, if the event is at i
-    lob = event_and_lob[:, -1, cst.LEN_EVENT_ONE_HOT:]
-    lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.LOB_MEAN_PRICE_10, cst.LOB_STD_PRICE_10)
-    lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.LOB_MEAN_SIZE_10, cst.LOB_STD_SIZE_10)
-
-    # assert (generated_events.shape[0]+1 == lob.shape[0])
-    # round price and size
-    generated_events[:, 2] = np.around(generated_events[:, 2], decimals=0)
-    generated_events[:, 3] = np.around(generated_events[:, 3], decimals=0)
-    lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
-    lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
-
-    # return the order type and direction to the original value
-    generated_events[:, 1] += 1
-    generated_events = np.concatenate((generated_events, np.ones((generated_events.shape[0], 1))), axis=1)
-    generated_events[:, 4] = np.where(generated_events[:, 2] < 0, -1, generated_events[:, 4])
-    generated_events[:, 2] = np.abs(generated_events[:, 2])
-
-    best_ask = lob[:, 0]
-    best_bid = lob[:, 1]
-
-    for i in range(generated_events.shape[0]):
-        # if it is an add buy order that is above the best ask, it means that we are willing to execute an ask limit order
-        # so we transform it into an execution of an ask limit order
-        if generated_events[i, 4] == 1 and generated_events[i, 1] == 1 and generated_events[i, 2] >= best_ask:
-            generated_events[i, 1] = 4
-            generated_events[i, 4] = -1
-            generated_events[i, 2] = np.min(lob[i, 0::4][lob[i, 0::4] <= [generated_events[i, 2]]])
-
-        elif generated_events[i, 4] == -1 and generated_events[i, 1] == 1 and generated_events[i, 2] <= best_bid:
-            generated_events[i, 1] = 4
-            generated_events[i, 4] = 1
-            generated_events[i, 2] = np.max(lob[i, 1::4][lob[i, 1::4] >= [generated_events[i, 2]]])
-
-    return lob, generated_events
 
 
 def unnormalize(x, mean, std):
     return x * std + mean
 
+def to_original_lob(event_and_lob, seq_size):
+    lob = event_and_lob[:, cst.LEN_EVENT:]
 
+    lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10)
+    lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10)
+    lob = lob[seq_size - 2:, :]
+    #assert (generated_events.shape[0]+1 == lob.shape[0])
+    # round price and size
 
+    lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
+    lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
 
+    return lob
+
+def check_constraints(file_recon, file_lob, seq_size):
+    generated_events = np.load(file_recon)
+    event_and_lob = np.load(file_lob)
+    lob = to_original_lob(event_and_lob, seq_size)
+    print()
+    print("numbers of lob ", lob.shape[0])
+    print("numbers of gen events ", generated_events.shape[0])
+    num_violations_price_del = 0
+    num_violations_price_exec = 0
+    num_violations_size = 0
+    num_non_violations_price_del = 0
+    num_non_violations_price_exec = 0
+    num_add = 0
+    for i in range(generated_events.shape[0]):
+        price = generated_events[i, 3]
+        size_event = generated_events[i, 2]
+        type = generated_events[i, 1]
+        if (type == 2 or type == 3 or type == 4):    #it is a cancellation
+            #take the index of the lob with the same value of the price
+            index = np.where(lob[i, :] == price)[0]
+            if (index.shape[0] == 0):
+                if (type == 2 or type == 3):
+                    num_violations_price_del += 1
+                else:
+                    num_violations_price_exec += 1
+            else:
+                size_limit_order = lob[i, index[0] + 1]
+                if (size_limit_order < size_event):
+                    num_violations_size += 1
+                else:
+                    if (type == 2 or type == 3):
+                        num_non_violations_price_del += 1
+                    else:
+                        num_non_violations_price_exec += 1
+        else:
+            num_add += 1
+    print("number of violations for price deletion ", num_violations_price_del)
+    print("number of violations for price execution ", num_violations_price_exec)
+    print("number of violations for size ", num_violations_size)
+    print("number of non violations for price deletion ", num_non_violations_price_del)
+    print("number of non violations for price execution ", num_non_violations_price_exec)
+    print("number of add orders ", num_add)
+    print()
 
 
 

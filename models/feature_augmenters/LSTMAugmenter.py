@@ -14,11 +14,11 @@ class LSTMAugmenter(AugmenterAB, nn.Module):
         dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.input_size = input_size
-        self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=2, batch_first=True, dropout=dropout)
-        self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout)
+        self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
+        self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
         self.chosen_model = config.CHOSEN_MODEL
         if config.CHOSEN_MODEL == cst.Models.CDT.value:
-            self.v_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout)
+            self.v_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
 
 
     def forward(self, input):

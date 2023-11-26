@@ -1,5 +1,5 @@
 import copy
-import numpy
+import numpy as np
 from torch import nn
 
 from config import Configuration
@@ -13,7 +13,7 @@ import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
-from utils.utils import to_original
+from utils.utils import unnormalize
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
@@ -51,12 +51,12 @@ class NNEngine(L.LightningModule):
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT_ONE_HOT).to(device=cst.DEVICE)
+            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT_ONE_HOT).to(cst.DEVICE, non_blocking=True)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
         if self.IS_AUGMENTATION and self.cond_type == 'full':
-            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(device=cst.DEVICE)
+            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(cst.DEVICE, non_blocking=True)
         elif self.IS_AUGMENTATION and self.cond_type == 'only_event':
             self.conditioning_augmenter = self.feature_augmenter
 
@@ -161,7 +161,7 @@ class NNEngine(L.LightningModule):
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
         recon = recon[:, 0, :]
-        recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
+        recon = self._check_constraints(full_cond, recon)
         batch_loss_mean = torch.mean(batch_losses)
         self.val_losses.append(batch_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -171,7 +171,7 @@ class NNEngine(L.LightningModule):
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
             batch_ema_losses = self.loss(x_0, recon, **reverse_context)
-            recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
+            recon = self._check_constraints(full_cond, recon)
             ema_loss = torch.mean(batch_ema_losses)
             self.val_ema_losses.append(ema_loss)
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -192,8 +192,8 @@ class NNEngine(L.LightningModule):
         self.num_violations_size = 0
 
     def on_test_start(self) -> None:
-        self.test_reconstructions = numpy.zeros((self.test_num_steps, cst.LEN_EVENT))
-        self.test_ema_reconstructions = numpy.zeros((self.test_num_steps, cst.LEN_EVENT))
+        self.test_reconstructions = np.zeros((self.test_num_steps, cst.LEN_EVENT))
+        self.test_ema_reconstructions = np.zeros((self.test_num_steps, cst.LEN_EVENT))
         self.test_num_batches = int(self.test_num_steps / self.test_batch_size) + 1
 
     def test_step(self, input, batch_idx):
@@ -206,15 +206,14 @@ class NNEngine(L.LightningModule):
         batch_loss_mean = torch.mean(batch_losses)
         self.test_losses.append(batch_loss_mean.item())
         recon = recon[:, 0, :]
-        recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
+        recon = self._check_constraints(full_cond, recon)
         if batch_idx != self.test_num_batches - 1:
-            self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon.cpu().detach().numpy()
+            self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon
         else:
-            self.test_reconstructions[batch_idx*self.test_batch_size:] = recon.cpu().detach().numpy()
+            self.test_reconstructions[batch_idx*self.test_batch_size:] = recon
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         # Testing: with EMA
-        '''
         with self.ema.average_parameters():
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
@@ -222,19 +221,18 @@ class NNEngine(L.LightningModule):
             ema_loss = torch.mean(batch_ema_losses)
             self.test_ema_losses.append(ema_loss.item())
             recon = recon[:, 0, :]
-            recon = self._check_constraints(full_cond, recon, self.cond_seq_size)
+            recon = self._check_constraints(full_cond, recon)
             if batch_idx != self.test_num_batches - 1:
-                self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon.cpu().detach().numpy()
+                self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon
             else:
-                self.test_ema_reconstructions[batch_idx * self.test_batch_size:] = recon.cpu().detach().numpy()
-        '''
+                self.test_ema_reconstructions[batch_idx * self.test_batch_size:] = recon
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean
 
     def on_test_end(self) -> None:
         loss = sum(self.test_losses) / len(self.test_losses)
-        #loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
+        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
         jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
         jsd_test_ema = JSDCalculator(self.test_data, self.test_reconstructions)
         if self.IS_WANDB:
@@ -247,15 +245,15 @@ class NNEngine(L.LightningModule):
             wandb.log({'test_jsd_ema_size': jsd_test_ema.calculate_jsd()[2]})
             wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
             wandb.log({'test_loss': loss})
-            #wandb.log({'test_ema_loss': loss_ema})
+            wandb.log({'test_ema_loss': loss_ema})
             wandb.log({'test_violations_price': self.num_violations_price})
             wandb.log({'test_violations_size': self.num_violations_size})
         print(f"\n test loss on epoch {self.current_epoch} is {loss}\n")
-        #print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
         print(f"\n violations price on epoch {self.current_epoch} is {self.num_violations_price}\n")
         print(f"\n violations size on epoch {self.current_epoch} is {self.num_violations_size}\n")
-        numpy.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
-        numpy.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
+        np.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
+        np.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
 
 
     def configure_optimizers(self):
@@ -295,23 +293,91 @@ class NNEngine(L.LightningModule):
             cond = cond[:, :, cst.LEN_EVENT_ONE_HOT:]
         return cond
 
-    def _check_constraints(self, event_and_lob, recon, seq_size):
+    def _check_constraints(self, event_and_lob, recon):
         event_and_lob = event_and_lob.cpu().detach().numpy()
         recon = recon.cpu().detach().numpy()
-        lob, generated_events = to_original(event_and_lob, recon, seq_size)
+        lob, generated_events = self._to_original(event_and_lob, recon)
         for i in range(generated_events.shape[0]):
             price = generated_events[i, 3]
             size_event = generated_events[i, 2]
             type = generated_events[i, 1]
-            if (type == 2 or type == 3):  # it is a deletion, execution or cancel
+            if (type == 2 or type == 3 or type == 4):  # it is a deletion, execution or cancel
                 # take the index of the lob with the same value of the price
-                index = torch.where(lob[i, :] == price)[0]
+                index = np.where(lob[i, :] == price)[0]
                 # check if the price is in the lob so it is valid
                 if (index.shape[0] == 0):
                     self.num_violations_price += 1
-
+                    print(f"\nPROBLEM CONSTRAINT type: {type}\n")
                 # check if the size is bigger than the size of the limit order
                 size_limit_order = lob[i, index + 1]
                 if (size_limit_order < size_event):
                     self.num_violations_size += 1
         return generated_events
+
+    def _to_original(self, event_and_lob, recon):
+        generated_events = np.zeros((recon.shape[0], cst.LEN_EVENT))
+        type = np.argmax(recon[:, 1:4], axis=1)
+        # type == 0 is add, type == 1 is cancel, type == 2 is deletion
+        generated_events[:, 0] = recon[:, 0]
+        generated_events[:, 1] = type
+        generated_events[:, 2] = recon[:, 4]
+        generated_events[:, 3] = recon[:, 5]
+
+        generated_events[:, 3] = unnormalize(generated_events[:, 3], cst.TSLA_EVENT_MEAN_PRICE, cst.TSLA_EVENT_STD_PRICE)
+        generated_events[:, 2] = unnormalize(generated_events[:, 2], cst.TSLA_EVENT_MEAN_SIZE, cst.TSLA_EVENT_STD_SIZE)
+        generated_events[:, 0] = unnormalize(generated_events[:, 0], cst.TSLA_EVENT_MEAN_TIME, cst.TSLA_EVENT_STD_TIME)
+
+        # we extract the last snapshot of the LOB before the event, that is i-1 in the sequence, if the event is at i
+        lob = event_and_lob[:, -1, cst.LEN_EVENT_ONE_HOT:]
+        lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10)
+        lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10)
+
+        # assert (generated_events.shape[0]+1 == lob.shape[0])
+        # round price and size
+        generated_events[:, 2] = np.around(generated_events[:, 2], decimals=0)
+        generated_events[:, 3] = np.around(generated_events[:, 3], decimals=0)
+        lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
+        lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
+
+        # return the order type and direction to the original value
+        generated_events[:, 1] += 1
+        generated_events = np.concatenate((generated_events, np.ones((generated_events.shape[0], 1))), axis=1)
+        generated_events[:, 4] = np.where(generated_events[:, 2] < 0, -1, generated_events[:, 4])
+        generated_events[:, 2] = np.abs(generated_events[:, 2])
+
+        best_ask = lob[:, 0]
+        best_bid = lob[:, 2]
+
+        for i in range(generated_events.shape[0]):
+            # if it is a cancel or delete order, we need to find the nearest price in the LOB
+            if (generated_events[i, 1] == 2 or generated_events[i, 1] == 3):
+                if (generated_events[i, 4] == 1):
+                    #find the nearest price in the buy side
+                    price = generated_events[i, 3]
+                    buy_price_side = lob[i, 2::4]
+                    difference = np.abs(buy_price_side - price)
+                    index = np.argmin(difference)
+                    generated_events[i, 3] = buy_price_side[index]
+                else:
+                    #find the nearest price in the sell side
+                    price = generated_events[i, 3]
+                    sell_price_side = lob[i, 0::4]
+                    difference = np.abs(sell_price_side - price)
+                    index = np.argmin(difference)
+                    generated_events[i, 3] = sell_price_side[index]
+
+            # if it is an add buy order that is above the best ask, it means that we are willing to execute a sell limit order
+            # so we transform it into an execution of an ask limit order
+            #TODO transform buy market order into execution of ask limit order (more than one if the size of the buy order
+            # is > of the size of the best sell limit order available) and viceversa
+            if generated_events[i, 4] == 1 and generated_events[i, 1] == 1 and generated_events[i, 3] >= best_ask[i]:
+                generated_events[i, 1] = 4
+                generated_events[i, 4] = -1
+                generated_events[i, 3] = np.min(lob[i, 0::4][lob[i, 0::4] <= [generated_events[i, 3]]])
+
+            elif generated_events[i, 4] == -1 and generated_events[i, 1] == 1 and generated_events[i, 3] <= best_bid[i]:
+                generated_events[i, 1] = 4
+                generated_events[i, 4] = 1
+                generated_events[i, 3] = np.max(lob[i, 2::4][lob[i, 2::4] >= [generated_events[i, 3]]])
+
+        return lob, generated_events

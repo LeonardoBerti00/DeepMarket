@@ -44,8 +44,8 @@ class LSTMModel(nn.Module):
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device) 
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
         out, _ = self.lstm(x, (h0, c0))  
         out = self.fc(out[:, -1, :])
         return out
@@ -71,8 +71,8 @@ class Trainer:
 
     def test(self):
         self.model.eval()
-        test_preds = torch.Tensor().to(self.device)
-        test_labels = torch.Tensor().to(self.device)
+        test_preds = torch.Tensor().to(self.device, non_blocking=True)
+        test_labels = torch.Tensor().to(self.device, non_blocking=True)
         with torch.no_grad():
             for inputs, labels in self.test_loader:
                 output = self.model(inputs)

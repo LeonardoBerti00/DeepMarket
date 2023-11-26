@@ -31,7 +31,7 @@ class DiffusionAB(ABC):
         Reparametrized forward diffusion process, takes in input x_0 and returns x_t after t steps of noise
         x_t(x_0, ϵ) = √(α̅_t)x_0 + √(1 - α̅_t)ϵ
         """
-        noise = torch.distributions.normal.Normal(0, 1).sample(x_0.shape).to(cst.DEVICE)
+        noise = torch.distributions.normal.Normal(0, 1).sample(x_0.shape).to(cst.DEVICE, non_blocking=True)
         first_term = torch.einsum('bld, b -> bld', x_0, torch.sqrt(self.alphas_cumprod[t]))
         second_term = torch.einsum('bld, b -> bld', noise, torch.sqrt(1 - self.alphas_cumprod[t]))
         x_t = first_term + second_term
@@ -42,5 +42,5 @@ class DiffusionAB(ABC):
         cov_matrix = torch.eye(x_0.shape)
         mean = torch.mul(x_0, torch.sqrt(self.alphas_cumprod[t]))
         std = torch.mul(cov_matrix, torch.sqrt(1 - self.alphas_cumprod[t]))
-        x_T = torch.distributions.Normal(mean, std).rsample().to(cst.DEVICE)
+        x_T = torch.distributions.Normal(mean, std).rsample().to(cst.DEVICE, non_blocking=True)
         return x_T, {'mean': mean, 'std': std}

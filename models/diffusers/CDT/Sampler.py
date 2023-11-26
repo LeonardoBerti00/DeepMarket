@@ -35,9 +35,9 @@ class ScheduleSampler(ABC):
         w = self.weights()
         p = w / np.sum(w)
         indices_np = np.random.choice(len(p), size=(batch_size,), p=p)
-        indices = torch.from_numpy(indices_np).long().to(cst.DEVICE)
+        indices = torch.from_numpy(indices_np).long().to(cst.DEVICE, non_blocking=True)
         weights_np = 1 / (len(p) * p[indices_np])
-        weights = torch.from_numpy(weights_np).float().to(cst.DEVICE)
+        weights = torch.from_numpy(weights_np).float().to(cst.DEVICE, non_blocking=True)
         return indices, weights
 
 
@@ -47,13 +47,13 @@ class LossSecondMomentResampler(ScheduleSampler):
         self.history_per_term = history_per_term
         self.uniform_prob = uniform_prob
         self._loss_history = np.zeros(
-            [num_diffusionsteps, history_per_term], dtype=np.float64
+            [num_diffusionsteps, history_per_term], dtype=np.float32
         )
-        self._loss_counts = np.zeros([num_diffusionsteps], dtype=np.int64)
+        self._loss_counts = np.zeros([num_diffusionsteps], dtype=np.int32)
 
     def weights(self):
         if not self._warmed_up():
-            return np.ones([self.num_diffusionsteps], dtype=np.float64)
+            return np.ones([self.num_diffusionsteps], dtype=np.float32)
         weights = np.sqrt(np.mean(self._loss_history ** 2, axis=-1))
         weights /= np.sum(weights)
         weights *= 1 - self.uniform_prob

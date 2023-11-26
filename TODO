@@ -13,6 +13,6 @@
 7. train with one stock and check the performance with another one
 8. experiment with latent representation of market state, so the input conditioning, using a VQ-VAE or RQ-VAE
 9. Implementing StockGAN (coletta)
-10. Speed-up tricks @leo
+
 
 (qui mettere solo major to do mentre per minor usare il classico to do)

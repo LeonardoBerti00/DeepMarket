@@ -37,30 +37,31 @@ class LOBDataset(data.Dataset):
 
     def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path)).to(torch.float32)
+        self.data = torch.from_numpy(np.load(self.path))
 
     def one_hot_encode(self):
         ''' one hot encode the second and final column'''
-        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 3)
+        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 2)
         self.encoded_data[:, 0] = self.data[:, 0]
         #encoding order type
         one_hot_order_type = torch.nn.functional.one_hot((self.data[:, 1]).to(torch.int64), num_classes=3).to(torch.float32)
-        self.encoded_data[:, 1:5] = one_hot_order_type
-        self.encoded_data[:, 5] = self.data[:, 2]
-        self.encoded_data[:, 6] = self.data[:, 3]
-        self.encoded_data[:, 7:] = self.data[:, 4:]
+        self.encoded_data[:, 1:4] = one_hot_order_type
+        self.encoded_data[:, 4] = self.data[:, 2]
+        self.encoded_data[:, 5] = self.data[:, 3]
+        self.encoded_data[:, 6:] = self.data[:, 4:]
 
     def transform_data(self):
         #transform execution order in add order of the opposite side
-        for i in range(self.data.shape[1]):
+        for i in range(self.data.shape[0]):
             if (self.data[i, 1] == 3):
+                self.data[i, 1] = 0
                 if (self.data[i, 2] < 0):
                     self.data[i, 2] = -self.data[i, 2]
                 elif self.data[i, 2] > 0:
                     self.data[i, 2] = -self.data[i, 2]
                 else:
                     raise ValueError("Execution order with size 0")
-                self.data[i, 1] = 0
+
 
 
 

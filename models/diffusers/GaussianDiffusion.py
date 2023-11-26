@@ -69,7 +69,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
-        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(device=cst.DEVICE), self.alphas_cumprod[:-1]])
+        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE, non_blocking=True), self.alphas_cumprod[:-1]])
 
         #calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
@@ -131,7 +131,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         var_t = torch.exp(log_var_t)
 
         # Sample a standard normal random variable z
-        z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE)
+        z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE, non_blocking=True)
         # Compute x_{t-1} from x_t the reverse diffusion process for the current time step
         x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (var_t * z)
 
@@ -245,12 +245,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
         '''
-        k = torch.full((mean1.shape), cst.LEN_EVENT_ONE_HOT, dtype=torch.float32).to(cst.DEVICE)
+        k = torch.full((mean1.shape), cst.LEN_EVENT_ONE_HOT, dtype=torch.float32).to(cst.DEVICE, non_blocking=True)
         #create a tensor matrices with the value of logvar1 as the diagonal
         diag_ar1 = torch.diag_embed(torch.exp(logvar1))
         diag_ar2 = torch.diag_embed(torch.exp(logvar2))
         tmp = (torch.einsum('blmn, blgh -> blmh', torch.inverse(diag_ar1), diag_ar2))
-        mask = torch.zeros(diag_ar1.shape).to(cst.DEVICE)
+        mask = torch.zeros(diag_ar1.shape).to(cst.DEVICE, non_blocking=True)
         mask[:, :, torch.arange(0, diag_ar1.shape[2]), torch.arange(0, diag_ar1.shape[3])] = 1.0  # This will mask all non-diagonal values.
         tmp_masked = tmp * mask
         trace_term = reduce(tmp_masked, 'b l m n -> b l m', 'sum')  # output will will contain the trace of each batch matrices.

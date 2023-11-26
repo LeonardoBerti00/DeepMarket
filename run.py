@@ -10,6 +10,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
+from utils.utils import check_constraints
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
@@ -67,10 +68,10 @@ def train(config, trainer):
         config=config,
         test_num_steps=test_set.__len__(),
         test_data=test_set.data,
-    ).to(cst.DEVICE, torch.float32)
+    ).to(cst.DEVICE, torch.float32, non_blocking=True)
 
     trainer.fit(model, train_dataloader, val_dataloader)
-    print("Starting test")
+    print("\nStarting test\n")
     trainer.test(model, dataloaders=test_dataloader)
 
 
@@ -83,7 +84,10 @@ def test(config, trainer, model):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
+    test_set.transform_data()
+    test_set.one_hot_encode()
     model.test_num_steps = test_set.__len__()
+    model.test_data = test_set.data
     test_dataloader = DataLoader(
             dataset=test_set,
             batch_size=1024,
@@ -93,7 +97,7 @@ def test(config, trainer, model):
             num_workers=16,
             persistent_workers=True
         )
-    model.to(cst.DEVICE, torch.float32)
+    model.to(cst.DEVICE, torch.float32, non_blocking=True)
     model.test_data = test_set.data
     trainer.test(model, dataloaders=test_dataloader)
 

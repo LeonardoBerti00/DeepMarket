@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-
+import constants as cst
 
 class TimestepEmbedder(nn.Module):
     """
@@ -11,9 +11,9 @@ class TimestepEmbedder(nn.Module):
         super().__init__()
         self.num_diffusionsteps = num_diffusionsteps
         self.mlp = nn.Sequential(
-            nn.Linear(frequency_embedding_size, hidden_size, bias=True),
-            nn.SiLU(),
-            nn.Linear(hidden_size, hidden_size, bias=True),
+            nn.Linear(frequency_embedding_size, hidden_size, bias=True, device=cst.DEVICE),
+            nn.LeakyReLU(True),
+            nn.Linear(hidden_size, hidden_size, bias=True, device=cst.DEVICE),
         )
         self.frequency_embedding_size = frequency_embedding_size
 
@@ -30,7 +30,7 @@ class TimestepEmbedder(nn.Module):
         half = dim // 2
         freqs = torch.exp(
             -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-        ).to(device=t.device)
+        ).to(device=cst.DEVICE, non_blocking=True)
         args = t[:, None].float() * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
@@ -52,9 +52,9 @@ class ConditionEmbedder(nn.Module):
         use_cfg_embedding = dropout_prob > 0
         # TODO try LSTM
         self.mlp = nn.Sequential(
-            nn.Linear(cond_size, cond_hidden_size, bias=True),
-            nn.SiLU(),
-            nn.Linear(cond_hidden_size, cond_hidden_size, bias=True),
+            nn.Linear(cond_size, cond_hidden_size, bias=True, device=cst.DEVICE),
+            nn.LeakyReLU(True),
+            nn.Linear(cond_hidden_size, cond_hidden_size, bias=True, device=cst.DEVICE),
         )
         self.dropout_prob = dropout_prob
 

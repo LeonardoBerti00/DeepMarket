@@ -75,12 +75,12 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
 
         B, _, K, L = total_input.shape
         if is_train:
-            t = torch.randint(0, self.num_steps, [B]).to(self.device)
+            t = torch.randint(0, self.num_steps, [B]).to(self.device, non_blocking=True)
             recon = self.diffuser(total_input, side_info, t).permute(0,2,1).unsqueeze(0)
         else:
             recon = torch.zeros((self.num_steps, B, L, K))
             for set_t in range(self.num_steps):
-                t = (torch.ones(B) * set_t).long().to(self.device)
+                t = (torch.ones(B) * set_t).long().to(self.device, non_blocking=True)
                 recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
         cond_mask, _ = cond_augmenter.deaugment(cond_mask)
         context.update({'cond_mask': cond_mask})
@@ -99,10 +99,10 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         """
             Time embedding as Eq. 13 in the paper
         """
-        pe = torch.zeros(pos.shape[0], pos.shape[1], d_model).to(self.device)
+        pe = torch.zeros(pos.shape[0], pos.shape[1], d_model).to(self.device, non_blocking=True)
         position = pos.unsqueeze(2)
         div_term = 1 / torch.pow(
-            10000.0, torch.arange(0, d_model, 2).to(self.device) / d_model
+            10000.0, torch.arange(0, d_model, 2).to(self.device, non_blocking=True) / d_model
         )
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)

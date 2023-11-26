@@ -60,7 +60,7 @@ if __name__ == "__main__":
                 checkpoint_reference = file
 
         # load checkpoint
-        model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0)
+        model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None)
         run(config, accelerator, model)
 
     # training without using wandb

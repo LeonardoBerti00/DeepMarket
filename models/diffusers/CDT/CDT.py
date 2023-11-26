@@ -16,16 +16,16 @@ class adaLN_Zero(nn.Module):
     """
     def __init__(self, input_size, num_heads, cond_len, mlp_ratio=4.0):
         super().__init__()
-        self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
+        self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
         if input_size == cst.LEN_EVENT_ONE_HOT: num_heads = 1
-        self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True)
-        self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
+        self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True, device=cst.DEVICE)
+        self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
         mlp_hidden_dim = int(input_size * mlp_ratio)
         approx_gelu = lambda: nn.GELU(approximate="tanh")
         self.mlp = Mlp(in_features=input_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
         self.adaLN_modulation = nn.Sequential(               #it's the MLP in the figure 3 of the paper
-            nn.SiLU(),
-            nn.Linear(input_size*cond_len, 6 * input_size, bias=True)
+            nn.LeakyReLU(),
+            nn.Linear(input_size*cond_len, 6 * input_size, bias=True, device=cst.DEVICE)
         )
         nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
         nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
@@ -50,12 +50,12 @@ class FinalLayer_adaLN_Zero(nn.Module):
     def __init__(self, input_size, cond_size, input_seq_len):
         super().__init__()
         self.input_size = input_size
-        self.norm_final = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(input_size, 2 * input_size, bias=True)
+        self.norm_final = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
+        self.linear = nn.Linear(input_size, 2 * input_size, bias=True, device=cst.DEVICE)
         self.input_seq_len = input_seq_len
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(input_size*cond_size, 2 * input_size, bias=True)
+            nn.LeakyReLU(),
+            nn.Linear(input_size*cond_size, 2 * input_size, bias=True, device=cst.DEVICE)
         )
         # Zero-out output layers:
         nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
