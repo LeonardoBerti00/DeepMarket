@@ -73,6 +73,7 @@ def train(config, trainer):
     trainer.fit(model, train_dataloader, val_dataloader)
     print("\nStarting test\n")
     trainer.test(model, dataloaders=test_dataloader)
+    #check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy", seq_size)
 
 
 def test(config, trainer, model):
@@ -164,7 +165,7 @@ def run_wandb(config, accelerator, wandb_logger):
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
                 callbacks=[
-                    EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True),
+                    EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=True),
                     checkpoint_callback,
                 ],
                 num_sanity_val_steps=0,
@@ -185,7 +186,7 @@ def sweep_init(config):
         },
         'early_terminate': {
             'type': 'hyperband',
-            'min_iter': 15,
+            'min_iter': 6,
             'eta': 1.5
         },
         'run_cap': 30,
