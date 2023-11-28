@@ -57,7 +57,7 @@ class NNEngine(L.LightningModule):
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
         if self.IS_AUGMENTATION and self.cond_type == 'full':
             self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(cst.DEVICE, non_blocking=True)
-        elif self.IS_AUGMENTATION and self.cond_type == 'only_event':
+        elif self.IS_AUGMENTATION and self.cond_type in ['only_event', 'only_lob']:
             self.conditioning_augmenter = self.feature_augmenter
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
@@ -95,7 +95,7 @@ class NNEngine(L.LightningModule):
         x_t.requires_grad = True
 
         # augment
-        x_t, cond = self.augment(x_t, cond, is_train)
+        x_t, cond = self.augment(x_t, context['conditioning'], is_train)
 
         context.update({
             'is_train': is_train,
