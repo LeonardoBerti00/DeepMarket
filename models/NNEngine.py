@@ -102,6 +102,7 @@ class NNEngine(L.LightningModule):
             't': self.t,
             'x_0': x_0,
             'conditioning_aug': cond,
+            'cond_augmenter': self.conditioning_augmenter
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
