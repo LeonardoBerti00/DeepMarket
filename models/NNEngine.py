@@ -348,7 +348,7 @@ class NNEngine(L.LightningModule):
 
         best_ask = lob[:, 0]
         best_bid = lob[:, 2]
-
+        diff_prices_del_canc = []
         for i in range(generated_events.shape[0]):
             # if it is a cancel or delete order, we need to find the nearest price in the LOB
             if (generated_events[i, 1] == 2 or generated_events[i, 1] == 3):
@@ -357,8 +357,16 @@ class NNEngine(L.LightningModule):
                     price = generated_events[i, 3]
                     buy_price_side = lob[i, 2::4]
                     difference = np.abs(buy_price_side - price)
-                    index = np.argmin(difference)
-                    generated_events[i, 3] = buy_price_side[index]
+                    violated_price = True
+                    for j in range(difference.shape[0]):
+                        if (difference[j] == 0):
+                            violated_price = False
+                    if violated_price:
+                        min_diff_price = np.min(difference)
+                        index_price = np.argmin(difference)
+                        generated_events[i, 3] = buy_price_side[index_price]
+                        diff_prices_del_canc.append(min_diff_price)
+
                 else:
                     #find the nearest price in the sell side
                     price = generated_events[i, 3]
