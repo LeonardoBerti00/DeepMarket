@@ -20,11 +20,15 @@ class Preprocessor:
         self.df = df
 
     def preprocess(self):
+        self._remove_idcolumn()
         self._rename_columns()
         self._one_hot_encode()
         self._normalize()
         self._divide_time()
         return self.df
+    
+    def _remove_idcolumn(self):
+        self.df = self.df.drop(self.df.columns[2], axis=1)
 
     def _rename_columns(self):
         self.df.columns = ["time", "event_type", "size", "price", "direction", "generated"]
@@ -66,6 +70,7 @@ class Trainer:
         self.device = device
 
     def train(self, epochs):
+        self.model.train()
         for epoch in range(epochs):
             for inputs, labels in self.train_loader:
                 self.optimizer.zero_grad()
@@ -101,6 +106,7 @@ def merge_dataframes_with_labels(d1, d2):
 
 df1 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert real data
 df2 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert generated data
+
 df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
 
 # Assuming df is already preprocessed
@@ -126,7 +132,8 @@ test_data = TensorDataset(test_X, test_y)
 test_loader = DataLoader(test_data, batch_size=72)
 
 model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1, device=device)
+model.to(device)
 
 trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
 trainer.train(epochs=10)
-print(trainer.test())
+trainer.test()
