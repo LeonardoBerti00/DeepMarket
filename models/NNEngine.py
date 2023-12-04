@@ -13,7 +13,7 @@ import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.csdi.CSDI import CSDIDiffuser
-from utils.utils import unnormalize
+from utils.utils_data import unnormalize
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
@@ -375,10 +375,7 @@ class NNEngine(L.LightningModule):
                     index = np.argmin(difference)
                     generated_events[i, 3] = sell_price_side[index]
 
-            # if it is an add buy order that is above the best ask, it means that we are willing to execute a sell limit order
-            # so we transform it into an execution of an ask limit order
-            #TODO transform buy market order into execution of ask limit order (more than one if the size of the buy order
-            # is > of the size of the best sell limit order available) and viceversa
+            # if it is a buy order that is above the best ask, it means that it is a buy market order
             if generated_events[i, 4] == 1 and generated_events[i, 1] == 1 and generated_events[i, 3] >= best_ask[i]:
                 generated_events[i, 1] = 4
                 generated_events[i, 4] = -1

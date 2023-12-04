@@ -34,7 +34,7 @@ if __name__ == "__main__":
         data_builder = LOBSTERDataBuilder(
             stock_name=config.CHOSEN_STOCK.name,
             data_dir=cst.DATA_DIR,
-            date_trading_days=config.DATE_TRADING_DAYS,
+            date_trading_days=cst.DATE_TRADING_DAYS,
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()

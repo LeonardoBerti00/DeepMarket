@@ -1,5 +1,5 @@
 import os
-from preprocessing.preprocessing_utils import z_score_orderbook, normalize_messages
+from utils.utils_data import z_score_orderbook, normalize_messages, preprocess_dataframes
 import pandas as pd
 import numpy as np
 import constants as cst
@@ -30,7 +30,6 @@ class LOBSTERDataBuilder:
         )
 
         self._prepare_dataframes(path)
-        self._normalize_dataframes()
 
         path_where_to_save = "{}/{}".format(
             self.data_dir,
@@ -45,6 +44,11 @@ class LOBSTERDataBuilder:
 
 
     def _normalize_dataframes(self):
+        # divide all the price, both of lob and messages, by 100
+        for i in range(len(self.dataframes)):
+            self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
+            self.dataframes[i][1].loc[:, ::2] /= 100
+
         #apply z score to orderbooks
         for i in range(len(self.dataframes)):
             if (i == 0):
@@ -65,7 +69,6 @@ class LOBSTERDataBuilder:
         np.save(path_where_to_save + "/val.npy", self.val_set)
         np.save(path_where_to_save + "/test.npy", self.test_set)
 
-
     def _prepare_dataframes(self, path):
 
         COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
@@ -84,63 +87,17 @@ class LOBSTERDataBuilder:
         split_days = self._split_days()
         split_days = [i * 2 for i in split_days]
         self._create_dataframes_splitted(path, split_days, COLUMNS_NAMES)
-        self._preprocess_dataframes()
+        self.dataframes = preprocess_dataframes(self.dataframes, self.n_lob_levels)
 
-
-    def _reset_indexes(self):
-        # reset the indexes of the messages and orderbooks
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0] = self.dataframes[i][0].reset_index(drop=True)
-            self.dataframes[i][1] = self.dataframes[i][1].reset_index(drop=True)
-
-
-    def _preprocess_dataframes(self):
-
-        self._reset_indexes()
-
-        # take only the first n_lob_levels levels of the orderbook and drop the others
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][1] = self.dataframes[i][1].iloc[:, :self.n_lob_levels * cst.LEN_LEVEL]
-
-        # take the indexes of the dataframes that are of type 5, 6, 7 and drop it
-        for i in range(len(self.dataframes)):
-            indexes = self.dataframes[i][0][self.dataframes[i][0]["event_type"].isin([5, 6, 7])].index
-            self.dataframes[i][0] = self.dataframes[i][0].drop(indexes)
-            self.dataframes[i][1] = self.dataframes[i][1].drop(indexes)
-
-        self._drop_missing_values()
-
-        # drop index column in messages
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0] = self.dataframes[i][0].drop(columns=["order_id"])
-
-        # do the difference of time row per row in messages and subsitute the values with the differences
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0]["time"] = self.dataframes[i][0]["time"].diff()
-            self.dataframes[i][0]["time"].iloc[0] = 0
-
-        self._reset_indexes()
-
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0]["size"] = self.dataframes[i][0]["size"] * self.dataframes[i][0]["direction"]
-
-        # drop the direction column
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0] = self.dataframes[i][0].drop(columns=["direction"])
-
-        # divide all the price, both of lob and messages, by 100
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
-            self.dataframes[i][1].loc[:, ::2] /= 100
-
-
+        # to conclude the preprocessing we normalize the dataframes
+        self._normalize_dataframes()
 
     def _split_days(self):
         train = int(self.num_trading_days * self.split_rates[0])
         val = int(self.num_trading_days * self.split_rates[1]) + train
         test = int(self.num_trading_days * self.split_rates[2]) + val
+        print(f"There are {train} days for training, {val - train} days for validation and {test - val} days for testing")
         return [train, val, test]
-
 
     def _create_dataframes_splitted(self, path, split_days, COLUMNS_NAMES):
 
@@ -207,20 +164,3 @@ class LOBSTERDataBuilder:
 
         self.dataframes.append([test_messages, test_orderbooks])
 
-
-    def _drop_missing_values(self):
-        # drop the orderbooks with missing values checking all the columns and save the indexes and drop them
-        for i in range(len(self.dataframes)):
-            indexes_null_values = self.dataframes[i][1][self.dataframes[i][1].isnull().any(axis=1)].index
-            if len(indexes_null_values) > 0:
-                print("Dropping {} orderbooks with missing values".format(len(indexes_null_values)))
-                self.dataframes[i][0] = self.dataframes[i][0].drop(indexes_null_values)
-                self.dataframes[i][1] = self.dataframes[i][1].drop(indexes_null_values)
-
-        # do the same for messages
-        for i in range(len(self.dataframes)):
-            indexes_null_values = self.dataframes[i][0][self.dataframes[i][0].isnull().any(axis=1)].index
-            if len(indexes_null_values) > 0:
-                print("Dropping {} orderbooks with missing values".format(len(indexes_null_values)))
-                self.dataframes[i][0] = self.dataframes[i][0].drop(indexes_null_values)
-                self.dataframes[i][1] = self.dataframes[i][1].drop(indexes_null_values)

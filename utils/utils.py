@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import torch
 import constants as cst
 
@@ -54,86 +53,5 @@ def Conv1d_with_init(in_channels, out_channels, kernel_size):
     layer = torch.nn.Conv1d(in_channels, out_channels, kernel_size)
     torch.nn.init.kaiming_normal_(layer.weight)
     return layer
-
-
-
-
-
-def unnormalize(x, mean, std):
-    return x * std + mean
-
-def to_original_lob(event_and_lob, seq_size):
-    lob = event_and_lob[:, cst.LEN_EVENT:]
-
-    lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10)
-    lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10)
-    lob = lob[seq_size - 2:, :]
-    #assert (generated_events.shape[0]+1 == lob.shape[0])
-    # round price and size
-
-    lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
-    lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
-
-    return lob
-
-def check_constraints(file_recon, file_lob, seq_size):
-    generated_events = np.load(file_recon)
-    event_and_lob = np.load(file_lob)
-    lob = to_original_lob(event_and_lob, seq_size)
-    print()
-    print("numbers of lob ", lob.shape[0])
-    print("numbers of gen events ", generated_events.shape[0])
-    num_violations_price_del = 0
-    num_violations_price_exec = 0
-    num_violations_size = 0
-    num_non_violations_price_del = 0
-    num_non_violations_price_exec = 0
-    num_add = 0
-    for i in range(generated_events.shape[0]):
-        price = generated_events[i, 3]
-        size_event = generated_events[i, 2]
-        type = generated_events[i, 1]
-        if (type == 2 or type == 3 or type == 4):    #it is a cancellation
-            #take the index of the lob with the same value of the price
-            index = np.where(lob[i, :] == price)[0]
-            if (index.shape[0] == 0):
-                if (type == 2 or type == 3):
-                    num_violations_price_del += 1
-                else:
-                    num_violations_price_exec += 1
-            else:
-                size_limit_order = lob[i, index[0] + 1]
-                if (size_limit_order < size_event):
-                    num_violations_size += 1
-                else:
-                    if (type == 2 or type == 3):
-                        num_non_violations_price_del += 1
-                    else:
-                        num_non_violations_price_exec += 1
-        else:
-            num_add += 1
-    print("number of violations for price deletion ", num_violations_price_del)
-    print("number of violations for price execution ", num_violations_price_exec)
-    print("number of violations for size ", num_violations_size)
-    print("number of non violations for price deletion ", num_non_violations_price_del)
-    print("number of non violations for price execution ", num_non_violations_price_exec)
-    print("number of add orders ", num_add)
-    print()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

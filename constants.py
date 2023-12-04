@@ -116,9 +116,10 @@ SEED = 0
 PRECISION = 32
 N_LOB_LEVELS = 10
 LEN_LEVEL = 4
-LEN_EVENT_ONE_HOT = 6
+LEN_EVENT_ONE_HOT = 5
 LEN_EVENT = 4
 
+DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"

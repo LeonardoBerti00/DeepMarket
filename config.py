@@ -17,14 +17,13 @@ class Configuration:
 
         self.IS_AUGMENTATION = True
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
 
         self.SPLIT_RATES = (.65, .05, .3)
 
         self.CHOSEN_MODEL = cst.Models.CDT
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
-        self.DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
 
         self.HP_SEARCH_METHOD = 'bayes'  # 'bayes'
 
@@ -59,7 +58,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
         self.COND_METHOD = "concatenation"
 
-        self.COND_TYPE = "only_lob"  # it can be full or only_event or only_lob
+        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         self.BETAS = None
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
