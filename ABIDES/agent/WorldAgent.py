@@ -34,7 +34,7 @@ class WorldAgent(Agent):
         self.state = 'AWAITING_WAKEUP'
         self.diffusion_model = diffusion_model
         self.historical_orders, self.historical_lob = self._load_orders_lob(self.symbol, data_dir, self.date, date_trading_days)
-        self.order = None
+        self.next_order = None
         self.subscription_requested = False
         self.date_trading_days = date_trading_days
         self.first_wakeup = True
@@ -57,13 +57,6 @@ class WorldAgent(Agent):
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
-        if self.subscription_requested is False: #and currentTime >= self.mkt_open:
-            self.requestDataSubscription(self.symbol, levels=10)
-            self.subscription_requested = True
-
-        if self.order is not None:
-            self.placeOrder(currentTime, self.order)
-
         # at the opening of the market we reconstruct the order book sending 10 limit orders for each side taken from self.lob
         if self.first_wakeup:
             for i in range(0, 40, 4):
@@ -72,9 +65,14 @@ class WorldAgent(Agent):
             offset = datetime.timedelta(seconds=self.historical_orders[0, 0])
             time_next_wakeup = currentTime + offset
             self.setWakeup(time_next_wakeup)
+            self.next_order = self.historical_orders[0]
+
+        if self.subscription_requested is False and currentTime > self.mkt_open:
+            self.requestDataSubscription(self.symbol, levels=10)
+            self.subscription_requested = True
 
         #if current time is between 09:30 and 10:00, then we are in the pre-open phase
-        elif currentTime >= self.mkt_open and currentTime <= self.mkt_open + pd.Timedelta('30min'):
+        if currentTime > self.mkt_open and currentTime <= self.mkt_open + pd.Timedelta('30min'):
             self.state = 'PRE_GENERATION'
             self.placeOrder(currentTime, self.historical_orders[self.historical_orders_index])
             self.historical_orders_index += 1
@@ -82,6 +80,10 @@ class WorldAgent(Agent):
 
         elif currentTime > self.mkt_open + pd.Timedelta('30min'):
             self.state = 'GENERATING'
+            #firstly we place the last order generated and next we generate the next order
+            if self.next_order is not None:
+                self.placeOrder(currentTime, self.next_order)
+                self.next_order = None
             """ 
             PSEUDOCODE:
             if cond.type == 'snapshot': 
@@ -105,12 +107,14 @@ class WorldAgent(Agent):
         elif msg.body['msg'] == 'MARKET_DATA':
             last_lob_snapshot = []
             min_actual_lob_level = min(len(msg.body['asks']), len(msg.body['bids']))
+            #we take the first 10 levels of the lob and update the list of lob snapshots to use for the conditioning of the diffusion model
             for i in range(0, 10):
                 if i < min_actual_lob_level:
                     last_lob_snapshot.append(msg.body['asks'][i][0])
                     last_lob_snapshot.append(msg.body['asks'][i][1])
                     last_lob_snapshot.append(msg.body['bids'][i][0])
                     last_lob_snapshot.append(msg.body['bids'][i][1])
+                #we need the else in case the actual lob has less than 10 levels
                 else:
                     if len(msg.body['asks']) > len(msg.body['bids']) and i < len(msg.body['asks']):
                         last_lob_snapshot.append(msg.body['asks'][i][0])
