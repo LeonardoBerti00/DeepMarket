@@ -143,7 +143,7 @@ class ExchangeAgent(FinancialAgent):
         # Don't do any further processing on these messages!
         return
 
-    # Log order messages only if that option is configured.  Log all other messages.
+    # Log order messages only if that option is configured. Log all other messages.
     if msg.body['msg'] in ['LIMIT_ORDER', 'MARKET_ORDER', 'CANCEL_ORDER', 'MODIFY_ORDER']:
       if self.log_orders: self.logEvent(msg.body['msg'], msg.body['order'].to_dict())
     else:

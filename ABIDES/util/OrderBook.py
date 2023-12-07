@@ -184,7 +184,7 @@ class OrderBook:
         log_print("{} placing market order as multiple limit orders", order.symbol, order.quantity)
         for lo in limit_orders.items():
             p, q = lo[0], lo[1]
-            limit_order = LimitOrder(order.agent_id, order.time_placed, order.symbol, q, order.is_buy_order, p)
+            limit_order = LimitOrder(order.agent_id, order.time_placed, order.symbol, q, order.is_buy_order, p, tag='market_order')
             self.handleLimitOrder(limit_order)
 
     def executeOrder(self, order):
@@ -356,7 +356,7 @@ class OrderBook:
             if self.isEqualPrice(order, o[0]):
                 for mi, mo in enumerate(book[i]):
                     if order.order_id == mo.order_id:
-                        book[i][0] = new_order
+                        book[i][mi] = new_order
                         for idx, orders in enumerate(self.history):
                             if new_order.order_id not in orders: continue
                             self.history[idx][new_order.order_id]['modifications'].append(

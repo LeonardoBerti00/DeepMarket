@@ -99,6 +99,7 @@ starting_cash = 1000000000  # Cash in this simulator is always in CENTS.
 
 #  How many orders in the past to store for transacted volume computation
 # stream_history_length = int(pd.to_timedelta(args.mm_wake_up_freq).total_seconds() * 100)
+stream_history_length = 2500000
 
 agents.extend([ExchangeAgent(id=0,
                              name="EXCHANGE_AGENT",
@@ -109,7 +110,7 @@ agents.extend([ExchangeAgent(id=0,
                              log_orders=exchange_log_orders,
                              pipeline_delay=0,
                              computation_delay=0,
-                             stream_history=0,
+                             stream_history=stream_history_length,
                              book_freq=0,
                              wide_book=True,
                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))])
