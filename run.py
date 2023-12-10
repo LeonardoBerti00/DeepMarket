@@ -10,7 +10,6 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
-from utils.utils_data import from_event_exec_to_order, check_constraints
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
@@ -25,8 +24,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    train_set.data = from_event_exec_to_order(train_set.data)
-    train_set.one_hot_encode()
+    train_set.one_hot_encode_type()
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
@@ -34,8 +32,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    val_set.data = from_event_exec_to_order(val_set.data)
-    val_set.one_hot_encode()
+    val_set.one_hot_encode_type()
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
@@ -43,8 +40,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    test_set.data = from_event_exec_to_order(test_set.data)
-    test_set.one_hot_encode()
+    test_set.one_hot_encode_type()
 
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
@@ -72,35 +68,12 @@ def train(config, trainer):
 
     trainer.fit(model, train_dataloader, val_dataloader)
     print("\nStarting test\n")
-    trainer.test(model, dataloaders=test_dataloader)
+    #trainer.test(model, dataloaders=test_dataloader)
     #check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy", seq_size)
 
 
 def test(config, trainer, model):
-    print_setup(config)
-
-    test_set = LOBDataset(
-        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
-        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.COND_TYPE,
-        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
-    )
-    test_set.data = from_event_exec_to_order(test_set.data)
-    test_set.one_hot_encode()
-    model.test_num_steps = test_set.__len__()
-    model.test_data = test_set.data
-    test_dataloader = DataLoader(
-            dataset=test_set,
-            batch_size=1024,
-            shuffle=False,
-            pin_memory=True,
-            drop_last=False,
-            num_workers=16,
-            persistent_workers=True
-        )
-    model.to(cst.DEVICE, torch.float32, non_blocking=True)
-    model.test_data = test_set.data
-    trainer.test(model, dataloaders=test_dataloader)
+    pass
 
 
 def run(config, accelerator, model=None):
@@ -149,6 +122,8 @@ def run_wandb(config, accelerator, wandb_logger):
                     config.HYPER_PARAMETERS[param] = model_params[param.value]
                     wandb_instance_name += str(param.value) + "_" + str(model_params[param.value]) + "_"
 
+            cond_type = config.COND_TYPE
+
             checkpoint_callback = ModelCheckpoint(
                 dirpath=cst.DIR_SAVED_MODEL,
                 monitor="val_loss",
@@ -156,10 +131,10 @@ def run_wandb(config, accelerator, wandb_logger):
                 save_last=True,
                 save_top_k=1,
                 every_n_epochs=1,
-                filename=str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+wandb_instance_name
+                filename=str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name
             )
 
-            checkpoint_callback.CHECKPOINT_NAME_LAST = str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+wandb_instance_name+"_last"
+            checkpoint_callback.CHECKPOINT_NAME_LAST = str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name+"_last"
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,

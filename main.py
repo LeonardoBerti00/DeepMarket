@@ -5,7 +5,7 @@ from run import run_wandb, run, sweep_init
 import torch
 from utils.utils import noise_scheduler
 import constants as cst
-from config import Configuration
+import configuration
 from preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from models.NNEngine import NNEngine
 
@@ -21,10 +21,7 @@ def set_torch():
 if __name__ == "__main__":
     set_torch()
     torch.autograd.set_detect_anomaly(True)
-    config = Configuration()
-    config.BETAS = noise_scheduler(
-        num_diffusion_timesteps=config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS],
-    )
+    config = configuration.Configuration()
     if (cst.DEVICE == "cpu"):
         accelerator = "cpu"
     else:

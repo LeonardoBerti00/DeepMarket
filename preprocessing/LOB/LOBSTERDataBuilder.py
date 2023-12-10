@@ -1,5 +1,5 @@
 import os
-from utils.utils_data import z_score_orderbook, normalize_messages, preprocess_dataframes
+from utils.utils_data import z_score_orderbook, normalize_messages, preprocess_data
 import pandas as pd
 import numpy as np
 import constants as cst
@@ -69,6 +69,7 @@ class LOBSTERDataBuilder:
         np.save(path_where_to_save + "/val.npy", self.val_set)
         np.save(path_where_to_save + "/test.npy", self.test_set)
 
+
     def _prepare_dataframes(self, path):
 
         COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
@@ -87,7 +88,6 @@ class LOBSTERDataBuilder:
         split_days = self._split_days()
         split_days = [i * 2 for i in split_days]
         self._create_dataframes_splitted(path, split_days, COLUMNS_NAMES)
-        self.dataframes = preprocess_dataframes(self.dataframes, self.n_lob_levels)
 
         # to conclude the preprocessing we normalize the dataframes
         self._normalize_dataframes()
@@ -116,10 +116,12 @@ class LOBSTERDataBuilder:
                     else:
                         if i == 1:
                             train_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            train_orderbooks, train_messages = preprocess_data([[train_messages, train_orderbooks]], self.n_lob_levels)
                             if (len(train_orderbooks) != len(train_messages)):
                                 raise ValueError("train_orderbook length is different than train_messages")
                         else:
                             train_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            train_orderbook, train_message = preprocess_data([[train_message, train_orderbook]], self.n_lob_levels)
                             train_messages = pd.concat([train_messages, train_message], axis=0)
                             train_orderbooks = pd.concat([train_orderbooks, train_orderbook], axis=0)
 
@@ -133,10 +135,12 @@ class LOBSTERDataBuilder:
                     else:
                         if i == split_days[0] + 1:
                             val_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            val_orderbooks, val_messages = preprocess_data([[val_messages, val_orderbooks]], self.n_lob_levels)
                             if (len(val_orderbooks) != len(val_messages)):
                                 raise ValueError("val_orderbook length is different than val_messages")
                         else:
                             val_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            val_orderbooks, val_messages = preprocess_data([[val_message, val_orderbook]], self.n_lob_levels)
                             val_messages = pd.concat([val_messages, val_message], axis=0)
                             val_orderbooks = pd.concat([val_orderbooks, val_orderbook], axis=0)
 
@@ -152,10 +156,13 @@ class LOBSTERDataBuilder:
                     else:
                         if i == split_days[1] + 1:
                             test_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            test_orderbooks, test_messages = preprocess_data([[test_messages, test_orderbooks]], self.n_lob_levels)
+
                             if (len(test_orderbooks) != len(test_messages)):
                                 raise ValueError("test_orderbook length is different than test_messages")
                         else:
                             test_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                            test_orderbook, test_message = preprocess_data([[test_message, test_orderbook]], self.n_lob_levels)
                             test_messages = pd.concat([test_messages, test_message], axis=0)
                             test_orderbooks = pd.concat([test_orderbooks, test_orderbook], axis=0)
 

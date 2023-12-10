@@ -53,7 +53,12 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
         raise ValueError("data contains null value")
 
     data["event_type"] = data["event_type"]-1.0
+    data["event_type"] = data["event_type"].replace(2, 1)
+    data["event_type"] = data["event_type"].replace(3, 2)
 
+    # order_type = 0 -> limit order
+    # order_type = 1 -> cancel order
+    # order_type = 2 -> market order
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time
 
 
@@ -65,18 +70,20 @@ def reset_indexes(dataframes):
     return dataframes
 
 
-def preprocess_dataframes(dataframes, n_lob_levels):
+def preprocess_data(dataframes, n_lob_levels):
     dataframes = reset_indexes(dataframes)
 
     # take only the first n_lob_levels levels of the orderbook and drop the others
     for i in range(len(dataframes)):
         dataframes[i][1] = dataframes[i][1].iloc[:, :n_lob_levels * cst.LEN_LEVEL]
 
-    # take the indexes of the dataframes that are of type 5, 6, 7 and drop it
+    # take the indexes of the dataframes that are of type 2, 5, 6, 7 and drop it
     for i in range(len(dataframes)):
-        indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([5, 6, 7])].index
-        dataframes[i][0] = dataframes[i][0].drop(indexes)
-        dataframes[i][1] = dataframes[i][1].drop(indexes)
+        indexes_to_drop = dataframes[i][0][dataframes[i][0]["event_type"].isin([2, 5, 6, 7])].index
+        dataframes[i][0] = dataframes[i][0].drop(indexes_to_drop)
+        dataframes[i][1] = dataframes[i][1].drop(indexes_to_drop)
+
+    dataframes = reset_indexes(dataframes)
 
     # drop index column in messages
     for i in range(len(dataframes)):
@@ -86,45 +93,57 @@ def preprocess_dataframes(dataframes, n_lob_levels):
     for i in range(len(dataframes)):
         first = dataframes[i][0]["time"].iloc[0]
         dataframes[i][0]["time"] = dataframes[i][0]["time"].diff()
-        dataframes[i][0]["time"].iloc[0] = first - 34200
+        dataframes[i][0].loc[0, "time"] = first - 34200
 
-    dataframes = reset_indexes(dataframes)
+    # add depth column to messages
+    for i in range(len(dataframes)):
+        dataframes[i][0]["depth"] = 0
+
+    # we compute the depth of the orders with respect to the orderbook
+    for i in range(0, len(dataframes)):
+        for j in range(1, dataframes[i][0].shape[0]):
+            order_price = dataframes[i][0]["price"].iloc[j]
+            direction = dataframes[i][0]["direction"].iloc[j]
+            type = dataframes[i][0]["event_type"].iloc[j]
+            if type == 1:
+                index = j
+            else:
+                index = j - 1
+            if direction == 1:
+                bid_side = dataframes[i][1].iloc[index, 2::4]
+                depth = np.where(bid_side == order_price)[0][0]
+
+            else:
+                ask_side = dataframes[i][1].iloc[index, 0::4]
+                depth = np.where(ask_side == order_price)[0][0]
+
+            dataframes[i][0].loc[j, "depth"] = depth
+
+    # we eliminate the first row of every dataframe because we can't deduce the depth
+    for i in range(len(dataframes)):
+        dataframes[i][0] = dataframes[i][0].iloc[1:, :]
+        dataframes[i][1] = dataframes[i][1].iloc[1:, :]
 
     # if the direction is -1 then we multiply the size by -1, so we can delete the direction column
     for i in range(len(dataframes)):
         dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["direction"]
 
+    # if order type is 4, then we transform the execution of a sell limit order in a buy market order
+    for i in range(len(dataframes)):
+        dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["event_type"].apply(
+            lambda x: -1 if x == 4 else 1)
+
     # drop the direction column
     for i in range(len(dataframes)):
         dataframes[i][0] = dataframes[i][0].drop(columns=["direction"])
 
-    # deletion and cancel orders become the same type
-    for i in range(len(dataframes)):
-        dataframes[i][0]["event_type"] = dataframes[i][0]["event_type"].replace(3, 2)
-
-    return dataframes
-
-
-def from_event_exec_to_order(data):
-    #transform execution event in add order of the opposite side
-    for i in range(data.shape[0]):
-        if (data[i, 1] == 3):
-            data[i, 1] = 0
-            # if the event is an execution of a sell limit order then we transform it in a buy market order
-            if (data[i, 2] < 0):
-                data[i, 2] = -data[i, 2]
-            # if the event is an execution of a sell limit order then we transform it in a buy market order
-            elif data[i, 2] > 0:
-                data[i, 2] = data[i, 2]
-            else:
-                raise ValueError("Execution order with size 0")
-    return data
+    return dataframes[0][1], dataframes[0][0]
 
 
 def unnormalize(x, mean, std):
     return x * std + mean
 
-
+'''
 def to_original_lob(event_and_lob, seq_size):
     lob = event_and_lob[:, cst.LEN_EVENT:]
 
@@ -183,3 +202,20 @@ def check_constraints(file_recon, file_lob, seq_size):
     print("number of non violations for price execution ", num_non_violations_price_exec)
     print("number of add orders ", num_add)
     print()
+    
+    
+def from_event_exec_to_order(data):
+    #transform execution event in add order of the opposite side
+    for i in range(data.shape[0]):
+        if (data[i, 1] == 3):
+            data[i, 1] = 0
+            # if the event is an execution of a sell limit order then we transform it in a buy market order
+            if (data[i, 2] < 0):
+                data[i, 2] = -data[i, 2]
+            # if the event is an execution of a sell limit order then we transform it in a buy market order
+            elif data[i, 2] > 0:
+                data[i, 2] = data[i, 2]
+            else:
+                raise ValueError("Execution order with size 0")
+    return data
+'''

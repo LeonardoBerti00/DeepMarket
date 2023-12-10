@@ -13,7 +13,10 @@ from agent.WorldAgent import WorldAgent
 from util.order import LimitOrder
 from util import util
 from agent.ExchangeAgent import ExchangeAgent
+from pathlib import Path
 
+import configuration
+from models.NNEngine import NNEngine
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -59,6 +62,9 @@ parser.add_argument('-e',
                     '--execution-agents',
                     action='store_true',
                     help='Flag to allow the execution agent to trade.')
+parser.add_argument('-cm',
+                    '--chosen-model',
+                    default='CDT')
 #parser.add_argument('-p',
 #                    '--execution-pov',
 #                    type=float,
@@ -116,6 +122,31 @@ agents.extend([ExchangeAgent(id=0,
                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
+chosen_model = args.chosen_model
+dir = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model))
+best_val_loss = 100000
+config = configuration.Configuration()
+for file in dir.iterdir():
+    val_loss = float(file.name.split("=")[1].split("_")[0])
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        checkpoint_reference = file
+
+#set hyperparameters from checkpoint reference
+config.COND_TYPE = checkpoint_reference.name.split("=")[2].split("_")[1]+"_"+checkpoint_reference.name.split("=")[2].split("_")[2]
+config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER] = checkpoint_reference.name.split("=")[2].split("_")[5]
+config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE] = float(checkpoint_reference.name.split("=")[2].split("_")[7])
+config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE] = int(checkpoint_reference.name.split("=")[2].split("_")[10])
+config.HYPER_PARAMETERS[cst.LearningHyperParameter.CONDITIONAL_DROPOUT] = float(checkpoint_reference.name.split("=")[2].split("_")[13])
+config.HYPER_PARAMETERS[cst.LearningHyperParameter.DROPOUT] = float(checkpoint_reference.name.split("=")[2].split("_")[15])
+if chosen_model == "CDT":
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1#int(checkpoint_reference.name.split("=")[2].split("_")[18])
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = int(checkpoint_reference.name.split("=")[2].split("_")[22])
+elif chosen_model == "CSDI":
+    pass #TODO
+
+# load checkpoint
+model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None)
 
 
 # 2) World Agent
@@ -125,8 +156,10 @@ agents.extend([WorldAgent(id=1,
                             symbol=symbol,
                             date=str(historical_date.date()),
                             date_trading_days=cst.DATE_TRADING_DAYS,
-                            diffusion_model=None,
+                            diffusion_model=model,
                             data_dir="C:/Users/leona/PycharmProjects/Diffusion-Models-for-Time-Series/data",
+                            cond_type=config.COND_TYPE,
+                            cond_seq_size=config.COND_SEQ_SIZE,
                             log_orders=log_orders,
                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64'))
                           )

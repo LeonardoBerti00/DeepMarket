@@ -14,10 +14,10 @@ class adaLN_Zero(nn.Module):
     """
     A CDT block with adaptive layer norm zero (adaLN-Zero) conditioning.
     """
-    def __init__(self, input_size, num_heads, cond_len, mlp_ratio=4.0):
+    def __init__(self, input_size, num_heads, cond_len, is_augmented, mlp_ratio=4.0):
         super().__init__()
         self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
-        if input_size == cst.LEN_EVENT_ONE_HOT: num_heads = 1
+        if not is_augmented: num_heads = 1
         self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True, device=cst.DEVICE)
         self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
         mlp_hidden_dim = int(input_size * mlp_ratio)
@@ -92,6 +92,7 @@ class DiT(nn.Module):
         token_sequence_size,
         mlp_ratio,
         cond_dropout_prob,
+        is_augmented,
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -100,7 +101,7 @@ class DiT(nn.Module):
         if (token_sequence_size != 1):
             self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, input_size)
         self.blocks = nn.ModuleList([
-            adaLN_Zero(input_size, num_heads, cond_seq_len+1, mlp_ratio=mlp_ratio) for _ in range(depth)
+            adaLN_Zero(input_size, num_heads, cond_seq_len+1, is_augmented=is_augmented, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1, token_sequence_size)
         self.initialize_weights()
@@ -173,6 +174,7 @@ class CDT(nn.Module):
         masked_sequence_size,
         mlp_ratio,
         cond_dropout_prob,
+        is_augmented
     ):
         super().__init__()
         assert cond_size == input_size
@@ -182,7 +184,7 @@ class CDT(nn.Module):
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
         self.blocks = nn.ModuleList([
-            adaLN_Zero(input_size, num_heads, 1, mlp_ratio=mlp_ratio) for _ in range(depth)
+            adaLN_Zero(input_size, num_heads, 1, is_augmented=is_augmented, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer_adaLN_Zero(input_size, 1, masked_sequence_size)
         self.initialize_weights()

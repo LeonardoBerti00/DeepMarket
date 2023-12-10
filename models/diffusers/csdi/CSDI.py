@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 import constants as cst
-from config import Configuration
+import configuration
 from models.diffusers.csdi.Diffuser import CSDIEpsilon
 from models.diffusers.DiffusionAB import DiffusionAB
 from models.feature_augmenters.AbstractAugmenter import AugmenterAB
@@ -16,12 +16,12 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 """
 class CSDIDiffuser(nn.Module, DiffusionAB):
     
-    def __init__(self, config: Configuration, feature_augmenter):
+    def __init__(self, config, feature_augmenter):
         DiffusionAB.__init__(self, config)
         super(CSDIDiffuser, self).__init__()
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.device = cst.DEVICE
-        self.target_dim = cst.LEN_EVENT_ONE_HOT
+        self.target_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_ORDER_EMB]
         self.feature_augmenter = feature_augmenter
         self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
@@ -98,7 +98,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         return recon, context
 
     def deaugment(self, input: torch.Tensor):
-        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], cst.LEN_EVENT_ONE_HOT), device=cst.DEVICE)
+        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], self.target_dim), device=cst.DEVICE)
         if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
             for i in range(input.shape[0]):
                 final_output[i], _ = self.feature_augmenter.deaugment(input[i], {})

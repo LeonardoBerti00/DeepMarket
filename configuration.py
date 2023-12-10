@@ -1,14 +1,16 @@
 from constants import CSDIParameters, LearningHyperParameter
 import constants as cst
+from utils.utils import noise_scheduler
+
 
 class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
         self.IS_TESTING = False
-        self.IS_TRAINING = True
+        self.IS_TRAINING = False
         self.IS_DEBUG = True
 
         assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
@@ -17,9 +19,9 @@ class Configuration:
 
         self.IS_AUGMENTATION = True
 
-        self.IS_DATA_PREPROCESSED = False
+        self.IS_DATA_PREPROCESSED = True
 
-        self.SPLIT_RATES = (.65, .05, .3)
+        self.SPLIT_RATES = (.75, .05, .2)
 
         self.CHOSEN_MODEL = cst.Models.CDT
 
@@ -52,6 +54,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
@@ -59,7 +63,9 @@ class Configuration:
         self.COND_METHOD = "concatenation"
 
         self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
-        self.BETAS = None
+        self.BETAS = noise_scheduler(
+        num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS],
+    )
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 44

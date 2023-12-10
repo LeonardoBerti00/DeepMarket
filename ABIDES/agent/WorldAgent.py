@@ -1,9 +1,11 @@
 import os
 from copy import deepcopy
 
+import torch
 from agent.Agent import Agent
 from agent.ExchangeAgent import ExchangeAgent
 from agent.TradingAgent import TradingAgent
+from torch import nn
 from util.order.LimitOrder import LimitOrder
 from util.util import log_print
 from message.Message import Message
@@ -14,8 +16,8 @@ import pandas as pd
 import datetime
 
 from ABIDES.util.order.MarketOrder import MarketOrder
-from utils.utils_data import preprocess_dataframes, from_event_exec_to_order, reset_indexes
-
+from utils.utils_data import reset_indexes, normalize_messages
+import constants as cst
 
 class WorldAgent(Agent):
     # the objective of this world agent is to replicate the market for the first 30mins and then
@@ -24,8 +26,8 @@ class WorldAgent(Agent):
     # and generates new orders for the next time step
 
 
-    def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir,
-                 log_orders=False, random_state=None):
+    def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
+                 cond_seq_size, log_orders=False, random_state=None):
         super().__init__(id, name, type, random_state=random_state)
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
@@ -44,6 +46,9 @@ class WorldAgent(Agent):
         self.first_wakeup = True
         self.active_limit_orders = {}
         self.placed_orders = []
+        self.count_modify = 0
+        self.cond_type = cond_type
+        self.cond_seq_size = cond_seq_size
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -51,6 +56,10 @@ class WorldAgent(Agent):
         self.oracle = self.kernel.oracle
         self.exchangeID = self.kernel.findAgentByType(ExchangeAgent)
         self.mkt_open = startTime
+
+    def kernelTerminating(self, startTime):
+        # self.kernel is set in Agent.kernelInitializing()
+        super().kernelStarting(startTime)
 
     def requestDataSubscription(self, symbol, levels):
         self.sendMessage(recipientID=self.exchangeID,
@@ -79,24 +88,116 @@ class WorldAgent(Agent):
             offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
             self.setWakeup(currentTime + offset)
 
-        elif currentTime > self.mkt_open + pd.Timedelta('30min'):
+        elif currentTime > self.mkt_open + pd.Timedelta('1min'):
             self.state = 'GENERATING'
             #firstly we place the last order generated and next we generate the next order
             if self.next_order is not None:
                 self.placeOrder(currentTime, self.next_order)
                 self.next_order = None
-            """ 
-            PSEUDOCODE:
-            if cond.type == 'snapshot': 
-            cond = self.oracle.observeLOB(self.symbol, currentTime)
-            ready_cond = transform_cond(cond)
-            x = torch.zeros(1, 1, cst.LEN_EVENT)
-            generated = self.diffusion_model(ready_cond, x)
+
+            if self.cond_type == 'only_lob':
+                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
+                cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots))
+            elif self.cond_type == 'only_event':
+                orders = np.array(self.placed_orders[-self.cond_seq_size:])
+                orders_preprocessed = self._preprocess_orders(orders, np.array(self.lob_snapshots[-self.cond_seq_size-1:]))
+                cond = self._one_hot_encode_type(orders_preprocessed)
+            else:
+                raise ValueError("cond_type not recognized")
+            x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT)
+            generated = self.diffusion_model(cond, x)
+            depth_emb = generated[:-2]
+            depth = torch.argmin(torch.abs(nn.embedding.weight - depth_emb))
             offset_time = generated[0]
             self.setWakeup(currentTime + offset_time)
             self.next_order = generated
             self.placeOrder(currentTime, generated)
-            """
+
+    def _one_hot_encode_type(self, orders):
+        encoded_orders = torch.zeros(orders.shape[0], orders.shape[1] + 2)
+        encoded_orders[:, 0] = orders[:, 0]
+        # encoding order type
+        one_hot_order_type = torch.nn.functional.one_hot((orders[:, 1]).to(torch.int64), num_classes=3).to(
+            torch.float32)
+        encoded_orders[:, 1:4] = one_hot_order_type
+        encoded_orders[:, 4] = orders[:, 2]
+        encoded_orders[:, 5] = orders[:, 3]
+        encoded_orders[:, 6:] = orders[:, 4:]
+
+    def _z_score_orderbook(self, orderbook):
+        orderbook[:, 0::2] = orderbook[:, 0::2] / 100
+        orderbook[:, 0::2] = (orderbook[:, 0::2] - cst.TSLA_LOB_MEAN_PRICE_10) / cst.TSLA_LOB_STD_PRICE_10
+        orderbook[:, 1::2] = (orderbook[:, 1::2] - cst.TSLA_LOB_MEAN_SIZE_10) / cst.TSLA_LOB_STD_SIZE_10
+        return orderbook
+
+    def _preprocess_orders(self, orders, lob_snapshots):
+        COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
+                                       "sell2", "vsell2", "buy2", "vbuy2",
+                                       "sell3", "vsell3", "buy3", "vbuy3",
+                                       "sell4", "vsell4", "buy4", "vbuy4",
+                                       "sell5", "vsell5", "buy5", "vbuy5",
+                                       "sell6", "vsell6", "buy6", "vbuy6",
+                                       "sell7", "vsell7", "buy7", "vbuy7",
+                                       "sell8", "vsell8", "buy8", "vbuy8",
+                                       "sell9", "vsell9", "buy9", "vbuy9",
+                                       "sell10", "vsell10", "buy10", "vbuy10"],
+                         "message": ["time", "event_type", "order_id", "size", "price", "direction"]}
+        orders_dataframe = pd.DataFrame(orders, columns=COLUMNS_NAMES["message"])
+        lob_dataframe = pd.DataFrame(lob_snapshots, columns=COLUMNS_NAMES["orderbook"])
+        dataframes = [[orders_dataframe, lob_dataframe]]
+
+        # add depth column to messages
+        for i in range(len(dataframes)):
+            dataframes[i][0]["depth"] = 0
+
+        # we compute the depth of the orders with respect to the orderbook
+        for i in range(0, len(dataframes)):
+            for j in range(0, dataframes[i][0].shape[0]):
+                order_price = dataframes[i][0]["price"].iloc[j]
+                direction = dataframes[i][0]["direction"].iloc[j]
+                type = dataframes[i][0]["event_type"].iloc[j]
+                if type == 1:
+                    index = j + 1
+                else:
+                    index = j
+                if direction == 1:
+                    bid_side = dataframes[i][1].iloc[index, 2::4]
+                    depth = np.where(bid_side == order_price)[0][0]
+                else:
+                    ask_side = dataframes[i][1].iloc[index, 0::4]
+                    depth = np.where(ask_side == order_price)[0][0]
+
+                dataframes[i][0].loc[j, "depth"] = depth
+
+        # if the direction is -1 then we multiply the size by -1, so we can delete the direction column
+        for i in range(len(dataframes)):
+            dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["direction"]
+
+        # if order type is 4, then we transform the execution of a sell limit order in a buy market order
+        for i in range(len(dataframes)):
+            dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["event_type"].apply(
+                lambda x: -1 if x == 4 else 1)
+
+        # drop the direction column
+        for i in range(len(dataframes)):
+            dataframes[i][0] = dataframes[i][0].drop(columns=["direction"])
+
+        # divide all the price, both of lob and messages, by 100
+        for i in range(len(self.dataframes)):
+            self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
+
+        # apply z score to orders
+        for i in range(len(dataframes)):
+            self.dataframes[i][0], _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0],
+                                                                         cst.TSLA_EVENT_MEAN_SIZE,
+                                                                         cst.TSLA_EVENT_MEAN_PRICE,
+                                                                         cst.TSLA_EVENT_STD_SIZE,
+                                                                         cst.TSLA_EVENT_STD_PRICE,
+                                                                         cst.TSLA_EVENT_MEAN_TIME,
+                                                                         cst.TSLA_EVENT_STD_TIME)
+
+        return torch.from_numpy(dataframes[0][0].to_numpy())
+
 
     def receiveMessage(self, currentTime, msg):
         super().receiveMessage(currentTime, msg)
@@ -112,36 +213,6 @@ class WorldAgent(Agent):
                 new_quantity = self.active_limit_orders[msg.body['order'].order_id].quantity - msg.body['order'].quantity
                 self.active_limit_orders[msg.body['order'].order_id].quantiy = new_quantity
 
-
-
-
-
-    def _update_lob_snapshot(self, msg):
-        last_lob_snapshot = []
-        min_actual_lob_level = min(len(msg.body['asks']), len(msg.body['bids']))
-        # we take the first 10 levels of the lob and update the list of lob snapshots
-        # to use for the conditioning of the diffusion model
-        for i in range(0, 10):
-            if i < min_actual_lob_level:
-                last_lob_snapshot.append(msg.body['asks'][i][0])
-                last_lob_snapshot.append(msg.body['asks'][i][1])
-                last_lob_snapshot.append(msg.body['bids'][i][0])
-                last_lob_snapshot.append(msg.body['bids'][i][1])
-            #we need the else in case the actual lob has less than 10 levels
-            else:
-                if len(msg.body['asks']) > len(msg.body['bids']) and i < len(msg.body['asks']):
-                    last_lob_snapshot.append(msg.body['asks'][i][0])
-                    last_lob_snapshot.append(msg.body['asks'][i][1])
-                    last_lob_snapshot.append(0)
-                    last_lob_snapshot.append(0)
-                elif len(msg.body['bids']) > len(msg.body['asks']) and i < len(msg.body['bids']):
-                    last_lob_snapshot.append(0)
-                    last_lob_snapshot.append(0)
-                    last_lob_snapshot.append(msg.body['bids'][i][0])
-                    last_lob_snapshot.append(msg.body['bids'][i][1])
-                else:
-                    for _ in range(4): last_lob_snapshot.append(0)
-        self.lob_snapshots.append(last_lob_snapshot)
 
     def placeOrder(self, currentTime, order):
         self.placed_orders.append(order)
@@ -221,7 +292,6 @@ class WorldAgent(Agent):
             to ensure the old and new orders are the same in some way."""
         self.sendMessage(self.exchangeID, Message({"msg": "MODIFY_ORDER", "sender": self.id,
                                                    "order": order, "new_order": newOrder}))
-
         # Log this activity.
         if self.log_orders: self.logEvent('MODIFY_ORDER', order.to_dict())
 
@@ -293,7 +363,32 @@ class WorldAgent(Agent):
         return dataframes
 
 
-
+    def _update_lob_snapshot(self, msg):
+        last_lob_snapshot = []
+        min_actual_lob_level = min(len(msg.body['asks']), len(msg.body['bids']))
+        # we take the first 10 levels of the lob and update the list of lob snapshots
+        # to use for the conditioning of the diffusion model
+        for i in range(0, 10):
+            if i < min_actual_lob_level:
+                last_lob_snapshot.append(msg.body['asks'][i][0])
+                last_lob_snapshot.append(msg.body['asks'][i][1])
+                last_lob_snapshot.append(msg.body['bids'][i][0])
+                last_lob_snapshot.append(msg.body['bids'][i][1])
+            #we need the else in case the actual lob has less than 10 levels
+            else:
+                if len(msg.body['asks']) > len(msg.body['bids']) and i < len(msg.body['asks']):
+                    last_lob_snapshot.append(msg.body['asks'][i][0])
+                    last_lob_snapshot.append(msg.body['asks'][i][1])
+                    last_lob_snapshot.append(0)
+                    last_lob_snapshot.append(0)
+                elif len(msg.body['bids']) > len(msg.body['asks']) and i < len(msg.body['bids']):
+                    last_lob_snapshot.append(0)
+                    last_lob_snapshot.append(0)
+                    last_lob_snapshot.append(msg.body['bids'][i][0])
+                    last_lob_snapshot.append(msg.body['bids'][i][1])
+                else:
+                    for _ in range(4): last_lob_snapshot.append(0)
+        self.lob_snapshots.append(last_lob_snapshot)
 
 
 

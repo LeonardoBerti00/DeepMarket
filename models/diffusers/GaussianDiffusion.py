@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from einops import rearrange, repeat, reduce
 
-from config import Configuration
+import configuration
 from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
@@ -14,7 +14,7 @@ from models.diffusers.CDT.CDT import CDT, CDT, DiT
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
-    def __init__(self, config: Configuration, feature_augmenter):
+    def __init__(self, config, feature_augmenter):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
@@ -35,7 +35,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
         else:
-            self.input_size = cst.LEN_EVENT_ONE_HOT
+            self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
             self.cond_size = config.COND_SIZE
         if (self.type == 'adaln_zero'):
             self.NN = DiT(
@@ -48,6 +48,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.x_seq_size,
                 self.mlp_ratio,
                 self.cond_dropout_prob,
+                self.IS_AUGMENTATION,
             )
         elif (self.type == 'concatenation'):
             self.NN = CDT(
@@ -60,6 +61,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.x_seq_size,
                 self.mlp_ratio,
                 self.cond_dropout_prob,
+                self.IS_AUGMENTATION,
             )
         elif (self.type == 'crossattention'):
             pass
@@ -115,9 +117,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         beta_t = self.betas[t]
         alpha_t = 1 - beta_t
         alpha_cumprod_t = self.alphas_cumprod[t]
-        beta_t = repeat(beta_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
-        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
-        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        beta_t = repeat(beta_t, 'b -> b 1 d', d=x_0.shape[-1])
+        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=x_0.shape[-1])
+        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=x_0.shape[-1])
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t_aug, cond, t)
         if self.IS_AUGMENTATION:
@@ -126,7 +128,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         frac = (v + 1) / 2
         max_log = torch.log(beta_t)
         min_log = self.posterior_log_var_clipped[t]
-        min_log = repeat(min_log, 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        min_log = repeat(min_log, 'b -> b 1 d', d=x_0.shape[-1])
         log_var_t = frac * max_log + (1 - frac) * min_log
         var_t = torch.exp(log_var_t)
 
@@ -223,13 +225,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         :param t: the timestep.
         :return: a tuple (mean, variance).
         """
-        posterior_mean_coef1 = repeat(self.posterior_mean_coef1[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
-        posterior_mean_coef2 = repeat(self.posterior_mean_coef2[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        posterior_mean_coef1 = repeat(self.posterior_mean_coef1[t], 'b -> b 1 d', d=x_0.shape[-1])
+        posterior_mean_coef2 = repeat(self.posterior_mean_coef2[t], 'b -> b 1 d', d=x_0.shape[-1])
         true_mean = (
                 posterior_mean_coef1 * x_0
                 + posterior_mean_coef2 * x_t
         )
-        true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=cst.LEN_EVENT_ONE_HOT)
+        true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=x_0.shape[-1])
         return true_mean, true_log_var_clipped
 
     """

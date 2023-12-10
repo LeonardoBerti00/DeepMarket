@@ -1,8 +1,9 @@
 import copy
 import numpy as np
 from torch import nn
+import os
 
-from config import Configuration
+import configuration
 import torch
 import lightning as L
 import constants as cst
@@ -23,7 +24,7 @@ from models.diffusers.CDT.Sampler import LossSecondMomentResampler
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config: Configuration, test_num_steps: int, test_data):
+    def __init__(self, config, test_num_steps: int, test_data):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
@@ -45,13 +46,15 @@ class NNEngine(L.LightningModule):
         self.train_losses, self.val_losses, self.test_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+        self.size_depth_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB]
+        self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
         self.betas = config.BETAS
         self.num_violations_price = 0
         self.num_violations_size = 0
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = LSTMAugmenter(config, cst.LEN_EVENT_ONE_HOT).to(cst.DEVICE, non_blocking=True)
+            self.feature_augmenter = LSTMAugmenter(config, self.size_order_emb).to(cst.DEVICE, non_blocking=True)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
@@ -62,12 +65,12 @@ class NNEngine(L.LightningModule):
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
+        self.depth_embedder = nn.Embedding(cst.N_LOB_LEVELS, self.size_depth_emb)
 
 
     def forward(self, cond, x_0, is_train):
-        # save the real input for future
-        real_input, real_cond = copy.deepcopy(x_0), copy.deepcopy(cond)
-
+        x_0, cond = self.depth_embedding(x_0, cond)
+        real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
         self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
         if isinstance(self.diffuser, CSDIDiffuser) and is_train:
             self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
@@ -91,8 +94,7 @@ class NNEngine(L.LightningModule):
     def single_step(self, cond, x_0, is_train, real_cond):
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
-        context.update({'x_t': copy.deepcopy(x_t)})
-        x_t.requires_grad = True
+        context.update({'x_t': x_t.detach().clone()})
 
         # augment
         x_t, cond = self.augment(x_t, context['conditioning'], is_train)
@@ -128,6 +130,17 @@ class NNEngine(L.LightningModule):
             assert self.augment_dim == self.cond_size
         return x_t, cond
 
+    def depth_embedding(self, x_0, cond):
+        depth = x_0[:, :, -1]
+        depth_emb = self.depth_embedder(depth.long()).float()
+        x_0 = torch.cat((x_0[:, :, :-1], depth_emb), dim=2)
+
+        if self.cond_type == 'only_event':
+            cond_depth = cond[:, :, -1]
+            cond_depth_emb = self.depth_embedder(cond_depth.long()).float()
+            cond = torch.cat((cond[:, :, :-1], cond_depth_emb), dim=2)
+        return x_0, cond
+
     def loss(self, real, recon, **kwargs):
         return self.diffuser.loss(real, recon, **kwargs)
 
@@ -158,11 +171,9 @@ class NNEngine(L.LightningModule):
         x_0 = input[1]
         full_cond = input[0]
         cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=False)
+        recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
-        recon = recon[:, 0, :]
-        recon = self._check_constraints(full_cond, recon)
         batch_loss_mean = torch.mean(batch_losses)
         self.val_losses.append(batch_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -172,7 +183,7 @@ class NNEngine(L.LightningModule):
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
             batch_ema_losses = self.loss(x_0, recon, **reverse_context)
-            recon = self._check_constraints(full_cond, recon)
+            #recon = self._check_constraints(full_cond, recon)
             ema_loss = torch.mean(batch_ema_losses)
             self.val_ema_losses.append(ema_loss)
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -201,13 +212,13 @@ class NNEngine(L.LightningModule):
         x_0 = input[1]
         full_cond = input[0]
         cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=False)
+        recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
         batch_loss_mean = torch.mean(batch_losses)
         self.test_losses.append(batch_loss_mean.item())
         recon = recon[:, 0, :]
-        recon = self._check_constraints(full_cond, recon)
+        #recon = self._check_constraints(full_cond, recon)
         if batch_idx != self.test_num_batches - 1:
             self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon
         else:
@@ -222,7 +233,7 @@ class NNEngine(L.LightningModule):
             ema_loss = torch.mean(batch_ema_losses)
             self.test_ema_losses.append(ema_loss.item())
             recon = recon[:, 0, :]
-            recon = self._check_constraints(full_cond, recon)
+            #recon = self._check_constraints(full_cond, recon)
             if batch_idx != self.test_num_batches - 1:
                 self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon
             else:

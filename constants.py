@@ -13,6 +13,8 @@ class LearningHyperParameter(str, Enum):
     SEQ_SIZE = "seq_size"          #it's the sequence length
     MASKED_SEQ_SIZE = "masked_seq_size"
     AUGMENT_DIM = "augment_dim"
+    SIZE_DEPTH_EMB = "size_depth_emb"
+    SIZE_ORDER_EMB = "size_order_emb"
     LAMBDA = "lambda"
     CDT_DEPTH = "CDT_depth"
     CDT_MLP_RATIO = "CDT_mlp_ratio"
@@ -116,7 +118,7 @@ SEED = 0
 PRECISION = 32
 N_LOB_LEVELS = 10
 LEN_LEVEL = 4
-LEN_EVENT_ONE_HOT = 5
+LEN_EVENT_ONE_HOT = 7
 LEN_EVENT = 4
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]

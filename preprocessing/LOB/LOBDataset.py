@@ -34,21 +34,20 @@ class LOBDataset(data.Dataset):
         x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT_ONE_HOT]
         return cond, x_0
 
-
     def _get_data(self):
         """ Loads the data. """
         self.data = torch.from_numpy(np.load(self.path))
 
-    def one_hot_encode(self):
+    def one_hot_encode_type(self):
         """ one hot encode the second and final column """
-        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 1)
+        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 2)
         self.encoded_data[:, 0] = self.data[:, 0]
         #encoding order type
-        one_hot_order_type = torch.nn.functional.one_hot((self.data[:, 1]).to(torch.int64), num_classes=2).to(torch.float32)
-        self.encoded_data[:, 1:3] = one_hot_order_type
-        self.encoded_data[:, 3] = self.data[:, 2]
-        self.encoded_data[:, 4] = self.data[:, 3]
-        self.encoded_data[:, 5:] = self.data[:, 4:]
+        one_hot_order_type = torch.nn.functional.one_hot((self.data[:, 1]).to(torch.int64), num_classes=3).to(torch.float32)
+        self.encoded_data[:, 1:4] = one_hot_order_type
+        self.encoded_data[:, 4] = self.data[:, 2]
+        self.encoded_data[:, 5] = self.data[:, 3]
+        self.encoded_data[:, 6:] = self.data[:, 4:]
 
 
 
