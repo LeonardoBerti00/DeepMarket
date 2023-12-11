@@ -148,6 +148,9 @@ elif chosen_model == "CSDI":
 # load checkpoint
 model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None)
 
+# we freeze the model
+for param in model.parameters():
+    param.requires_grad = False
 
 # 2) World Agent
 agents.extend([WorldAgent(id=1,

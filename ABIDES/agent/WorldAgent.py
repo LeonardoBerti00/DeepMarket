@@ -49,6 +49,7 @@ class WorldAgent(Agent):
         self.count_modify = 0
         self.cond_type = cond_type
         self.cond_seq_size = cond_seq_size
+        self.first_generation = True
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -82,36 +83,104 @@ class WorldAgent(Agent):
             self.first_wakeup = False
 
         #if current time is between 09:30 and 10:00, then we are in the pre-open phase
-        if currentTime > self.mkt_open and currentTime <= self.mkt_open + pd.Timedelta('30min'):
+        if currentTime > self.mkt_open and currentTime <= self.mkt_open + pd.Timedelta('1min'):
+            if (len(self.placed_orders)) == 431:
+                print("ci siamo")
             self.placeOrder(currentTime, self.historical_orders[self.next_historical_orders_index])
             self.next_historical_orders_index += 1
             offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
             self.setWakeup(currentTime + offset)
 
+
         elif currentTime > self.mkt_open + pd.Timedelta('1min'):
             self.state = 'GENERATING'
-            #firstly we place the last order generated and next we generate the next order
+            # firstly we place the last order generated and next we generate the next order
             if self.next_order is not None:
                 self.placeOrder(currentTime, self.next_order)
                 self.next_order = None
 
-            if self.cond_type == 'only_lob':
-                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
-                cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots))
-            elif self.cond_type == 'only_event':
-                orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                orders_preprocessed = self._preprocess_orders(orders, np.array(self.lob_snapshots[-self.cond_seq_size-1:]))
-                cond = self._one_hot_encode_type(orders_preprocessed)
+            # we generate the first order then the others will be generated everytime we receive the update of the lob
+            if self.first_generation:
+                generated = self._generate_order(currentTime)
+                self.next_order = generated
+                self.placeOrder(currentTime, generated)
+                self.first_generation = False
+
+    def _generate_order(self, currentTime):
+        if self.cond_type == 'only_lob':
+            lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
+            cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots))
+        elif self.cond_type == 'only_event':
+            orders = np.array(self.placed_orders[-self.cond_seq_size:])
+            orders_preprocessed = self._preprocess_orders(orders,
+                                                          np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
+            cond = self._one_hot_encode_type(orders_preprocessed)
+        else:
+            raise ValueError("cond_type not recognized")
+        cond = cond.unsqueeze(0)
+        x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT)
+        generated, context = self.diffusion_model(cond, x, False)
+        generated = generated[0, 0, :]
+        generated = self._postprocess_generated(generated)
+
+        offset_time = generated[0]
+        self.setWakeup(currentTime + offset_time)
+        return generated
+
+    def _postprocess_generated(self, generated):
+        # we need to go from the output of the diffusion model to the order
+        # we select the depth with the minimum distance from the nn.Embedding layer
+        depth_emb = generated[-2:]
+        depth = torch.argmin(torch.sum(torch.abs(self.diffusion_model.depth_embedder.weight.data - depth_emb), dim=1))
+
+        # we need to convert the order type from one hot encoding to the original encoding, so we select the nearest to 1
+        order_type = torch.argmin(torch.abs(generated[1:4] - 1.0)) + 1
+        if order_type == 3 or order_type == 2:
+            order_type += 1
+        # order type == 1 -> limit order
+        # order type == 3 -> cancel order
+        # order type == 4 -> market order
+
+        # we unnormalize the price and the size
+        price = generated[5] * cst.TSLA_EVENT_STD_PRICE + cst.TSLA_EVENT_MEAN_PRICE
+        size = generated[4] * cst.TSLA_EVENT_STD_SIZE + cst.TSLA_EVENT_MEAN_SIZE
+
+        direction = -1 if size < 0 else 1
+        size = abs(size)
+
+        if order_type == 1:
+            order_id = self.unused_order_ids[0]
+            self.unused_order_ids = self.unused_order_ids[1:]
+
+        elif order_type == 3:
+            if direction == 1:
+                bid_side = self.lob_snapshots[-1, 2::4]
+                price = bid_side[depth]
+                # search all the active limit orders with the same price
+                orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
+                # if there are no orders with the same price then we raise an exception
+                if len(orders_with_same_price) == 0:
+                    raise Exception("there are no orders with the same price")
+                # we select the order with the quantity near to the quantity generated
+                order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+
             else:
-                raise ValueError("cond_type not recognized")
-            x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT)
-            generated = self.diffusion_model(cond, x)
-            depth_emb = generated[:-2]
-            depth = torch.argmin(torch.abs(nn.embedding.weight - depth_emb))
-            offset_time = generated[0]
-            self.setWakeup(currentTime + offset_time)
-            self.next_order = generated
-            self.placeOrder(currentTime, generated)
+                ask_side = self.lob_snapshots[-1, 0::4]
+                price = ask_side[depth]
+                # search all the active limit orders with the same price
+                orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
+                # if there are no orders with the same price then we raise an exception
+                if len(orders_with_same_price) == 0:
+                    raise Exception("there are no orders with the same price")
+                # we select the order with the quantity near to the quantity generated
+                order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+
+        elif order_type == 4:
+            order_id = 0
+            direction = -direction
+
+        offset_time = generated[0]
+        return np.array([offset_time, order_type, order_id, size, price, direction])
 
     def _one_hot_encode_type(self, orders):
         encoded_orders = torch.zeros(orders.shape[0], orders.shape[1] + 2)
@@ -120,9 +189,8 @@ class WorldAgent(Agent):
         one_hot_order_type = torch.nn.functional.one_hot((orders[:, 1]).to(torch.int64), num_classes=3).to(
             torch.float32)
         encoded_orders[:, 1:4] = one_hot_order_type
-        encoded_orders[:, 4] = orders[:, 2]
-        encoded_orders[:, 5] = orders[:, 3]
-        encoded_orders[:, 6:] = orders[:, 4:]
+        encoded_orders[:, 4:] = orders[:, 2:]
+        return encoded_orders
 
     def _z_score_orderbook(self, orderbook):
         orderbook[:, 0::2] = orderbook[:, 0::2] / 100
@@ -180,21 +248,22 @@ class WorldAgent(Agent):
 
         # drop the direction column
         for i in range(len(dataframes)):
-            dataframes[i][0] = dataframes[i][0].drop(columns=["direction"])
+            dataframes[i][0] = dataframes[i][0].drop(columns=["direction", "order_id"])
+
 
         # divide all the price, both of lob and messages, by 100
-        for i in range(len(self.dataframes)):
-            self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
+        for i in range(len(dataframes)):
+            dataframes[i][0]["price"] = dataframes[i][0]["price"] / 100
 
         # apply z score to orders
         for i in range(len(dataframes)):
-            self.dataframes[i][0], _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0],
-                                                                         cst.TSLA_EVENT_MEAN_SIZE,
-                                                                         cst.TSLA_EVENT_MEAN_PRICE,
-                                                                         cst.TSLA_EVENT_STD_SIZE,
-                                                                         cst.TSLA_EVENT_STD_PRICE,
-                                                                         cst.TSLA_EVENT_MEAN_TIME,
-                                                                         cst.TSLA_EVENT_STD_TIME)
+            dataframes[i][0], _, _, _, _, _, _ = normalize_messages(dataframes[i][0],
+                                                                     cst.TSLA_EVENT_MEAN_SIZE,
+                                                                     cst.TSLA_EVENT_MEAN_PRICE,
+                                                                     cst.TSLA_EVENT_STD_SIZE,
+                                                                     cst.TSLA_EVENT_STD_PRICE,
+                                                                     cst.TSLA_EVENT_MEAN_TIME,
+                                                                     cst.TSLA_EVENT_STD_TIME)
 
         return torch.from_numpy(dataframes[0][0].to_numpy())
 
@@ -203,6 +272,12 @@ class WorldAgent(Agent):
         super().receiveMessage(currentTime, msg)
         if msg.body['msg'] == 'MARKET_DATA':
             self._update_lob_snapshot(msg)
+            if self.state == 'GENERATING':
+                generated = self._generate_order(currentTime)
+                self.next_order = generated
+                self.placeOrder(currentTime, generated)
+                self.first_generation = False
+
         elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag != 'market_order' and msg.body['order'].order_id == 10044395.0:
             #check if the quantoty is the same of the order placed
             if msg.body['order'].quantity == self.active_limit_orders[msg.body['order'].order_id].quantity:
@@ -239,13 +314,13 @@ class WorldAgent(Agent):
                     elif type == 2:
                         # partial deletion of a limit order
                         new_order = LimitOrder(self.id, self.currentTime, self.symbol, old_order.quantity-quantity, old_order.is_buy_order, old_order.limit_price, old_order.order_id, None)
-                        self.placed_orders.append(new_order)
+                        #self.placed_orders.append(new_order)
                         self.active_limit_orders[new_order.order_id] = order
                         self.modifyOrder(old_order, new_order)
 
                 elif type == 4:
                     # if type == 4 it means that it is an execution order, so if it is an execution order of a sell limit order
-                    # we place a market order of the same quantity and viceversa
+                    # we place a buy market order of the same quantity and viceversa
                     is_buy_order = False if direction else True
                     # the curren order_id is the order_id of the sell (buy) limit order filled, so we need to assign to
                     # the market order another order_id
@@ -339,7 +414,7 @@ class WorldAgent(Agent):
     def preprocess_events(self, dataframes):
 
         for i in range(len(dataframes)):
-            indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([5, 6, 7])].index
+            indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([2, 5, 6, 7])].index
             dataframes[i][0] = dataframes[i][0].drop(indexes)
             dataframes[i][1] = dataframes[i][1].drop(indexes)
 

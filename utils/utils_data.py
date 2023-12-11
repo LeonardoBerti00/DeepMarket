@@ -29,6 +29,8 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
 
 
 def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  std_prices=None, mean_time=None, std_time=None):
+    # we transform the sell market orders in buy market orders and viceversa
+    data.loc[data["event_type"] == 4, "size"] = -data.loc[data["event_type"] == 4, "size"]
 
     #apply z score to prices and size column
     if (mean_size is None) or (std_size is None):
@@ -55,10 +57,10 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     data["event_type"] = data["event_type"]-1.0
     data["event_type"] = data["event_type"].replace(2, 1)
     data["event_type"] = data["event_type"].replace(3, 2)
-
     # order_type = 0 -> limit order
     # order_type = 1 -> cancel order
     # order_type = 2 -> market order
+
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time
 
 
