@@ -1,5 +1,5 @@
-from models.diffusers.csdi.Embedder import CSDIEmbeddingDiffusionStep
-from models.diffusers.csdi.Residuals import ResidualBlock
+from models.diffusers.CSDI.Embedder import CSDIEmbeddingDiffusionStep
+from models.diffusers.CSDI.Residuals import ResidualBlock
 import torch
 import torch.nn as nn
 import math

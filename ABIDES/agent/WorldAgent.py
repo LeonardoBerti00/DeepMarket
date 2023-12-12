@@ -16,7 +16,7 @@ import pandas as pd
 import datetime
 
 from ABIDES.util.order.MarketOrder import MarketOrder
-from utils.utils_data import reset_indexes, normalize_messages
+from utils.utils_data import reset_indexes, normalize_messages, one_hot_encode_type
 import constants as cst
 
 class WorldAgent(Agent):
@@ -27,7 +27,7 @@ class WorldAgent(Agent):
 
 
     def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, log_orders=False, random_state=None):
+                 cond_seq_size, log_orders=False, random_state=None, normalization_terms=None):
         super().__init__(id, name, type, random_state=random_state)
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
@@ -50,6 +50,7 @@ class WorldAgent(Agent):
         self.cond_type = cond_type
         self.cond_seq_size = cond_seq_size
         self.first_generation = True
+        self.normalization_terms = normalization_terms
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -58,9 +59,9 @@ class WorldAgent(Agent):
         self.exchangeID = self.kernel.findAgentByType(ExchangeAgent)
         self.mkt_open = startTime
 
-    def kernelTerminating(self, startTime):
+    def kernelTerminating(self):
         # self.kernel is set in Agent.kernelInitializing()
-        super().kernelStarting(startTime)
+        super().kernelTerminating()
 
     def requestDataSubscription(self, symbol, levels):
         self.sendMessage(recipientID=self.exchangeID,
@@ -73,7 +74,6 @@ class WorldAgent(Agent):
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
-        # at the opening of the market we reconstruct the order book sending 10 limit orders for each side taken from self.lob
         if self.first_wakeup:
             self.state = 'PRE_GENERATING'
             offset = datetime.timedelta(seconds=self.historical_orders[0, 0])
@@ -82,15 +82,12 @@ class WorldAgent(Agent):
             self.requestDataSubscription(self.symbol, levels=10)
             self.first_wakeup = False
 
-        #if current time is between 09:30 and 10:00, then we are in the pre-open phase
-        if currentTime > self.mkt_open and currentTime <= self.mkt_open + pd.Timedelta('1min'):
-            if (len(self.placed_orders)) == 431:
-                print("ci siamo")
+        # if current time is between 09:30 and 10:00, then we are in the pre-open phase
+        elif self.mkt_open < currentTime <= self.mkt_open + pd.Timedelta('1min'):
             self.placeOrder(currentTime, self.historical_orders[self.next_historical_orders_index])
             self.next_historical_orders_index += 1
             offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
             self.setWakeup(currentTime + offset)
-
 
         elif currentTime > self.mkt_open + pd.Timedelta('1min'):
             self.state = 'GENERATING'
@@ -103,47 +100,153 @@ class WorldAgent(Agent):
             if self.first_generation:
                 generated = self._generate_order(currentTime)
                 self.next_order = generated
-                self.placeOrder(currentTime, generated)
                 self.first_generation = False
+
+    def receiveMessage(self, currentTime, msg):
+        super().receiveMessage(currentTime, msg)
+        if msg.body['msg'] == 'MARKET_DATA':
+            self._update_lob_snapshot(msg)
+            if self.state == 'GENERATING':
+                generated = self._generate_order(currentTime)
+                self.next_order = generated
+                self.first_generation = False
+
+        elif msg.body['msg'] == 'ORDER_ACCEPTED' and msg.body['order'].tag == 'market_order':
+            self.placed_orders.append(msg.body['order'])
+
+        # we check if it is a market order because when we place a market order we receive both the message
+        # of the limit order executed and of the market order executed, so we don't want to count twice the same order
+        elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag != 'market_order':
+            # check if the quantity is the same of the order placed
+            if msg.body['order'].quantity == self.active_limit_orders[msg.body['order'].order_id].quantity:
+                # if the quantity is the same then we can delete the order from the active limit orders
+                del self.active_limit_orders[msg.body['order'].order_id]
+            else:
+                # if the quantity is not the same then we need to modify the order in the active limit orders
+                new_quantity = self.active_limit_orders[msg.body['order'].order_id].quantity - msg.body['order'].quantity
+                self.active_limit_orders[msg.body['order'].order_id].quantiy = new_quantity
+
+
+
+    def placeOrder(self, currentTime, order):
+
+        order_id = order[2]
+        type = order[1]
+        quantity = order[3]
+        price = int(order[4])
+        direction = order[5]
+        if quantity > 0:
+            direction = False if direction == -1 else True
+            if type == 1:
+                self.placeLimitOrder(self.symbol, quantity, is_buy_order=direction, limit_price=price, order_id=order_id)
+                self.placed_orders.append(order)
+            elif type == 2 or type == 3:
+                self.placed_orders.append(order)
+                if order_id in self.active_limit_orders:
+                    old_order = self.active_limit_orders[order_id]
+                    del self.active_limit_orders[order_id]
+                else:
+                    raise Exception("trying to cancel an order that doesn't exist")
+
+                if type == 3:
+                    # total deletion of a limit order
+                    self.cancelOrder(old_order)
+                elif type == 2:
+                    # partial deletion of a limit order
+                    new_order = LimitOrder(self.id, self.currentTime, self.symbol, old_order.quantity-quantity, old_order.is_buy_order, old_order.limit_price, old_order.order_id, None)
+                    #self.placed_orders.append(new_order)
+                    self.active_limit_orders[new_order.order_id] = order
+                    self.modifyOrder(old_order, new_order)
+
+            elif type == 4:
+                # if type == 4 it means that it is an execution order, so if it is an execution order of a sell limit order
+                # we place a buy market order of the same quantity and viceversa
+                is_buy_order = False if direction else True
+                # the curren order_id is the order_id of the sell (buy) limit order filled, so we need to assign to
+                # the market order another order_id
+                order_id = self.unused_order_ids[0]
+                self.unused_order_ids = self.unused_order_ids[1:]
+                self.placeMarketOrder(self.symbol, quantity, is_buy_order=is_buy_order, order_id=order_id)
+        else:
+            log_print("Agent ignored order of quantity zero: {}", order)
+
 
     def _generate_order(self, currentTime):
         if self.cond_type == 'only_lob':
             lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
-            cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots))
+            cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
         elif self.cond_type == 'only_event':
             orders = np.array(self.placed_orders[-self.cond_seq_size:])
             orders_preprocessed = self._preprocess_orders(orders,
                                                           np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
-            cond = self._one_hot_encode_type(orders_preprocessed)
+            cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
         else:
             raise ValueError("cond_type not recognized")
         cond = cond.unsqueeze(0)
-        x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT)
+        x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT, device=cst.DEVICE, dtype=torch.float32)
         generated, context = self.diffusion_model(cond, x, False)
         generated = generated[0, 0, :]
         generated = self._postprocess_generated(generated)
-
-        offset_time = generated[0]
+        offset_time = datetime.timedelta(seconds=generated[0])
         self.setWakeup(currentTime + offset_time)
         return generated
+
+
+    def placeLimitOrder(self, symbol, quantity, is_buy_order, limit_price, order_id=None, ignore_risk=True, tag=None):
+        order = LimitOrder(self.id, self.currentTime, symbol, quantity, is_buy_order, limit_price, order_id, tag)
+        self.active_limit_orders[order.order_id] = order
+        self.sendMessage(self.exchangeID, Message({"msg": "LIMIT_ORDER", "sender": self.id, "order": order}))
+        # Log this activity.
+        if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
+
+    def placeMarketOrder(self, symbol, quantity, is_buy_order, order_id=None, ignore_risk=True, tag=None):
+        """
+          The market order is created as multiple limit orders crossing the spread walking the book until all the quantities are matched.
+        """
+        order = MarketOrder(self.id, self.currentTime, symbol, quantity, is_buy_order, order_id)
+        self.sendMessage(self.exchangeID, Message({"msg": "MARKET_ORDER", "sender": self.id, "order": order}))
+        if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
+
+    def cancelOrder(self, order):
+        """Used by any Trading Agent subclass to cancel any order.
+        The order must currently appear in the agent's open orders list."""
+        if isinstance(order, LimitOrder):
+            self.sendMessage(self.exchangeID, Message({"msg": "CANCEL_ORDER", "sender": self.id,
+                                                       "order": order}))
+            # Log this activity.
+            if self.log_orders: self.logEvent('CANCEL_SUBMITTED', order.to_dict())
+        else:
+            log_print("order {} of type, {} cannot be cancelled", order, type(order))
+
+    def modifyOrder(self, order, newOrder):
+        """ Used by any Trading Agent subclass to modify any existing limit order.  The order must currently
+            appear in the agent's open orders list.  Some additional tests might be useful here
+            to ensure the old and new orders are the same in some way."""
+        self.sendMessage(self.exchangeID, Message({"msg": "MODIFY_ORDER", "sender": self.id,
+                                                   "order": order, "new_order": newOrder}))
+        # Log this activity.
+        if self.log_orders: self.logEvent('MODIFY_ORDER', order.to_dict())
+
+
 
     def _postprocess_generated(self, generated):
         # we need to go from the output of the diffusion model to the order
         # we select the depth with the minimum distance from the nn.Embedding layer
         depth_emb = generated[-2:]
-        depth = torch.argmin(torch.sum(torch.abs(self.diffusion_model.depth_embedder.weight.data - depth_emb), dim=1))
+        depth = torch.argmin(torch.sum(torch.abs(self.diffusion_model.depth_embedder.weight.data - depth_emb), dim=1)).item()
 
         # we need to convert the order type from one hot encoding to the original encoding, so we select the nearest to 1
-        order_type = torch.argmin(torch.abs(generated[1:4] - 1.0)) + 1
+        order_type = torch.argmin(torch.abs(generated[1:4] - 1.0)).item() + 1
         if order_type == 3 or order_type == 2:
             order_type += 1
         # order type == 1 -> limit order
         # order type == 3 -> cancel order
         # order type == 4 -> market order
 
-        # we unnormalize the price and the size
-        price = generated[5] * cst.TSLA_EVENT_STD_PRICE + cst.TSLA_EVENT_MEAN_PRICE
-        size = generated[4] * cst.TSLA_EVENT_STD_SIZE + cst.TSLA_EVENT_MEAN_SIZE
+        # we return the price, the size and the time to the original scale
+        price = round(generated[5].item() * self.normalization_terms["event"][0] + self.normalization_terms["event"][1], ndigits=0)*100
+        size = round(generated[4].item() * self.normalization_terms["event"][2] + self.normalization_terms["event"][3], ndigits=0)
+        time = abs(generated[0].item() * self.normalization_terms["event"][4] + self.normalization_terms["event"][5])
 
         direction = -1 if size < 0 else 1
         size = abs(size)
@@ -154,18 +257,18 @@ class WorldAgent(Agent):
 
         elif order_type == 3:
             if direction == 1:
-                bid_side = self.lob_snapshots[-1, 2::4]
+                bid_side = self.lob_snapshots[-1][2::4]
                 price = bid_side[depth]
                 # search all the active limit orders with the same price
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we raise an exception
                 if len(orders_with_same_price) == 0:
-                    raise Exception("there are no orders with the same price")
+                    raise Exception("we have generated a cancel order but there are no active orders referring to it")
                 # we select the order with the quantity near to the quantity generated
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
             else:
-                ask_side = self.lob_snapshots[-1, 0::4]
+                ask_side = self.lob_snapshots[-1][0::4]
                 price = ask_side[depth]
                 # search all the active limit orders with the same price
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
@@ -177,25 +280,17 @@ class WorldAgent(Agent):
 
         elif order_type == 4:
             order_id = 0
+            # we transform market orders in execution orders of the opposite side as the original message files
             direction = -direction
 
-        offset_time = generated[0]
-        return np.array([offset_time, order_type, order_id, size, price, direction])
+        return np.array([time, order_type, order_id, size, price, direction])
 
-    def _one_hot_encode_type(self, orders):
-        encoded_orders = torch.zeros(orders.shape[0], orders.shape[1] + 2)
-        encoded_orders[:, 0] = orders[:, 0]
-        # encoding order type
-        one_hot_order_type = torch.nn.functional.one_hot((orders[:, 1]).to(torch.int64), num_classes=3).to(
-            torch.float32)
-        encoded_orders[:, 1:4] = one_hot_order_type
-        encoded_orders[:, 4:] = orders[:, 2:]
-        return encoded_orders
+
 
     def _z_score_orderbook(self, orderbook):
         orderbook[:, 0::2] = orderbook[:, 0::2] / 100
-        orderbook[:, 0::2] = (orderbook[:, 0::2] - cst.TSLA_LOB_MEAN_PRICE_10) / cst.TSLA_LOB_STD_PRICE_10
-        orderbook[:, 1::2] = (orderbook[:, 1::2] - cst.TSLA_LOB_MEAN_SIZE_10) / cst.TSLA_LOB_STD_SIZE_10
+        orderbook[:, 0::2] = (orderbook[:, 0::2] - self.normalization_terms["lob"][2]) / self.normalization_terms["event"][3]
+        orderbook[:, 1::2] = (orderbook[:, 1::2] - self.normalization_terms["lob"][0]) / self.normalization_terms["event"][1]
         return orderbook
 
     def _preprocess_orders(self, orders, lob_snapshots):
@@ -265,110 +360,9 @@ class WorldAgent(Agent):
                                                                      cst.TSLA_EVENT_MEAN_TIME,
                                                                      cst.TSLA_EVENT_STD_TIME)
 
-        return torch.from_numpy(dataframes[0][0].to_numpy())
+        return torch.from_numpy(dataframes[0][0].to_numpy()).to(cst.DEVICE, torch.float32)
 
 
-    def receiveMessage(self, currentTime, msg):
-        super().receiveMessage(currentTime, msg)
-        if msg.body['msg'] == 'MARKET_DATA':
-            self._update_lob_snapshot(msg)
-            if self.state == 'GENERATING':
-                generated = self._generate_order(currentTime)
-                self.next_order = generated
-                self.placeOrder(currentTime, generated)
-                self.first_generation = False
-
-        elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag != 'market_order' and msg.body['order'].order_id == 10044395.0:
-            #check if the quantoty is the same of the order placed
-            if msg.body['order'].quantity == self.active_limit_orders[msg.body['order'].order_id].quantity:
-                #if the quantity is the same then we can delete the order from the active limit orders
-                del self.active_limit_orders[msg.body['order'].order_id]
-            else:
-                #if the quantity is not the same then we need to modify the order in the active limit orders
-                new_quantity = self.active_limit_orders[msg.body['order'].order_id].quantity - msg.body['order'].quantity
-                self.active_limit_orders[msg.body['order'].order_id].quantiy = new_quantity
-
-
-    def placeOrder(self, currentTime, order):
-        self.placed_orders.append(order)
-        if self.state == "PRE_GENERATING":
-            order_id = order[2]
-            type = order[1]
-            quantity = order[3]
-            price = int(order[4])
-            direction = order[5]
-            if quantity > 0:
-                direction = False if direction == -1 else True
-                if type == 1:
-                    self.placeLimitOrder(self.symbol, quantity, is_buy_order=direction, limit_price=price, order_id=order_id)
-                elif type == 2 or type == 3:
-                    if order_id in self.active_limit_orders:
-                        old_order = self.active_limit_orders[order_id]
-                        del self.active_limit_orders[order_id]
-                    else:
-                        raise Exception("trying to cancel an order that doesn't exist")
-
-                    if type == 3:
-                        # total deletion of a limit order
-                        self.cancelOrder(old_order)
-                    elif type == 2:
-                        # partial deletion of a limit order
-                        new_order = LimitOrder(self.id, self.currentTime, self.symbol, old_order.quantity-quantity, old_order.is_buy_order, old_order.limit_price, old_order.order_id, None)
-                        #self.placed_orders.append(new_order)
-                        self.active_limit_orders[new_order.order_id] = order
-                        self.modifyOrder(old_order, new_order)
-
-                elif type == 4:
-                    # if type == 4 it means that it is an execution order, so if it is an execution order of a sell limit order
-                    # we place a buy market order of the same quantity and viceversa
-                    is_buy_order = False if direction else True
-                    # the curren order_id is the order_id of the sell (buy) limit order filled, so we need to assign to
-                    # the market order another order_id
-                    order_id = self.unused_order_ids[0]
-                    self.unused_order_ids = self.unused_order_ids[1:]
-                    self.placeMarketOrder(self.symbol, quantity, is_buy_order=is_buy_order, order_id=order_id)
-            else:
-                log_print("Agent ignored order of quantity zero: {}", order)
-
-        elif self.state == "GENERATING":
-            pass
-
-
-    def placeLimitOrder(self, symbol, quantity, is_buy_order, limit_price, order_id=None, ignore_risk=True, tag=None):
-        order = LimitOrder(self.id, self.currentTime, symbol, quantity, is_buy_order, limit_price, order_id, tag)
-        self.active_limit_orders[order.order_id] = order
-        self.sendMessage(self.exchangeID, Message({"msg": "LIMIT_ORDER", "sender": self.id, "order": order}))
-        # Log this activity.
-        if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
-
-    def placeMarketOrder(self, symbol, quantity, is_buy_order, order_id=None, ignore_risk=True, tag=None):
-        """
-          The market order is created as multiple limit orders crossing the spread walking the book until all the quantities are matched.
-        """
-        order = MarketOrder(self.id, self.currentTime, symbol, quantity, is_buy_order, order_id)
-        self.sendMessage(self.exchangeID, Message({"msg": "MARKET_ORDER", "sender": self.id, "order": order}))
-        if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
-
-
-    def cancelOrder(self, order):
-        """Used by any Trading Agent subclass to cancel any order.
-        The order must currently appear in the agent's open orders list."""
-        if isinstance(order, LimitOrder):
-            self.sendMessage(self.exchangeID, Message({"msg": "CANCEL_ORDER", "sender": self.id,
-                                                       "order": order}))
-            # Log this activity.
-            if self.log_orders: self.logEvent('CANCEL_SUBMITTED', order.to_dict())
-        else:
-            log_print("order {} of type, {} cannot be cancelled", order, type(order))
-
-    def modifyOrder(self, order, newOrder):
-        """ Used by any Trading Agent subclass to modify any existing limit order.  The order must currently
-            appear in the agent's open orders list.  Some additional tests might be useful here
-            to ensure the old and new orders are the same in some way."""
-        self.sendMessage(self.exchangeID, Message({"msg": "MODIFY_ORDER", "sender": self.id,
-                                                   "order": order, "new_order": newOrder}))
-        # Log this activity.
-        if self.log_orders: self.logEvent('MODIFY_ORDER', order.to_dict())
 
     def _load_orders_lob(self, symbol, data_dir, date, date_trading_days):
         path = "{}/{}/{}_{}_{}".format(

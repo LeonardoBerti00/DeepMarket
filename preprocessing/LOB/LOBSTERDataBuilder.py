@@ -104,6 +104,7 @@ class LOBSTERDataBuilder:
         # iterate over files in the data directory of self.STOCK_NAME
         for i, filename in enumerate(os.listdir(path)):
             f = os.path.join(path, filename)
+            print(f)
             if os.path.isfile(f):
                 # then we create the df for the training set
                 if i < split_days[0]:

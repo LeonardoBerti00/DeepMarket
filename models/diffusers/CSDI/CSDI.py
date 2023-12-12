@@ -7,7 +7,7 @@ import torch.nn as nn
 
 import constants as cst
 import configuration
-from models.diffusers.csdi.Diffuser import CSDIEpsilon
+from models.diffusers.CSDI.Diffuser import CSDIEpsilon
 from models.diffusers.DiffusionAB import DiffusionAB
 from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
@@ -24,11 +24,11 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         self.target_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_ORDER_EMB]
         self.feature_augmenter = feature_augmenter
         self.num_steps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-        self.embedding_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.DIFFUSION_STEP_EMB_DIM]
-        self.n_heads = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.N_HEADS]
-        self.embedding_time_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_TIME_DIM]
-        self.embedding_feature_dim = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.EMBEDDING_FEATURE_DIM]
-        self.layers = config.CSDI_HYPERPARAMETERS[cst.CSDIParameters.LAYERS]
+        self.embedding_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_DIFFUSION_STEP_EMB_DIM]
+        self.n_heads = config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_N_HEADS]
+        self.embedding_time_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_EMBEDDING_TIME_DIM]
+        self.embedding_feature_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_EMBEDDING_FEATURE_DIM]
+        self.layers = config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_LAYERS]
         self.side_dim = self.embedding_time_dim + 1
         
         self.betas = config.BETAS

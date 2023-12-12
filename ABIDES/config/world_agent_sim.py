@@ -99,6 +99,13 @@ agent_count, agents, agent_types = 0, [], []
 
 # Hyperparameters
 symbol = args.ticker
+if symbol == "TSLA":
+    normalization_terms = {"lob": [cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10, cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10],
+                            "event": [cst.TSLA_EVENT_STD_PRICE, cst.TSLA_EVENT_MEAN_PRICE, cst.TSLA_EVENT_STD_SIZE, cst.TSLA_EVENT_MEAN_SIZE, cst.TSLA_EVENT_STD_TIME, cst.TSLA_EVENT_MEAN_TIME]}
+elif symbol == "INTC":
+    normalization_terms = {"lob": [cst.INTC_LOB_MEAN_SIZE_10, cst.INTC_LOB_STD_SIZE_10, cst.INTC_LOB_MEAN_PRICE_10, cst.INTC_LOB_STD_PRICE_10],
+                            "event": [cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_PRICE, cst.INTC_EVENT_STD_SIZE, cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_TIME, cst.INTC_EVENT_MEAN_TIME]}
+
 starting_cash = 1000000000  # Cash in this simulator is always in CENTS.
 
 # 1) Exchange Agent
@@ -146,7 +153,7 @@ elif chosen_model == "CSDI":
     pass #TODO
 
 # load checkpoint
-model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None)
+model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None).to(cst.DEVICE)
 
 # we freeze the model
 for param in model.parameters():
@@ -164,7 +171,8 @@ agents.extend([WorldAgent(id=1,
                             cond_type=config.COND_TYPE,
                             cond_seq_size=config.COND_SEQ_SIZE,
                             log_orders=log_orders,
-                            random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64'))
+                            random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
+                            normalization_terms=normalization_terms,
                           )
                ])
 

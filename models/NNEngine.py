@@ -13,7 +13,7 @@ import time
 import wandb
 from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
-from models.diffusers.csdi.CSDI import CSDIDiffuser
+from models.diffusers.CSDI.CSDI import CSDIDiffuser
 from utils.utils_data import unnormalize
 from utils.utils_models import pick_diffuser
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
@@ -69,6 +69,7 @@ class NNEngine(L.LightningModule):
 
 
     def forward(self, cond, x_0, is_train):
+
         x_0, cond = self.depth_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
         self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
@@ -305,96 +306,4 @@ class NNEngine(L.LightningModule):
             cond = cond[:, :, cst.LEN_EVENT_ONE_HOT:]
         return cond
 
-    def _check_constraints(self, event_and_lob, recon):
-        event_and_lob = event_and_lob.cpu().detach().numpy()
-        recon = recon.cpu().detach().numpy()
-        lob, generated_events = self._to_original(event_and_lob, recon)
-        for i in range(generated_events.shape[0]):
-            price = generated_events[i, 3]
-            size_event = generated_events[i, 2]
-            type = generated_events[i, 1]
-            if (type == 2 or type == 3 or type == 4):  # it is a deletion, execution or cancel
-                # take the index of the lob with the same value of the price
-                index = np.where(lob[i, :] == price)[0]
-                # check if the price is in the lob so it is valid
-                if (index.shape[0] == 0):
-                    self.num_violations_price += 1
-                    print(f"\nPROBLEM CONSTRAINT type: {type}\n")
-                # check if the size is bigger than the size of the limit order
-                size_limit_order = lob[i, index + 1]
-                if (size_limit_order < size_event):
-                    self.num_violations_size += 1
-        return generated_events
 
-    def _to_original(self, event_and_lob, recon):
-        generated_events = np.zeros((recon.shape[0], cst.LEN_EVENT))
-        type = np.argmax(recon[:, 1:4], axis=1)
-        # type == 0 is add, type == 1 is cancel, type == 2 is deletion
-        generated_events[:, 0] = recon[:, 0]
-        generated_events[:, 1] = type
-        generated_events[:, 2] = recon[:, 4]
-        generated_events[:, 3] = recon[:, 5]
-
-        generated_events[:, 3] = unnormalize(generated_events[:, 3], cst.TSLA_EVENT_MEAN_PRICE, cst.TSLA_EVENT_STD_PRICE)
-        generated_events[:, 2] = unnormalize(generated_events[:, 2], cst.TSLA_EVENT_MEAN_SIZE, cst.TSLA_EVENT_STD_SIZE)
-        generated_events[:, 0] = unnormalize(generated_events[:, 0], cst.TSLA_EVENT_MEAN_TIME, cst.TSLA_EVENT_STD_TIME)
-
-        # we extract the last snapshot of the LOB before the event, that is i-1 in the sequence, if the event is at i
-        lob = event_and_lob[:, -1, cst.LEN_EVENT_ONE_HOT:]
-        lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10)
-        lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10)
-
-        # assert (generated_events.shape[0]+1 == lob.shape[0])
-        # round price and size
-        generated_events[:, 2] = np.around(generated_events[:, 2], decimals=0)
-        generated_events[:, 3] = np.around(generated_events[:, 3], decimals=0)
-        lob[:, 0::2] = np.around(lob[:, 0::2], decimals=0)
-        lob[:, 1::2] = np.around(lob[:, 1::2], decimals=0)
-
-        # return the order type and direction to the original value
-        generated_events[:, 1] += 1
-        generated_events = np.concatenate((generated_events, np.ones((generated_events.shape[0], 1))), axis=1)
-        generated_events[:, 4] = np.where(generated_events[:, 2] < 0, -1, generated_events[:, 4])
-        generated_events[:, 2] = np.abs(generated_events[:, 2])
-
-        best_ask = lob[:, 0]
-        best_bid = lob[:, 2]
-        diff_prices_del_canc = []
-        for i in range(generated_events.shape[0]):
-            # if it is a cancel or delete order, we need to find the nearest price in the LOB
-            if (generated_events[i, 1] == 2 or generated_events[i, 1] == 3):
-                if (generated_events[i, 4] == 1):
-                    #find the nearest price in the buy side
-                    price = generated_events[i, 3]
-                    buy_price_side = lob[i, 2::4]
-                    difference = np.abs(buy_price_side - price)
-                    violated_price = True
-                    for j in range(difference.shape[0]):
-                        if (difference[j] == 0):
-                            violated_price = False
-                    if violated_price:
-                        min_diff_price = np.min(difference)
-                        index_price = np.argmin(difference)
-                        generated_events[i, 3] = buy_price_side[index_price]
-                        diff_prices_del_canc.append(min_diff_price)
-
-                else:
-                    #find the nearest price in the sell side
-                    price = generated_events[i, 3]
-                    sell_price_side = lob[i, 0::4]
-                    difference = np.abs(sell_price_side - price)
-                    index = np.argmin(difference)
-                    generated_events[i, 3] = sell_price_side[index]
-
-            # if it is a buy order that is above the best ask, it means that it is a buy market order
-            if generated_events[i, 4] == 1 and generated_events[i, 1] == 1 and generated_events[i, 3] >= best_ask[i]:
-                generated_events[i, 1] = 4
-                generated_events[i, 4] = -1
-                generated_events[i, 3] = np.min(lob[i, 0::4][lob[i, 0::4] <= [generated_events[i, 3]]])
-
-            elif generated_events[i, 4] == -1 and generated_events[i, 1] == 1 and generated_events[i, 3] <= best_bid[i]:
-                generated_events[i, 1] = 4
-                generated_events[i, 4] = 1
-                generated_events[i, 3] = np.max(lob[i, 2::4][lob[i, 2::4] >= [generated_events[i, 3]]])
-
-        return lob, generated_events

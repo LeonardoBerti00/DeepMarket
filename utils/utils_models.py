@@ -1,5 +1,5 @@
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
-from models.diffusers.csdi.CSDI import CSDIDiffuser
+from models.diffusers.CSDI.CSDI import CSDIDiffuser
 import constants as cst
 
 def pick_diffuser(config, model_name, augmenter):

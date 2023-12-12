@@ -1,4 +1,4 @@
-from constants import CSDIParameters, LearningHyperParameter
+from constants import LearningHyperParameter
 import constants as cst
 from utils.utils import noise_scheduler
 
@@ -8,12 +8,11 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = True
-        self.IS_SWEEP = False
-        self.IS_TESTING = False
+        self.IS_SWEEP = True
         self.IS_TRAINING = False
-        self.IS_DEBUG = True
+        self.IS_DEBUG = False
 
-        assert (self.IS_WANDB + self.IS_TESTING + self.IS_TRAINING) == 1
+        assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
         self.VALIDATE_EVERY = 1
 
@@ -23,7 +22,7 @@ class Configuration:
 
         self.SPLIT_RATES = (.75, .05, .2)
 
-        self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_MODEL = cst.Models.CSDI
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
 
@@ -35,15 +34,14 @@ class Configuration:
 
         self.NUM_WORKERS = 4
 
-        self.EARLY_STOPPING_METRIC = None
         self.IS_SHUFFLE_TRAIN_SET = True
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
         self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 1024
-        self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.01
-        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 30
+        self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
+        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
@@ -57,34 +55,37 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
+
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
         self.COND_METHOD = "concatenation"
 
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_CHANNELS] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_DIFFUSION_STEP_EMB_DIM] = 128
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_EMBEDDING_TIME_DIM] = 128
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_EMBEDDING_FEATURE_DIM] = 16
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_LAYERS] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
+
+
         self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         self.BETAS = noise_scheduler(
         num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS],
-    )
+        )
+
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 44
         elif self.COND_TYPE == "only_event":
             self.COND_SIZE = cst.LEN_EVENT_ONE_HOT
+            self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 16
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40
 
-        #da cmbiare come per CDT
-        self.CSDI_HYPERPARAMETERS = {lp: None for lp in CSDIParameters}
-        
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.N_HEADS] = 2
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.SIDE_DIM] = 10
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.CHANNELS] = 2
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.DIFFUSION_STEP_EMB_DIM] = 128
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_TIME_DIM] = 128
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.EMBEDDING_FEATURE_DIM] = 16
-        self.CSDI_HYPERPARAMETERS[CSDIParameters.LAYERS] = 1
+
 
 
 

@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 
+import torch
+
 import constants as cst
 
 
@@ -24,7 +26,12 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
     # check if there are null values, then raise value error
     if data.isnull().values.any():
         raise ValueError("data contains null value")
-
+    print("printing lob mean and std")
+    print(mean_size)
+    print(std_size)
+    print(mean_prices)
+    print(std_prices)
+    print("end printing lob mean and std")
     return data, mean_size, mean_prices, std_size,  std_prices
 
 
@@ -60,7 +67,12 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     # order_type = 0 -> limit order
     # order_type = 1 -> cancel order
     # order_type = 2 -> market order
-
+    print(mean_time)
+    print(std_time)
+    print(mean_size)
+    print(std_size)
+    print(mean_prices)
+    print(std_prices)
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time
 
 
@@ -144,6 +156,19 @@ def preprocess_data(dataframes, n_lob_levels):
 
 def unnormalize(x, mean, std):
     return x * std + mean
+
+
+def one_hot_encode_type(data):
+    encoded_data = torch.zeros(data.shape[0], data.shape[1] + 2, dtype=torch.float32)
+    encoded_data[:, 0] = data[:, 0]
+    # encoding order type
+    one_hot_order_type = torch.nn.functional.one_hot((data[:, 1]).to(torch.int64), num_classes=3).to(
+        torch.float32)
+    encoded_data[:, 1:4] = one_hot_order_type
+    encoded_data[:, 4:] = data[:, 2:]
+    return encoded_data
+
+
 
 '''
 def to_original_lob(event_and_lob, seq_size):

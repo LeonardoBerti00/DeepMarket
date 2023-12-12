@@ -21,8 +21,6 @@ class LOBDataset(data.Dataset):
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
 
-
-
     def __len__(self):
         """ Denotes the total number of samples. """
         return len(self.data)-self.seq_size+1
@@ -38,16 +36,7 @@ class LOBDataset(data.Dataset):
         """ Loads the data. """
         self.data = torch.from_numpy(np.load(self.path))
 
-    def one_hot_encode_type(self):
-        """ one hot encode the second and final column """
-        self.encoded_data = torch.zeros(self.data.shape[0], self.data.shape[1] + 2)
-        self.encoded_data[:, 0] = self.data[:, 0]
-        #encoding order type
-        one_hot_order_type = torch.nn.functional.one_hot((self.data[:, 1]).to(torch.int64), num_classes=3).to(torch.float32)
-        self.encoded_data[:, 1:4] = one_hot_order_type
-        self.encoded_data[:, 4] = self.data[:, 2]
-        self.encoded_data[:, 5] = self.data[:, 3]
-        self.encoded_data[:, 6:] = self.data[:, 4:]
+
 
 
 

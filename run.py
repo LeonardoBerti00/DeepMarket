@@ -10,10 +10,13 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
+from models.diffusers.CSDI.CSDI_hparam import HP_CSDI, HP_CSDI_FIXED
+from utils.utils_data import one_hot_encode_type
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
-    cst.Models.CDT: HP_SEARCH_TYPES(HP_CDT, HP_CDT_FIXED)
+    cst.Models.CDT: HP_SEARCH_TYPES(HP_CDT, HP_CDT_FIXED),
+    cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED)
 }
 
 def train(config, trainer):
@@ -24,7 +27,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    train_set.one_hot_encode_type()
+    train_set.encoded_data = one_hot_encode_type(train_set.data)
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
@@ -32,7 +35,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    val_set.one_hot_encode_type()
+    val_set.encoded_data = one_hot_encode_type(val_set.data)
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
@@ -40,7 +43,7 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    test_set.one_hot_encode_type()
+    test_set.encoded_data = one_hot_encode_type(test_set.data)
 
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
@@ -72,10 +75,6 @@ def train(config, trainer):
     #check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy", seq_size)
 
 
-def test(config, trainer, model):
-    pass
-
-
 def run(config, accelerator, model=None):
     trainer = L.Trainer(
         accelerator=accelerator,
@@ -87,10 +86,7 @@ def run(config, accelerator, model=None):
         num_sanity_val_steps=0,
         detect_anomaly=False
     )
-    if (config.IS_TESTING):
-        test(config, trainer, model)
-    else:
-        train(config, trainer)
+    train(config, trainer)
 
 def run_wandb(config, accelerator, wandb_logger):
     def wandb_sweep_callback():

@@ -15,8 +15,9 @@ class DiffusionAB(ABC):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.alphas_cumprod = config.ALPHAS_CUMPROD
         self.betas = config.BETAS
+        self.alphas = 1 - self.betas
+        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
         self.x_SEQ_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE]
         self.SEQ_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.SEQ_size - self.x_SEQ_size

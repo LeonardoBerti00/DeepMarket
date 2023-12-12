@@ -47,19 +47,6 @@ if __name__ == "__main__":
             start_wandb = run_wandb(config, accelerator, wandb_logger)
             start_wandb()
 
-    elif config.IS_TESTING:
-        dir = Path(cst.DIR_SAVED_MODEL+"/"+str(config.CHOSEN_MODEL.name))
-        best_val_loss = 100000
-        for file in dir.iterdir():
-            val_loss = float(file.name.split("=")[1].split("_")[0])
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                checkpoint_reference = file
-
-        # load checkpoint
-        model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None)
-        run(config, accelerator, model)
-
     # training without using wandb
     elif config.IS_TRAINING:
         run(config, accelerator)
