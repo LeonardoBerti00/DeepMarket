@@ -102,7 +102,7 @@ class LOBSTERDataBuilder:
     def _create_dataframes_splitted(self, path, split_days, COLUMNS_NAMES):
 
         # iterate over files in the data directory of self.STOCK_NAME
-        for i, filename in enumerate(os.listdir(path)):
+        for i, filename in enumerate(sorted(os.listdir(path))):
             f = os.path.join(path, filename)
             print(f)
             if os.path.isfile(f):
