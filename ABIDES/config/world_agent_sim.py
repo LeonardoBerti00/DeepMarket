@@ -82,8 +82,8 @@ seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
 
-exchange_log_orders = False
-log_orders = None
+exchange_log_orders = True
+log_orders = True
 
 simulation_start_time = dt.datetime.now()
 print("Simulation Start Time: {}".format(simulation_start_time))
@@ -150,7 +150,7 @@ if chosen_model == "CDT":
     config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1#int(checkpoint_reference.name.split("=")[2].split("_")[18])
     config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = int(checkpoint_reference.name.split("=")[2].split("_")[22])
 elif chosen_model == "CSDI":
-    pass #TODO
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_LAYERS] = int(checkpoint_reference.name.split("=")[2].split("_")[18])
 
 # load checkpoint
 model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None).to(cst.DEVICE)
@@ -173,6 +173,7 @@ agents.extend([WorldAgent(id=1,
                             log_orders=log_orders,
                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
                             normalization_terms=normalization_terms,
+                            starting_time_diffusion='1min'
                           )
                ])
 

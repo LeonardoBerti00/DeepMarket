@@ -197,9 +197,8 @@ class Kernel:
           print ("\n--- Simulation time: {}, messages processed: {}, wallclock elapsed: {} ---\n".format(
                          self.fmtTime(self.currentTime), ttl_messages, pd.Timestamp('now') - eventQueueWallClockStart))
 
-        log_print ("\n--- Kernel Event Queue pop ---")
-        log_print ("Kernel handling {} message for agent {} at time {}", 
-                   msg_type, msg_recipient, self.fmtTime(self.currentTime))
+        #log_print ("\n--- Kernel Event Queue pop ---")
+        #log_print ("Kernel handling {} message for agent {} at time {}", msg_type, msg_recipient, self.fmtTime(self.currentTime))
 
         ttl_messages += 1
 
@@ -218,8 +217,7 @@ class Kernel:
             # Push the wakeup call back into the PQ with a new time.
             self.messages.put((self.agentCurrentTimes[agent],
                               (msg_recipient, msg_type, msg)))
-            log_print ("Agent in future: wakeup requeued for {}",
-                       self.fmtTime(self.agentCurrentTimes[agent]))
+            #log_print ("Agent in future: wakeup requeued for {}", self.fmtTime(self.agentCurrentTimes[agent]))
             continue
             
           # Set agent's current time to global current time for start
@@ -233,8 +231,7 @@ class Kernel:
           self.agentCurrentTimes[agent] += pd.Timedelta(self.agentComputationDelays[agent] +
                                                         self.currentAgentAdditionalDelay)
 
-          log_print ("After wakeup return, agent {} delayed from {} to {}",
-                     agent, self.fmtTime(self.currentTime), self.fmtTime(self.agentCurrentTimes[agent]))
+          #log_print ("After wakeup return, agent {} delayed from {} to {}", agent, self.fmtTime(self.currentTime), self.fmtTime(self.agentCurrentTimes[agent]))
 
         elif msg_type == MessageType.MESSAGE:
 
@@ -247,8 +244,7 @@ class Kernel:
             # Push the message back into the PQ with a new time.
             self.messages.put((self.agentCurrentTimes[agent],
                               (msg_recipient, msg_type, msg)))
-            log_print ("Agent in future: message requeued for {}",
-                       self.fmtTime(self.agentCurrentTimes[agent]))
+            #log_print ("Agent in future: message requeued for {}", self.fmtTime(self.agentCurrentTimes[agent]))
             continue
 
           # Set agent's current time to global current time for start
@@ -262,8 +258,8 @@ class Kernel:
           self.agentCurrentTimes[agent] += pd.Timedelta(self.agentComputationDelays[agent] +
                                                         self.currentAgentAdditionalDelay)
 
-          log_print ("After receiveMessage return, agent {} delayed from {} to {}",
-                     agent, self.fmtTime(self.currentTime), self.fmtTime(self.agentCurrentTimes[agent]))
+          #log_print ("After receiveMessage return, agent {} delayed from {} to {}",
+          #           agent, self.fmtTime(self.currentTime), self.fmtTime(self.agentCurrentTimes[agent]))
 
         else:
           raise ValueError("Unknown message type found in queue",
@@ -411,8 +407,8 @@ class Kernel:
                        "currentTime:", self.currentTime,
                        "requestedTime:", requestedTime)
 
-    log_print ("Kernel adding wakeup for agent {} at time {}",
-               sender, self.fmtTime(requestedTime))
+    #log_print ("Kernel adding wakeup for agent {} at time {}",
+     #          sender, self.fmtTime(requestedTime))
 
     self.messages.put((requestedTime,
                       (sender, MessageType.WAKEUP, None)))

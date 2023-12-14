@@ -27,7 +27,7 @@ class WorldAgent(Agent):
 
 
     def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, log_orders=False, random_state=None, normalization_terms=None):
+                 cond_seq_size, log_orders=False, random_state=None, normalization_terms=None, starting_time_diffusion='30min'):
         super().__init__(id, name, type, random_state=random_state)
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
@@ -51,6 +51,10 @@ class WorldAgent(Agent):
         self.cond_seq_size = cond_seq_size
         self.first_generation = True
         self.normalization_terms = normalization_terms
+        self.starting_time_diffusion = starting_time_diffusion
+        self.ignored_cancel = 0
+        self.generated_orders_out_of_depth = 0
+        self.generated_cancel_orders_empty_depth = 0
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -62,6 +66,8 @@ class WorldAgent(Agent):
     def kernelTerminating(self):
         # self.kernel is set in Agent.kernelInitializing()
         super().kernelTerminating()
+        print("World Agent terminating.")
+        print("World Agent ignored {} cancel orders".format(self.ignored_cancel))
 
     def requestDataSubscription(self, symbol, levels):
         self.sendMessage(recipientID=self.exchangeID,
@@ -83,16 +89,21 @@ class WorldAgent(Agent):
             self.first_wakeup = False
 
         # if current time is between 09:30 and 10:00, then we are in the pre-open phase
-        elif self.mkt_open < currentTime <= self.mkt_open + pd.Timedelta('1min'):
-            self.placeOrder(currentTime, self.historical_orders[self.next_historical_orders_index])
+        elif self.mkt_open < currentTime <= self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
+            next_order = self.historical_orders[self.next_historical_orders_index]
+            if next_order[1] == 4.0:
+                self.offset_time_market_order = next_order[0]
+            self.placeOrder(currentTime, next_order)
             self.next_historical_orders_index += 1
             offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
             self.setWakeup(currentTime + offset)
 
-        elif currentTime > self.mkt_open + pd.Timedelta('1min'):
+        elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             self.state = 'GENERATING'
             # firstly we place the last order generated and next we generate the next order
             if self.next_order is not None:
+                if self.next_order[1] == 4:
+                    self.offset_time_market_order = self.next_order[0]
                 self.placeOrder(currentTime, self.next_order)
                 self.next_order = None
 
@@ -101,6 +112,9 @@ class WorldAgent(Agent):
                 generated = self._generate_order(currentTime)
                 self.next_order = generated
                 self.first_generation = False
+                offset_time = datetime.timedelta(seconds=generated[0])
+                self.setWakeup(currentTime + offset_time)
+
 
     def receiveMessage(self, currentTime, msg):
         super().receiveMessage(currentTime, msg)
@@ -110,9 +124,13 @@ class WorldAgent(Agent):
                 generated = self._generate_order(currentTime)
                 self.next_order = generated
                 self.first_generation = False
+                offset_time = datetime.timedelta(seconds=generated[0])
+                self.setWakeup(currentTime + offset_time)
 
-        elif msg.body['msg'] == 'ORDER_ACCEPTED' and msg.body['order'].tag == 'market_order':
-            self.placed_orders.append(msg.body['order'])
+        elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag == 'market_order':
+            # we saved the market order as an execution of a limit order of the opposite side
+            direction = -1 if msg.body['order'].is_buy_order else 1
+            self.placed_orders.append(np.array([self.offset_time_market_order, 4, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
 
         # we check if it is a market order because when we place a market order we receive both the message
         # of the limit order executed and of the market order executed, so we don't want to count twice the same order
@@ -127,9 +145,7 @@ class WorldAgent(Agent):
                 self.active_limit_orders[msg.body['order'].order_id].quantiy = new_quantity
 
 
-
     def placeOrder(self, currentTime, order):
-
         order_id = order[2]
         type = order[1]
         quantity = order[3]
@@ -146,8 +162,9 @@ class WorldAgent(Agent):
                     old_order = self.active_limit_orders[order_id]
                     del self.active_limit_orders[order_id]
                 else:
-                    raise Exception("trying to cancel an order that doesn't exist")
-
+                    self.ignored_cancel += 1
+                    return
+                    # raise Exception("trying to cancel an order that doesn't exist")
                 if type == 3:
                     # total deletion of a limit order
                     self.cancelOrder(old_order)
@@ -172,23 +189,23 @@ class WorldAgent(Agent):
 
 
     def _generate_order(self, currentTime):
-        if self.cond_type == 'only_lob':
-            lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
-            cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
-        elif self.cond_type == 'only_event':
-            orders = np.array(self.placed_orders[-self.cond_seq_size:])
-            orders_preprocessed = self._preprocess_orders(orders,
-                                                          np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
-            cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
-        else:
-            raise ValueError("cond_type not recognized")
-        cond = cond.unsqueeze(0)
-        x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT, device=cst.DEVICE, dtype=torch.float32)
-        generated, context = self.diffusion_model(cond, x, False)
-        generated = generated[0, 0, :]
-        generated = self._postprocess_generated(generated)
-        offset_time = datetime.timedelta(seconds=generated[0])
-        self.setWakeup(currentTime + offset_time)
+        generated = None
+        while generated is None:
+            if self.cond_type == 'only_lob':
+                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
+                cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
+            elif self.cond_type == 'only_event':
+                orders = np.array(self.placed_orders[-self.cond_seq_size:])
+                orders_preprocessed = self._preprocess_orders(orders,
+                                                              np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
+                cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
+            else:
+                raise ValueError("cond_type not recognized")
+            cond = cond.unsqueeze(0)
+            x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT, device=cst.DEVICE, dtype=torch.float32)
+            generated, context = self.diffusion_model(cond, x, False)
+            generated = generated[0, 0, :]
+            generated = self._postprocess_generated(generated)
         return generated
 
 
@@ -228,7 +245,6 @@ class WorldAgent(Agent):
         if self.log_orders: self.logEvent('MODIFY_ORDER', order.to_dict())
 
 
-
     def _postprocess_generated(self, generated):
         # we need to go from the output of the diffusion model to the order
         # we select the depth with the minimum distance from the nn.Embedding layer
@@ -254,6 +270,18 @@ class WorldAgent(Agent):
         if order_type == 1:
             order_id = self.unused_order_ids[0]
             self.unused_order_ids = self.unused_order_ids[1:]
+            if direction == 1:
+                bid_side = self.lob_snapshots[-1][2::4]
+                last_price = bid_side[-1]
+                if price < last_price:
+                    self.generated_orders_out_of_depth += 1
+                    return None
+            else:
+                ask_side = self.lob_snapshots[-1][0::4]
+                last_price = ask_side[-1]
+                if price > last_price:
+                    self.generated_orders_out_of_depth += 1
+                    return None
 
         elif order_type == 3:
             if direction == 1:
@@ -263,18 +291,20 @@ class WorldAgent(Agent):
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we raise an exception
                 if len(orders_with_same_price) == 0:
-                    raise Exception("we have generated a cancel order but there are no active orders referring to it")
+                    self.generated_cancel_orders_empty_depth += 1
+                    return None
                 # we select the order with the quantity near to the quantity generated
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
                 price = ask_side[depth]
-                # search all the active limit orders with the same price
+                # search all the active limit orders in the same level
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we raise an exception
                 if len(orders_with_same_price) == 0:
-                    raise Exception("there are no orders with the same price")
+                    self.generated_cancel_orders_empty_depth += 1
+                    return None
                 # we select the order with the quantity near to the quantity generated
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
@@ -286,12 +316,12 @@ class WorldAgent(Agent):
         return np.array([time, order_type, order_id, size, price, direction])
 
 
-
     def _z_score_orderbook(self, orderbook):
         orderbook[:, 0::2] = orderbook[:, 0::2] / 100
         orderbook[:, 0::2] = (orderbook[:, 0::2] - self.normalization_terms["lob"][2]) / self.normalization_terms["event"][3]
         orderbook[:, 1::2] = (orderbook[:, 1::2] - self.normalization_terms["lob"][0]) / self.normalization_terms["event"][1]
         return orderbook
+
 
     def _preprocess_orders(self, orders, lob_snapshots):
         COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
@@ -325,9 +355,13 @@ class WorldAgent(Agent):
                     index = j
                 if direction == 1:
                     bid_side = dataframes[i][1].iloc[index, 2::4]
+                    if len(np.where(bid_side == order_price)[0]) == 0:
+                        print("here")
                     depth = np.where(bid_side == order_price)[0][0]
                 else:
                     ask_side = dataframes[i][1].iloc[index, 0::4]
+                    if len(np.where(ask_side == order_price)[0]) == 0:
+                        print("here")
                     depth = np.where(ask_side == order_price)[0][0]
 
                 dataframes[i][0].loc[j, "depth"] = depth

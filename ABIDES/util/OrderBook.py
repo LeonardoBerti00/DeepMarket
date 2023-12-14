@@ -186,6 +186,7 @@ class OrderBook:
             p, q = lo[0], lo[1]
             limit_order = LimitOrder(order.agent_id, order.time_placed, order.symbol, q, order.is_buy_order, p, tag='market_order')
             self.handleLimitOrder(limit_order)
+            self.owner.publishOrderBookData()
 
     def executeOrder(self, order):
         # Finds a single best match for this order, without regard for quantity.

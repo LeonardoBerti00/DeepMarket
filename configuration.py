@@ -8,9 +8,9 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = True
-        self.IS_SWEEP = True
+        self.IS_SWEEP = False
         self.IS_TRAINING = False
-        self.IS_DEBUG = False
+        self.IS_DEBUG = True
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
@@ -22,7 +22,7 @@ class Configuration:
 
         self.SPLIT_RATES = (.75, .05, .2)
 
-        self.CHOSEN_MODEL = cst.Models.CSDI
+        self.CHOSEN_MODEL = cst.Models.CDT
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
 
