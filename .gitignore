@@ -1,3 +1,4 @@
 __pycache__
-data/
+data/reconstructions
+data/TSLA
 lightning_logs/

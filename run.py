@@ -1,5 +1,7 @@
 import lightning as L
 import torch
+from lightning.pytorch.loggers import WandbLogger
+
 import wandb
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
@@ -58,7 +60,7 @@ def train(config, trainer):
         test_set=test_set,
         batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE],
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
-        num_workers=16
+        num_workers=8
     )
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
@@ -88,8 +90,9 @@ def run(config, accelerator, model=None):
     )
     train(config, trainer)
 
-def run_wandb(config, accelerator, wandb_logger):
+def run_wandb(config, accelerator):
     def wandb_sweep_callback():
+        wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model="all", save_dir=cst.DIR_SAVED_MODEL)
         run_name = None
         if not config.IS_SWEEP:
             run_name = ""
@@ -108,6 +111,7 @@ def run_wandb(config, accelerator, wandb_logger):
             wandb_instance.log({"cond_type": config.COND_TYPE}, commit=False)
             wandb_instance.log({"cond_method": config.COND_METHOD}, commit=False)
             wandb_instance.log({"num_diff_steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
+            wandb_instance.log({"is_augmentation": config.IS_AUGMENTATION}, commit=False)
 
             if config.IS_SWEEP:
                 model_params = wandb.config
@@ -116,9 +120,11 @@ def run_wandb(config, accelerator, wandb_logger):
             for param in cst.LearningHyperParameter:
                 if param.value in model_params:
                     config.HYPER_PARAMETERS[param] = model_params[param.value]
-                    wandb_instance_name += str(param.value) + "_" + str(model_params[param.value]) + "_"
+                    wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
 
             cond_type = config.COND_TYPE
+            is_augmentation = config.IS_AUGMENTATION
+            diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
 
             checkpoint_callback = ModelCheckpoint(
                 dirpath=cst.DIR_SAVED_MODEL,
@@ -127,10 +133,9 @@ def run_wandb(config, accelerator, wandb_logger):
                 save_last=True,
                 save_top_k=1,
                 every_n_epochs=1,
-                filename=str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name
-            )
+                filename=str(config.CHOSEN_MODEL.name) + "/{val_loss:.2f}_{epoch}_" + str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps))
 
-            checkpoint_callback.CHECKPOINT_NAME_LAST = str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name+"_last"
+            checkpoint_callback.CHECKPOINT_NAME_LAST = str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name+"aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)+"_last"
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,
@@ -170,4 +175,3 @@ def print_setup(config):
     print("Conditioning type: ", config.COND_TYPE)
     if config.CHOSEN_MODEL.name == "CDT":
         print("Conditioning method: ", config.COND_METHOD)
-

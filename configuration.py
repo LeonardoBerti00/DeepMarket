@@ -8,9 +8,9 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = True
-        self.IS_SWEEP = False
+        self.IS_SWEEP = True
         self.IS_TRAINING = False
-        self.IS_DEBUG = True
+        self.IS_DEBUG = False
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
@@ -32,14 +32,12 @@ class Configuration:
         self.WANDB_RUN_NAME = None
         self.WANDB_SWEEP_NAME = None
 
-        self.NUM_WORKERS = 4
-
         self.IS_SHUFFLE_TRAIN_SET = True
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 128
-        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 1024
+        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
+        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 512
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
@@ -50,7 +48,6 @@ class Configuration:
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1

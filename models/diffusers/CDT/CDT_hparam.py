@@ -1,8 +1,7 @@
 import constants as cst
 
 HP_CDT = {
-    cst.LearningHyperParameter.BATCH_SIZE.value: {'values': [128, 256]},
-    cst.LearningHyperParameter.CONDITIONAL_DROPOUT.value: {'values': [0.0, 0.1, 0.2]},
+    cst.LearningHyperParameter.CONDITIONAL_DROPOUT.value: {'values': [0.0, 0.1]},
     cst.LearningHyperParameter.DROPOUT.value: {'values': [0, 0.1]},
     cst.LearningHyperParameter.LEARNING_RATE.value: {'values': [0.0001, 0.0003, 0.003, 0.001]},
     cst.LearningHyperParameter.OPTIMIZER.value: {'values': [cst.Optimizers.ADAM.value, cst.Optimizers.LION.value]},

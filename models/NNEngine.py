@@ -196,11 +196,9 @@ class NNEngine(L.LightningModule):
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
         self.log('val_loss', self.val_loss)
         if self.IS_WANDB:
-            wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch)
+            wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch + 1)
         print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
-        print(f"\n violations price on epoch {self.current_epoch} is {self.num_violations_price}\n")
-        print(f"\n violations size on epoch {self.current_epoch} is {self.num_violations_size}\n")
         self.num_violations_price = 0
         self.num_violations_size = 0
 
@@ -296,8 +294,6 @@ class NNEngine(L.LightningModule):
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")
         wandb.define_metric("val_ema_loss", summary="min")
-        wandb.define_metric("test_loss", summary="min")
-        wandb.define_metric("test_ema_loss", summary="min")
 
     def _select_cond(self, cond, cond_type):
         if cond_type == 'only_event':
