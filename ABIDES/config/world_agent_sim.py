@@ -5,7 +5,11 @@ import numpy as np
 import pandas as pd
 import sys
 import datetime as dt
+
+import torch
 from dateutil.parser import parse
+from lightning import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 import constants as cst
 from Kernel import Kernel
@@ -65,6 +69,9 @@ parser.add_argument('-e',
 parser.add_argument('-cm',
                     '--chosen-model',
                     default='CDT')
+parser.add_argument('-pt',
+                    '--param-type',
+                    default='normal')
 #parser.add_argument('-p',
 #                    '--execution-pov',
 #                    type=float,
@@ -130,30 +137,21 @@ agents.extend([ExchangeAgent(id=0,
 agent_types.extend("ExchangeAgent")
 agent_count += 1
 chosen_model = args.chosen_model
-dir = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model))
-best_val_loss = 100000
+param_type = args.param_type
+dir_path = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model)+"/"+param_type)
+best_val_loss = 1000000
 config = configuration.Configuration()
-for file in dir.iterdir():
-    val_loss = float(file.name.split("=")[1].split("_")[0])
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        checkpoint_reference = file
-
-#set hyperparameters from checkpoint reference
-config.COND_TYPE = checkpoint_reference.name.split("=")[2].split("_")[1]+"_"+checkpoint_reference.name.split("=")[2].split("_")[2]
-config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER] = checkpoint_reference.name.split("=")[2].split("_")[5]
-config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE] = float(checkpoint_reference.name.split("=")[2].split("_")[7])
-config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE] = int(checkpoint_reference.name.split("=")[2].split("_")[10])
-config.HYPER_PARAMETERS[cst.LearningHyperParameter.CONDITIONAL_DROPOUT] = float(checkpoint_reference.name.split("=")[2].split("_")[13])
-config.HYPER_PARAMETERS[cst.LearningHyperParameter.DROPOUT] = float(checkpoint_reference.name.split("=")[2].split("_")[15])
-if chosen_model == "CDT":
-    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1#int(checkpoint_reference.name.split("=")[2].split("_")[18])
-    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = int(checkpoint_reference.name.split("=")[2].split("_")[22])
-elif chosen_model == "CSDI":
-    config.HYPER_PARAMETERS[cst.LearningHyperParameter.CSDI_LAYERS] = int(checkpoint_reference.name.split("=")[2].split("_")[18])
+for file in dir_path.iterdir():
+    try:
+        val_loss = float(file.name.split("=")[1].split("_")[0])
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            checkpoint_reference = file
+    except:
+        continue
 
 # load checkpoint
-model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, test_num_steps=0, test_data=None).to(cst.DEVICE)
+model = NNEngine.load_from_checkpoint(checkpoint_reference)
 
 # we freeze the model
 for param in model.parameters():
@@ -179,7 +177,6 @@ agents.extend([WorldAgent(id=1,
 
 agent_types.extend("WorldAgent")
 agent_count += 1
-
 
 
 ########################################### KERNEL AND OTHER CONFIG ####################################################

@@ -64,17 +64,9 @@ def train(config, trainer):
     )
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
-    seq_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
-    model = NNEngine(
-        config=config,
-        test_num_steps=test_set.__len__(),
-        test_data=test_set.data,
-    ).to(cst.DEVICE, torch.float32, non_blocking=True)
-
+    model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
     trainer.fit(model, train_dataloader, val_dataloader)
-    print("\nStarting test\n")
-    #trainer.test(model, dataloaders=test_dataloader)
-    #check_constraints(cst.RECON_DIR + "/test_reconstructions.npy", cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy", seq_size)
+
 
 
 def run(config, accelerator, model=None):
@@ -125,17 +117,20 @@ def run_wandb(config, accelerator):
             cond_type = config.COND_TYPE
             is_augmentation = config.IS_AUGMENTATION
             diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+            filename_ckpt = str(config.CHOSEN_MODEL.name) + "/normal/{val_loss:.2f}_{epoch}_" + str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
+            config.FILENAME_CKPT = str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
 
             checkpoint_callback = ModelCheckpoint(
                 dirpath=cst.DIR_SAVED_MODEL,
                 monitor="val_loss",
                 mode="min",
-                save_last=True,
+                save_last=False,
                 save_top_k=1,
                 every_n_epochs=1,
-                filename=str(config.CHOSEN_MODEL.name) + "/{val_loss:.2f}_{epoch}_" + str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps))
+                filename=filename_ckpt
+            )
 
-            checkpoint_callback.CHECKPOINT_NAME_LAST = str(config.CHOSEN_MODEL.name)+"/{val_loss:.2f}_{epoch}_"+str(cond_type)+"_"+wandb_instance_name+"aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)+"_last"
+            checkpoint_callback.CHECKPOINT_NAME_LAST = filename_ckpt+"_last"
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,

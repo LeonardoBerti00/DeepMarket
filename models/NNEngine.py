@@ -24,13 +24,11 @@ from models.diffusers.CDT.Sampler import LossSecondMomentResampler
 
 class NNEngine(L.LightningModule):
     
-    def __init__(self, config, test_num_steps: int, test_data):
+    def __init__(self, config):
         super().__init__()
         """
         This is the skeleton of the diffusion models.
         """
-        self.test_num_steps = test_num_steps
-        self.test_data = test_data
         self.IS_WANDB = config.IS_WANDB
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
@@ -45,12 +43,17 @@ class NNEngine(L.LightningModule):
         self.cond_seq_size = config.COND_SEQ_SIZE
         self.train_losses, self.val_losses, self.test_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
+        self.min_loss_ema = 10000000
+        if self.IS_WANDB:
+            self.filename_ckpt = config.FILENAME_CKPT
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_depth_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
         self.betas = config.BETAS
         self.num_violations_price = 0
         self.num_violations_size = 0
+        self.chosen_model = config.CHOSEN_MODEL.name
+        self.last_path_ckpt_ema = None
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
@@ -64,9 +67,10 @@ class NNEngine(L.LightningModule):
             self.conditioning_augmenter = self.feature_augmenter
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
+        self.ema.to(cst.DEVICE)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.depth_embedder = nn.Embedding(cst.N_LOB_LEVELS, self.size_depth_emb)
-
+        self.save_hyperparameters()
 
     def forward(self, cond, x_0, is_train):
 
@@ -164,6 +168,8 @@ class NNEngine(L.LightningModule):
 
     def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
+        self.val_losses = []
+        self.val_ema_losses = []
         if self.IS_WANDB:
             wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
         print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
@@ -172,7 +178,7 @@ class NNEngine(L.LightningModule):
         x_0 = input[1]
         full_cond = input[0]
         cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=True)
+        recon, reverse_context = self.forward(cond, x_0, is_train=False)
         reverse_context.update({'is_train': False})
         batch_losses = self.loss(x_0, recon, **reverse_context)
         batch_loss_mean = torch.mean(batch_losses)
@@ -185,8 +191,8 @@ class NNEngine(L.LightningModule):
             reverse_context.update({'is_train': False})
             batch_ema_losses = self.loss(x_0, recon, **reverse_context)
             #recon = self._check_constraints(full_cond, recon)
-            ema_loss = torch.mean(batch_ema_losses)
-            self.val_ema_losses.append(ema_loss)
+            batch_ema_loss_mean = torch.mean(batch_ema_losses)
+            self.val_ema_losses.append(batch_ema_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean
@@ -194,78 +200,22 @@ class NNEngine(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         self.val_loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
+        if loss_ema < self.min_loss_ema:
+            self.min_loss_ema = loss_ema
+            if self.IS_WANDB:
+                if self.last_path_ckpt_ema is not None:
+                    os.remove(self.last_path_ckpt_ema)
+                filename_ckpt_ema = "val_ema=" + str(round(loss_ema, 3)) + "_epoch=" + str(self.current_epoch) + "_" + self.filename_ckpt + "_ema.ckpt"
+                path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/ema/" + filename_ckpt_ema
+                with self.ema.average_parameters():
+                    self.trainer.save_checkpoint(path_ckpt_ema)
+                self.last_path_ckpt_ema = path_ckpt_ema
+
         self.log('val_loss', self.val_loss)
         if self.IS_WANDB:
             wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch + 1)
         print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
-        self.num_violations_price = 0
-        self.num_violations_size = 0
-
-    def on_test_start(self) -> None:
-        self.test_reconstructions = np.zeros((self.test_num_steps, cst.LEN_EVENT))
-        self.test_ema_reconstructions = np.zeros((self.test_num_steps, cst.LEN_EVENT))
-        self.test_num_batches = int(self.test_num_steps / self.test_batch_size) + 1
-
-    def test_step(self, input, batch_idx):
-        x_0 = input[1]
-        full_cond = input[0]
-        cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=True)
-        reverse_context.update({'is_train': False})
-        batch_losses = self.loss(x_0, recon, **reverse_context)
-        batch_loss_mean = torch.mean(batch_losses)
-        self.test_losses.append(batch_loss_mean.item())
-        recon = recon[:, 0, :]
-        #recon = self._check_constraints(full_cond, recon)
-        if batch_idx != self.test_num_batches - 1:
-            self.test_reconstructions[batch_idx*self.test_batch_size:(batch_idx+1)*self.test_batch_size] = recon
-        else:
-            self.test_reconstructions[batch_idx*self.test_batch_size:] = recon
-        if isinstance(self.diffuser, GaussianDiffusion):
-            self.diffuser.init_losses()
-        # Testing: with EMA
-        with self.ema.average_parameters():
-            recon, reverse_context = self.forward(cond, x_0, is_train=False)
-            reverse_context.update({'is_train': False})
-            batch_ema_losses = self.loss(x_0, recon, **reverse_context)
-            ema_loss = torch.mean(batch_ema_losses)
-            self.test_ema_losses.append(ema_loss.item())
-            recon = recon[:, 0, :]
-            #recon = self._check_constraints(full_cond, recon)
-            if batch_idx != self.test_num_batches - 1:
-                self.test_ema_reconstructions[batch_idx * self.test_batch_size:(batch_idx + 1) * self.test_batch_size] = recon
-            else:
-                self.test_ema_reconstructions[batch_idx * self.test_batch_size:] = recon
-        if isinstance(self.diffuser, GaussianDiffusion):
-            self.diffuser.init_losses()
-        return batch_loss_mean
-
-    def on_test_end(self) -> None:
-        loss = sum(self.test_losses) / len(self.test_losses)
-        loss_ema = sum(self.test_ema_losses) / len(self.test_ema_losses)
-        jsd_test = JSDCalculator(self.test_data, self.test_ema_reconstructions)
-        jsd_test_ema = JSDCalculator(self.test_data, self.test_reconstructions)
-        if self.IS_WANDB:
-            wandb.log({'test_jsd_ema_time': jsd_test_ema.calculate_jsd()[0]})
-            wandb.log({'test_jsd_time': jsd_test.calculate_jsd()[0]})
-            wandb.log({'test_jsd_ema_type': jsd_test_ema.calculate_jsd()[1]})
-            wandb.log({'test_jsd_type': jsd_test.calculate_jsd()[1]})
-            wandb.log({'test_jsd_ema_price': jsd_test_ema.calculate_jsd()[3]})
-            wandb.log({'test_jsd_price': jsd_test.calculate_jsd()[3]})
-            wandb.log({'test_jsd_ema_size': jsd_test_ema.calculate_jsd()[2]})
-            wandb.log({'test_jsd_size': jsd_test.calculate_jsd()[2]})
-            wandb.log({'test_loss': loss})
-            wandb.log({'test_ema_loss': loss_ema})
-            wandb.log({'test_violations_price': self.num_violations_price})
-            wandb.log({'test_violations_size': self.num_violations_size})
-        print(f"\n test loss on epoch {self.current_epoch} is {loss}\n")
-        print(f"\n test ema loss on epoch {self.current_epoch} is {loss_ema}\n")
-        print(f"\n violations price on epoch {self.current_epoch} is {self.num_violations_price}\n")
-        print(f"\n violations size on epoch {self.current_epoch} is {self.num_violations_size}\n")
-        np.save(cst.RECON_DIR + "/test_reconstructions.npy", self.test_reconstructions)
-        np.save(cst.RECON_DIR + "/test_ema_reconstructions.npy", self.test_ema_reconstructions)
-
 
     def configure_optimizers(self):
         if self.optimizer == 'Adam':

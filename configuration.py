@@ -8,9 +8,9 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = True
-        self.IS_SWEEP = True
+        self.IS_SWEEP = False
         self.IS_TRAINING = False
-        self.IS_DEBUG = False
+        self.IS_DEBUG = True
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
@@ -23,6 +23,10 @@ class Configuration:
         self.SPLIT_RATES = (.75, .05, .2)
 
         self.CHOSEN_MODEL = cst.Models.CDT
+        if self.CHOSEN_MODEL == cst.Models.CDT:
+            cst.PROJECT_NAME = "CDTS"
+        elif self.CHOSEN_MODEL == cst.Models.CSDI:
+            cst.PROJECT_NAME = "CSDI"
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
 
@@ -48,7 +52,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
-        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
