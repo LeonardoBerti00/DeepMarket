@@ -10,6 +10,7 @@ HP_CDT = {
     cst.LearningHyperParameter.AUGMENT_DIM.value: {'values': [16, 32]},
 }
 
+
 HP_CDT_FIXED = {
     cst.LearningHyperParameter.BATCH_SIZE.value: 256,
     cst.LearningHyperParameter.CONDITIONAL_DROPOUT.value: 0.1,

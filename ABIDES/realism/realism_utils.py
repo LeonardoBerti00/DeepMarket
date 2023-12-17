@@ -133,9 +133,10 @@ def make_orderbook_for_analysis(stream_path, orderbook_path, num_levels=5, ignor
         *[[f'ask_price_{level}', f'ask_size_{level}', f'bid_price_{level}', f'bid_size_{level}'] for level in
           range(1, num_levels + 1)]))
     merged = pd.merge(stream_processed, ob_processed, left_index=True, right_index=True, how='left')
+    merged = merged.tail(-1)
     merge_cols = ['ORDER_ID', 'PRICE', 'SIZE', 'BUY_SELL_FLAG', 'TYPE'] + columns
     merged = merged[merge_cols]
-    merged['PRICE'] = merged['PRICE'] / 100
+    merged['PRICE'] = merged['PRICE'] / 10000
 
     # clean
     # merged = merged.dropna()
@@ -145,8 +146,8 @@ def make_orderbook_for_analysis(stream_path, orderbook_path, num_levels=5, ignor
     if ignore_cancellations:
         merged = merged[merged.SIZE != 0]
 
-    merged['MID_PRICE'] = (merged['ask_price_1'] + merged['bid_price_1']) / (2 * 100)
-    merged['SPREAD'] = (merged['ask_price_1'] - merged['bid_price_1']) / 100
+    merged['MID_PRICE'] = (merged['ask_price_1'] + merged['bid_price_1']) / (2 * 10000)
+    merged['SPREAD'] = (merged['ask_price_1'] - merged['bid_price_1']) / 10000
     merged['ORDER_VOLUME_IMBALANCE'] = merged['ask_size_1'] / (merged['bid_size_1'] + merged['ask_size_1'])
 
     if hide_liquidity_collapse:
@@ -235,7 +236,8 @@ def get_execution_agent_vwap(experiment_name, agent_name, date, seed, pov, log_d
 
     executed_orders["VWAP"] = (executed_orders['PRICE'].multiply(executed_orders['SIZE'])).cumsum() / executed_orders[
         'SIZE'].cumsum()
-    executed_orders["VWAP"] = executed_orders["VWAP"] / 100
+    executed_orders["VWAP"] = executed_orders["VWAP"] / 10000
+    print("realism_utils line 240    " + str(executed_orders["VWAP"].loc[0]))
     final_vwap = executed_orders.iloc[-1].VWAP
 
     return final_vwap

@@ -84,13 +84,12 @@ class OrderBook:
                 log_print("SENT: notifications of order execution to agents {} and {} for orders {} and {}",
                           filled_order.agent_id, matched_order.agent_id, filled_order.order_id, matched_order.order_id)
 
-                self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": filled_order}))
-                self.owner.sendMessage(matched_order.agent_id,
-                                       Message({"msg": "ORDER_EXECUTED", "order": matched_order}))
+                #self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": filled_order}))
+                self.owner.sendMessage(matched_order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": matched_order}))
 
                 # Accumulate the volume and average share price of the currently executing inbound trade.
                 executed.append((filled_order.quantity, filled_order.fill_price))
-
+                self.owner.publishOrderBookData()
                 if order.quantity <= 0:
                     matching = False
 
@@ -103,7 +102,7 @@ class OrderBook:
                           order.agent_id, order.order_id)
 
                 self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_ACCEPTED", "order": order}))
-
+                self.owner.publishOrderBookData()
                 matching = False
 
         if not matching:
@@ -186,7 +185,7 @@ class OrderBook:
             p, q = lo[0], lo[1]
             limit_order = LimitOrder(order.agent_id, order.time_placed, order.symbol, q, order.is_buy_order, p, tag='market_order')
             self.handleLimitOrder(limit_order)
-            self.owner.publishOrderBookData()
+
 
     def executeOrder(self, order):
         # Finds a single best match for this order, without regard for quantity.

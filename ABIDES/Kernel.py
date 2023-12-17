@@ -495,7 +495,7 @@ class Kernel:
 
     if self.skip_log: return
 
-    path = os.path.join(".", "log", self.log_dir)
+    path = os.path.join(".", "ABIDES", "log", self.log_dir)
 
     if filename:
       file = "{}.bz2".format(filename)

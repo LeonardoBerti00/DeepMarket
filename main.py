@@ -35,7 +35,7 @@ if __name__ == "__main__":
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-
+        exit()
     if config.IS_WANDB:
 
         if config.IS_SWEEP:

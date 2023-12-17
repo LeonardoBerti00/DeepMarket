@@ -45,7 +45,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='16:00:00',
+                    default='10:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -133,7 +133,8 @@ agents.extend([ExchangeAgent(id=0,
                              stream_history=stream_history_length,
                              book_freq=0,
                              wide_book=True,
-                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))])
+                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))
+               ])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
 chosen_model = args.chosen_model
@@ -171,7 +172,7 @@ agents.extend([WorldAgent(id=1,
                             log_orders=log_orders,
                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
                             normalization_terms=normalization_terms,
-                            starting_time_diffusion='1min'
+                            starting_time_diffusion='60min'
                           )
                ])
 

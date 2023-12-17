@@ -27,8 +27,8 @@ class WorldAgent(Agent):
 
 
     def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, log_orders=False, random_state=None, normalization_terms=None, starting_time_diffusion='30min'):
-        super().__init__(id, name, type, random_state=random_state)
+                 cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, starting_time_diffusion='30min'):
+        super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
         self.symbol = symbol
@@ -80,6 +80,8 @@ class WorldAgent(Agent):
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
+        if len(self.placed_orders) != len(self.lob_snapshots):
+            print("here")
         if self.first_wakeup:
             self.state = 'PRE_GENERATING'
             offset = datetime.timedelta(seconds=self.historical_orders[0, 0])
@@ -91,21 +93,14 @@ class WorldAgent(Agent):
         # if current time is between 09:30 and 10:00, then we are in the pre-open phase
         elif self.mkt_open < currentTime <= self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             next_order = self.historical_orders[self.next_historical_orders_index]
-            if next_order[1] == 4.0:
-                self.offset_time_market_order = next_order[0]
+            self.last_offset_time = next_order[0]
             self.placeOrder(currentTime, next_order)
             self.next_historical_orders_index += 1
             offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
-            self.setWakeup(currentTime + offset)
+            self.setWakeup(currentTime + offset + datetime.timedelta(microseconds=1))
 
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             self.state = 'GENERATING'
-            # firstly we place the last order generated and next we generate the next order
-            if self.next_order is not None:
-                if self.next_order[1] == 4:
-                    self.offset_time_market_order = self.next_order[0]
-                self.placeOrder(currentTime, self.next_order)
-                self.next_order = None
 
             # we generate the first order then the others will be generated everytime we receive the update of the lob
             if self.first_generation:
@@ -113,37 +108,41 @@ class WorldAgent(Agent):
                 self.next_order = generated
                 self.first_generation = False
                 offset_time = datetime.timedelta(seconds=generated[0])
-                self.setWakeup(currentTime + offset_time)
+                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
+                return
+
+            # firstly we place the last order generated and next we generate the next order
+            if self.next_order is not None and len(self.kernel.messages.queue) == 0:
+                self.placeOrder(currentTime, self.next_order)
+                self.next_order = self._generate_order(currentTime)
+                offset_time = datetime.timedelta(seconds=self.next_order[0])
+                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
+
+            elif (len(self.kernel.messages.queue) > 0):
+                self.setWakeup(currentTime + datetime.timedelta(microseconds=1))
 
 
     def receiveMessage(self, currentTime, msg):
         super().receiveMessage(currentTime, msg)
         if msg.body['msg'] == 'MARKET_DATA':
             self._update_lob_snapshot(msg)
-            if self.state == 'GENERATING':
-                generated = self._generate_order(currentTime)
-                self.next_order = generated
-                self.first_generation = False
-                offset_time = datetime.timedelta(seconds=generated[0])
-                self.setWakeup(currentTime + offset_time)
+            self._update_active_limit_orders()
 
-        elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag == 'market_order':
-            # we saved the market order as an execution of a limit order of the opposite side
-            direction = -1 if msg.body['order'].is_buy_order else 1
-            self.placed_orders.append(np.array([self.offset_time_market_order, 4, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
+        # if we had placed a market order and it is executed we receive the message of the limit order order filled
+        elif msg.body['msg'] == 'ORDER_EXECUTED':
+            direction = 1 if msg.body['order'].is_buy_order else -1
+            self.placed_orders.append(np.array([self.last_offset_time, 4, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
+            self.logEvent('ORDER_EXECUTED', msg.body['order'].to_dict())
 
-        # we check if it is a market order because when we place a market order we receive both the message
-        # of the limit order executed and of the market order executed, so we don't want to count twice the same order
-        elif msg.body['msg'] == 'ORDER_EXECUTED' and msg.body['order'].tag != 'market_order':
-            # check if the quantity is the same of the order placed
-            if msg.body['order'].quantity == self.active_limit_orders[msg.body['order'].order_id].quantity:
-                # if the quantity is the same then we can delete the order from the active limit orders
-                del self.active_limit_orders[msg.body['order'].order_id]
-            else:
-                # if the quantity is not the same then we need to modify the order in the active limit orders
-                new_quantity = self.active_limit_orders[msg.body['order'].order_id].quantity - msg.body['order'].quantity
-                self.active_limit_orders[msg.body['order'].order_id].quantiy = new_quantity
+        elif msg.body['msg'] == 'ORDER_ACCEPTED':
+            direction = 1 if msg.body['order'].is_buy_order else -1
+            self.placed_orders.append(np.array([self.last_offset_time, 1, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
+            self.logEvent('ORDER_ACCEPTED', msg.body['order'].to_dict())
 
+        elif msg.body['msg'] == 'ORDER_CANCELLED':
+            direction = 1 if msg.body['order'].is_buy_order else -1
+            self.placed_orders.append(np.array([self.last_offset_time, 3, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
+            self.logEvent('ORDER_CANCELLED', msg.body['order'].to_dict())
 
     def placeOrder(self, currentTime, order):
         order_id = order[2]
@@ -155,9 +154,8 @@ class WorldAgent(Agent):
             direction = False if direction == -1 else True
             if type == 1:
                 self.placeLimitOrder(self.symbol, quantity, is_buy_order=direction, limit_price=price, order_id=order_id)
-                self.placed_orders.append(order)
+
             elif type == 2 or type == 3:
-                self.placed_orders.append(order)
                 if order_id in self.active_limit_orders:
                     old_order = self.active_limit_orders[order_id]
                     del self.active_limit_orders[order_id]
@@ -171,9 +169,8 @@ class WorldAgent(Agent):
                 elif type == 2:
                     # partial deletion of a limit order
                     new_order = LimitOrder(self.id, self.currentTime, self.symbol, old_order.quantity-quantity, old_order.is_buy_order, old_order.limit_price, old_order.order_id, None)
-                    #self.placed_orders.append(new_order)
-                    self.active_limit_orders[new_order.order_id] = order
                     self.modifyOrder(old_order, new_order)
+                    self.placed_orders.append(np.array([order[0], 2, new_order.order_id, quantity, new_order.limit_price, direction]))
 
             elif type == 4:
                 # if type == 4 it means that it is an execution order, so if it is an execution order of a sell limit order
@@ -211,7 +208,6 @@ class WorldAgent(Agent):
 
     def placeLimitOrder(self, symbol, quantity, is_buy_order, limit_price, order_id=None, ignore_risk=True, tag=None):
         order = LimitOrder(self.id, self.currentTime, symbol, quantity, is_buy_order, limit_price, order_id, tag)
-        self.active_limit_orders[order.order_id] = order
         self.sendMessage(self.exchangeID, Message({"msg": "LIMIT_ORDER", "sender": self.id, "order": order}))
         # Log this activity.
         if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
@@ -273,13 +269,13 @@ class WorldAgent(Agent):
             if direction == 1:
                 bid_side = self.lob_snapshots[-1][2::4]
                 last_price = bid_side[-1]
-                if price < last_price:
+                if price < last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
                 last_price = ask_side[-1]
-                if price > last_price:
+                if price > last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
 
@@ -310,10 +306,48 @@ class WorldAgent(Agent):
 
         elif order_type == 4:
             order_id = 0
-            # we transform market orders in execution orders of the opposite side as the original message files
+            # the diffusion gives in output market order and not execution of limit order,
+            # so we transform market orders in execution orders of the opposite side as the original message files
             direction = -direction
 
         return np.array([time, order_type, order_id, size, price, direction])
+
+    def querySpread(self, symbol, price, bids, asks, book):
+        # The spread message now also includes last price for free.
+        self.queryLastTrade(symbol, price)
+
+        self.known_bids[symbol] = bids
+        self.known_asks[symbol] = asks
+
+        if bids:
+            best_bid, best_bid_qty = (bids[0][0], bids[0][1])
+        else:
+            best_bid, best_bid_qty = ('No bids', 0)
+
+        if asks:
+            best_ask, best_ask_qty = (asks[0][0], asks[0][1])
+        else:
+            best_ask, best_ask_qty = ('No asks', 0)
+
+        log_print("Received spread of {} @ {} / {} @ {} for {}", best_bid_qty, best_bid, best_ask_qty, best_ask, symbol)
+
+        self.logEvent("BID_DEPTH", bids)
+        self.logEvent("ASK_DEPTH", asks)
+        self.logEvent("IMBALANCE", [sum([x[1] for x in bids]), sum([x[1] for x in asks])])
+
+        self.book = book
+
+    def _update_active_limit_orders(self):
+        asks = self.kernel.agents[0].order_books[self.symbol].asks
+        bids = self.kernel.agents[0].order_books[self.symbol].bids
+        self.active_limit_orders = {}
+        for level in asks:
+            for order in level:
+                self.active_limit_orders[order.order_id] = order
+        for level in bids:
+            for order in level:
+                self.active_limit_orders[order.order_id] = order
+
 
 
     def _z_score_orderbook(self, orderbook):
@@ -355,14 +389,18 @@ class WorldAgent(Agent):
                     index = j
                 if direction == 1:
                     bid_side = dataframes[i][1].iloc[index, 2::4]
+                    indexes = np.where(bid_side == order_price)[0]
                     if len(np.where(bid_side == order_price)[0]) == 0:
-                        print("here")
-                    depth = np.where(bid_side == order_price)[0][0]
+                        depth = 9
+                    else:
+                        depth = np.where(bid_side == order_price)[0][0]
                 else:
                     ask_side = dataframes[i][1].iloc[index, 0::4]
+                    indexes = np.where(ask_side == order_price)[0]
                     if len(np.where(ask_side == order_price)[0]) == 0:
-                        print("here")
-                    depth = np.where(ask_side == order_price)[0][0]
+                        depth = 9
+                    else:
+                        depth = np.where(ask_side == order_price)[0][0]
 
                 dataframes[i][0].loc[j, "depth"] = depth
 
@@ -430,7 +468,7 @@ class WorldAgent(Agent):
                     raise ValueError("File name not recognized")
 
         dataframes = [[events, lob]]
-        dataframes = self.preprocess_events(dataframes)
+        dataframes = self._preprocess_events(dataframes)
         events = dataframes[0][0]
         lob = dataframes[0][1]
         # transform to numpy
@@ -439,10 +477,10 @@ class WorldAgent(Agent):
         return events, lob
 
 
-    def preprocess_events(self, dataframes):
+    def _preprocess_events(self, dataframes):
 
         for i in range(len(dataframes)):
-            indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([2, 5, 6, 7])].index
+            indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([5, 6, 7])].index
             dataframes[i][0] = dataframes[i][0].drop(indexes)
             dataframes[i][1] = dataframes[i][1].drop(indexes)
 
@@ -491,6 +529,7 @@ class WorldAgent(Agent):
                     last_lob_snapshot.append(msg.body['bids'][i][1])
                 else:
                     for _ in range(4): last_lob_snapshot.append(0)
+        self.last_lob_snapshot = last_lob_snapshot
         self.lob_snapshots.append(last_lob_snapshot)
 
 

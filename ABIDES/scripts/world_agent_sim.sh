@@ -4,8 +4,7 @@ NUM_JOBS=32
 python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim
 
 cd util/plotting
-python -u liquidity_telemetry.py ../../log/world_agent_sim/EXCHANGE_AGENT.bz2 ../../log/world_agent_sim/ORDERBOOK_TSLA_FULL.bz2 \
--o world_agent_sim.png -c configs/plot_09.30_11.30.json
+python -u liquidity_telemetry.py ../../log/1702758359/EXCHANGE_AGENT.bz2 ../../log/1702758359/ORDERBOOK_TSLA_FULL.bz2 -o world_agent_sim.png -c configs/plot_09.30_11.30.json
 cd ../../
 
 #python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.01 -e -p 0.01

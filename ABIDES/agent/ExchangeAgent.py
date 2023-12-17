@@ -240,7 +240,7 @@ class ExchangeAgent(FinancialAgent):
       else:
         # Hand the order to the order book for processing.
         self.order_books[order.symbol].handleLimitOrder(deepcopy(order))
-        self.publishOrderBookData()
+        #self.publishOrderBookData()
     elif msg.body['msg'] == "MARKET_ORDER":
       order = msg.body['order']
       #log_print("{} received MARKET_ORDER: {}", self.name, order)
