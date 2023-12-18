@@ -1,0 +1,14 @@
+## Packages to install through pip install requirements.txt
+numpy==1.24.3
+scipy==1.10.1
+pandas==2.0.1
+scikit-learn==1.2.2
+matplotlib==3.7.1
+tqdm==4.65.0
+einops==0.6.1
+tmm
+timm
+torch-ema
+wandb==0.15.10
+lightning==2.0.8
+lion-pytorch
