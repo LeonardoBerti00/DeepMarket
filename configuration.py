@@ -11,6 +11,8 @@ class Configuration:
         self.IS_SWEEP = True
         self.IS_TRAINING = False
         self.IS_DEBUG = False
+        self.IS_DISCRIMINATIVE = False
+        self.IS_PREDICTIVE = False
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
