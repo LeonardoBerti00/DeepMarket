@@ -8,8 +8,8 @@ import os.path
 
 import sys
 sys.path.extend(['../util/formatting'])
-from convert_order_book import process_orderbook
-from convert_order_stream import convert_stream_to_format
+from util.formatting.convert_order_book import process_orderbook
+from util.formatting.convert_order_stream import convert_stream_to_format
 import itertools
 
 import matplotlib.dates as mdates
@@ -41,12 +41,12 @@ def make_plots(plot_data, plot_params_dict):
 
     colors = list(get_plot_colors(plot_data + ['dummy']*2))
     color = colors.pop(0)
-    linestyles = get_plot_linestyles(len(plot_data) + 2)
+    linestyles = get_plot_linestyles(len(plot_data) + 4)
     linestyle = linestyles.pop(0)
-
     orderbook_df = plot_data[0]['no_execution_df']
     orderbook_df["MID_PRICE"].plot(ax=axes[0], label=plot_params_dict['baseline_label'], color=color, linestyle=linestyle)
-
+    linestyles.pop(0)
+    linestyles.pop(0)
     for plot_data_dict in plot_data:
         color = colors.pop(0)
         linestyle = linestyles.pop(0)

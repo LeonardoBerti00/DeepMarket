@@ -55,6 +55,7 @@ class WorldAgent(Agent):
         self.ignored_cancel = 0
         self.generated_orders_out_of_depth = 0
         self.generated_cancel_orders_empty_depth = 0
+        self.depth_rounding = 0
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -80,8 +81,16 @@ class WorldAgent(Agent):
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
-        if len(self.placed_orders) != len(self.lob_snapshots):
-            print("here")
+        #make a print every 10 minutes
+        if currentTime.minute % 5 == 0:
+            print("Current time: {}".format(currentTime))
+            print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
+            print("Number of generated cancel orders empty depth: {}".format(self.generated_cancel_orders_empty_depth))
+            print("Number of depth rounding: {}".format(self.depth_rounding))
+            now = datetime.datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            print("Current Time =", current_time)
+
         if self.first_wakeup:
             self.state = 'PRE_GENERATING'
             offset = datetime.timedelta(seconds=self.historical_orders[0, 0])
@@ -312,30 +321,6 @@ class WorldAgent(Agent):
 
         return np.array([time, order_type, order_id, size, price, direction])
 
-    def querySpread(self, symbol, price, bids, asks, book):
-        # The spread message now also includes last price for free.
-        self.queryLastTrade(symbol, price)
-
-        self.known_bids[symbol] = bids
-        self.known_asks[symbol] = asks
-
-        if bids:
-            best_bid, best_bid_qty = (bids[0][0], bids[0][1])
-        else:
-            best_bid, best_bid_qty = ('No bids', 0)
-
-        if asks:
-            best_ask, best_ask_qty = (asks[0][0], asks[0][1])
-        else:
-            best_ask, best_ask_qty = ('No asks', 0)
-
-        log_print("Received spread of {} @ {} / {} @ {} for {}", best_bid_qty, best_bid, best_ask_qty, best_ask, symbol)
-
-        self.logEvent("BID_DEPTH", bids)
-        self.logEvent("ASK_DEPTH", asks)
-        self.logEvent("IMBALANCE", [sum([x[1] for x in bids]), sum([x[1] for x in asks])])
-
-        self.book = book
 
     def _update_active_limit_orders(self):
         asks = self.kernel.agents[0].order_books[self.symbol].asks
@@ -347,7 +332,6 @@ class WorldAgent(Agent):
         for level in bids:
             for order in level:
                 self.active_limit_orders[order.order_id] = order
-
 
 
     def _z_score_orderbook(self, orderbook):
@@ -391,6 +375,7 @@ class WorldAgent(Agent):
                     bid_side = dataframes[i][1].iloc[index, 2::4]
                     indexes = np.where(bid_side == order_price)[0]
                     if len(np.where(bid_side == order_price)[0]) == 0:
+                        self.depth_rounding += 1
                         depth = 9
                     else:
                         depth = np.where(bid_side == order_price)[0][0]
@@ -399,6 +384,7 @@ class WorldAgent(Agent):
                     indexes = np.where(ask_side == order_price)[0]
                     if len(np.where(ask_side == order_price)[0]) == 0:
                         depth = 9
+                        self.depth_rounding += 1
                     else:
                         depth = np.where(ask_side == order_price)[0][0]
 

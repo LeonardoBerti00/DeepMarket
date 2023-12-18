@@ -80,10 +80,7 @@ class Kernel:
     self.oracle = oracle
 
     # If a log directory was not specified, use the initial wallclock.
-    if log_dir:
-      self.log_dir = log_dir
-    else:
-      self.log_dir = str(int(self.kernelWallClockStart.timestamp()))
+    self.log_dir = log_dir
 
     # The kernel maintains a current time for each agent to allow
     # simulation of per-agent computation delays.  The agent's time

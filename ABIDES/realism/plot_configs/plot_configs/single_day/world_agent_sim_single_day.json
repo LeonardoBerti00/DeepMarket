@@ -4,15 +4,15 @@
   "CLIPPED_FINISH_TIME": "11:30:00",
   "PLOT_DATA": [
     {
-      "participation_of_volume": 0.1,
+      "participation_of_volume": 0.05,
       "no_execution_exchange_path": "../log/world_agent_sim/EXCHANGE_AGENT.bz2",
-      "no_execution_orderbook_path": "../log/world_agent_sim/ORDERBOOK_ABM_FULL.bz2",
-      "yes_execution_exchange_path": "../log/world_agent_sim_pov_0.01/EXCHANGE_AGENT.bz2",
-      "yes_execution_orderbook_path": "../log/world_agent_sim_pov_0.01/ORDERBOOK_ABM_FULL.bz2",
+      "no_execution_orderbook_path": "../log/world_agent_sim/ORDERBOOK_TSLA_FULL.bz2",
+      "yes_execution_exchange_path": "../log/world_agent_sim_pov_0.05/EXCHANGE_AGENT.bz2",
+      "yes_execution_orderbook_path": "../log/world_agent_sim_pov_0.05/ORDERBOOK_TSLA_FULL.bz2",
       "seed": 1234
     }
   ],
-  "CACHE_FILE": "cache/world_agent_sim_pov_0.01.pkl",
+  "CACHE_FILE": "cache/world_agent_sim_pov_0.05.pkl",
   "USE_CACHE": false,
   "PLOT_PARAMS_DICT": {
     "baseline_label": "Baseline",
@@ -20,7 +20,7 @@
     "shade_start_datetime": "2015-01-30 10:00:00",
     "shade_end_datetime": "2015-01-30 11:00:00",
     "spread_lookback": "1min",
-    "output_file_path": "visualizations/world_agent_sim_pov_2015-01-30.png",
+    "output_file_path": "../log/world_agent_sim_pov_0.05/world_agent_sim_pov_2015-01-30.png",
     "execution_agent_name": "POV_EXECUTION_AGENT",
     "experiment_name": "world_agent_sim_pov",
     "log_dir": "../log"

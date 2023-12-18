@@ -136,7 +136,7 @@ def run_wandb(config, accelerator):
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
                 callbacks=[
-                    EarlyStopping(monitor="val_loss", mode="min", patience=5, verbose=True),
+                    EarlyStopping(monitor="val_loss", mode="min", patience=3, verbose=True),
                     checkpoint_callback,
                 ],
                 num_sanity_val_steps=0,
@@ -157,10 +157,10 @@ def sweep_init(config):
         },
         'early_terminate': {
             'type': 'hyperband',
-            'min_iter': 6,
+            'min_iter': 3,
             'eta': 1.5
         },
-        'run_cap': 30,
+        'run_cap': 100,
         'parameters': {**HP_DICT_MODEL[config.CHOSEN_MODEL].sweep}
     }
     return sweep_config

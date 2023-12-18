@@ -1,18 +1,20 @@
 #!/bin/bash
 NUM_JOBS=32
 #python printf "Hello World"
-python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim
+python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -pt ema
 
 cd util/plotting
-python -u liquidity_telemetry.py ../../log/1702758359/EXCHANGE_AGENT.bz2 ../../log/1702758359/ORDERBOOK_TSLA_FULL.bz2 -o world_agent_sim.png -c configs/plot_09.30_11.30.json
+# you may need to change the name of the log directory that now is market_replay_sim
+python -u liquidity_telemetry.py ../../log/{insert_log_dir}/EXCHANGE_AGENT.bz2 ../../log/{insert_log_dir}/ORDERBOOK_TSLA_FULL.bz2 -o ../../log/{insert_log_dir}/world_agent_sim.png -c configs/plot_09.30_11.30.json
 cd ../../
 
-#python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.01 -e -p 0.01
-#python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.05 -e -p 0.05
-python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.1 -e -p 0.1
-#python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.5 -e -p 0.5
+#python -u abides.py -c market_replay_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.01 -e -p 0.01
+#python -u abides.py -c market_replay_sim -t TSLA -d 20150130 -s 1234 -l market_replay_sim_pov_0.05 -e -p 0.05
+python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -e -p 0.1
+#python -u abides.py -c market_replay_sim -t TSLA -d 20150130 -s 1234 -l world_agent_sim_pov_0.5 -e -p 0.5
 
 cd realism
+#you may need to change the json config file
 python -u impact_single_day_pov.py plot_configs/plot_configs/single_day/world_agent_sim_single_day.json
 cd ..
 

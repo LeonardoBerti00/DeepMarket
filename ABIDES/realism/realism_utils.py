@@ -342,8 +342,8 @@ def forward_fill_series(s1, s2):
     dummy_to_add_to_s1 = pd.Series([np.NaN] * missing_times_from_s1.size, index=missing_times_from_s1)
     dummy_to_add_to_s2 = pd.Series([np.NaN] * missing_times_from_s2.size, index=missing_times_from_s2)
 
-    s2_out = s2_out.append(dummy_to_add_to_s2)
-    s1_out = s1_out.append(dummy_to_add_to_s1)
+    s2_out = pd.concat([s2_out, dummy_to_add_to_s2])
+    s1_out = pd.concat([s1_out, dummy_to_add_to_s1])
 
     s1_out = s1_out.sort_index()
     s2_out = s2_out.sort_index()

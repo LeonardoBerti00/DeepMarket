@@ -150,7 +150,7 @@ def make_plots(plot_inputs, plot_params_dict, title=None, out_file="liquidity_te
     #  top plot -- mid price + fundamental
     if plot_inputs['fundamental'] is not None:
         plot_inputs['fundamental'].loc[xmin:xmax].plot(ax=axes[0], color='blue', label="Fundamental")
-    plot_inputs['mid_price'].loc[xmin:xmax].plot(ax=axes[0], color='black', label="Mid price")
+    plot_inputs['mid_price'].loc[xmin:xmax].plot(ax=axes[0], color='blue', label="Mid price")
     axes[0].axvspan(shade_start, shade_end, alpha=0.2, color='grey')
     axes[0].xaxis.set_visible(False)
     axes[0].legend(fontsize='large')
@@ -158,7 +158,7 @@ def make_plots(plot_inputs, plot_params_dict, title=None, out_file="liquidity_te
     axes[0].set_xlim(xmin, xmax)
 
     # spread
-    plot_inputs['spread'][xmin:xmax].plot(ax=axes[1], color='black', label="Spread")
+    plot_inputs['spread'][xmin:xmax].plot(ax=axes[1], color='red', label="Spread")
     axes[1].axvspan(shade_start, shade_end, alpha=0.2, color='grey')
     axes[1].xaxis.set_visible(False)
     # axes[0].legend(fontsize='large')
@@ -167,7 +167,7 @@ def make_plots(plot_inputs, plot_params_dict, title=None, out_file="liquidity_te
 
     # order volume imbalance
 
-    plot_inputs['order_volume_imbalance'][xmin:xmax].plot(ax=axes[2], color='black', label="Order volume imbalance")
+    plot_inputs['order_volume_imbalance'][xmin:xmax].plot(ax=axes[2], color='orange', label="Order volume imbalance")
     axes[2].axvspan(shade_start, shade_end, alpha=0.2, color='grey')
 
     axes[2].xaxis.set_visible(False)

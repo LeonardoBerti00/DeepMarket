@@ -19,8 +19,8 @@ silent_mode = False
 # execution when verbose flag is not set.  This is especially fast because
 # the arguments will not even be formatted when in silent mode.
 def log_print (str, *args):
-  if not silent_mode: print (str.format(*args))
-
+  #if not silent_mode: print (str.format(*args))
+    return
 
 # Accessor method for the global silent_mode variable.
 def be_silent ():

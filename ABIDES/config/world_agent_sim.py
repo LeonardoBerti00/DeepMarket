@@ -17,6 +17,7 @@ from agent.WorldAgent import WorldAgent
 from util.order import LimitOrder
 from util import util
 from agent.ExchangeAgent import ExchangeAgent
+from agent.execution.POVExecutionAgent import POVExecutionAgent
 from pathlib import Path
 
 import configuration
@@ -45,14 +46,10 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='10:00:00',
+                    default='16:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
-parser.add_argument('-l',
-                    '--log_dir',
-                    default=None,
-                    help='Log directory name (default: unix timestamp at program start)')
 parser.add_argument('-s',
                     '--seed',
                     type=int,
@@ -72,11 +69,11 @@ parser.add_argument('-cm',
 parser.add_argument('-pt',
                     '--param-type',
                     default='normal')
-#parser.add_argument('-p',
-#                    '--execution-pov',
-#                    type=float,
-#                    default=0.1,
-#                    help='Participation of Volume level for execution agent')
+parser.add_argument('-p',
+                    '--execution-pov',
+                    type=float,
+                    default=0.1,
+                    help='Participation of Volume level for execution agent')
 
 args, remaining_args = parser.parse_known_args()
 
@@ -84,7 +81,6 @@ if args.config_help:
     parser.print_help()
     sys.exit()
 
-log_dir = args.log_dir  # Requested log directory.
 seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
@@ -137,6 +133,11 @@ agents.extend([ExchangeAgent(id=0,
                ])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
+
+
+
+# 2) World Agent
+
 chosen_model = args.chosen_model
 param_type = args.param_type
 dir_path = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model)+"/"+param_type)
@@ -158,7 +159,6 @@ model = NNEngine.load_from_checkpoint(checkpoint_reference)
 for param in model.parameters():
     param.requires_grad = False
 
-# 2) World Agent
 agents.extend([WorldAgent(id=1,
                             name="WORLD_AGENT",
                             type="WorldAgent",
@@ -172,7 +172,7 @@ agents.extend([WorldAgent(id=1,
                             log_orders=log_orders,
                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
                             normalization_terms=normalization_terms,
-                            starting_time_diffusion='60min'
+                            starting_time_diffusion='15min'
                           )
                ])
 
@@ -180,20 +180,61 @@ agent_types.extend("WorldAgent")
 agent_count += 1
 
 
+
+# 3) Execution Agent
+trade_pov = True if args.execution_agents else False
+
+#### Participation of Volume Agent parameters
+
+pov_agent_start_time = mkt_open + pd.to_timedelta('01:00:00')
+pov_agent_end_time = mkt_open + pd.to_timedelta('01:30:00')
+pov_proportion_of_volume = args.execution_pov
+pov_quantity = 1e5
+pov_frequency = '1min'
+pov_direction = "BUY"
+
+pov_agent = POVExecutionAgent(id=agent_count,
+                              name='POV_EXECUTION_AGENT',
+                              type='ExecutionAgent',
+                              symbol=symbol,
+                              starting_cash=starting_cash,
+                              start_time=pov_agent_start_time,
+                              end_time=pov_agent_end_time,
+                              freq=pov_frequency,
+                              lookback_period=pov_frequency,
+                              pov=pov_proportion_of_volume,
+                              direction=pov_direction,
+                              quantity=pov_quantity,
+                              trade=trade_pov,
+                              log_orders=True,  # needed for plots so conflicts with others
+                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+                                                                                          dtype='uint64')))
+
+#execution_agents = [pov_agent]
+#agents.extend(execution_agents)
+#agent_types.extend("ExecutionAgent")
+#agent_count += 1
+
+
+
+
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
 kernel = Kernel("World Agent Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16,
                                                                                                   dtype='uint64')))
 kernelStartTime = mkt_open
-kernelStopTime = mkt_close + pd.to_timedelta('00:01:00')
-
+kernelStopTime = mkt_close + pd.to_timedelta('00:00:01')
+if trade_pov:
+    log_dir = "world_agent_sim_pov_{}_ckpt_".format(pov_proportion_of_volume) + checkpoint_reference.name
+else:
+    log_dir = "world_agent_sim_ckpt_" + checkpoint_reference.name
 defaultComputationDelay = 0  # 50 nanoseconds
 #time.sleep(3)
 kernel.runner(agents=agents,
               startTime=kernelStartTime,
               stopTime=kernelStopTime,
               defaultComputationDelay=defaultComputationDelay,
-              log_dir=args.log_dir)
+              log_dir=log_dir)
 
 
 simulation_end_time = dt.datetime.now()
