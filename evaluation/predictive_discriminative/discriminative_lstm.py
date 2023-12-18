@@ -5,6 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 
+
 # REFERENCE: Time-series Generative Adversarial Networks
 
 # merge gen and not gen datased adding a binary label column
@@ -20,28 +21,27 @@ class Preprocessor:
         self.df = df
 
     def preprocess(self):
-        self._remove_idcolumn()
-        self._rename_columns()
+        self._remove_columns()
         self._one_hot_encode()
-        self._normalize()
-        self._divide_time()
+        self.zscore()
         return self.df
     
-    def _remove_idcolumn(self):
-        self.df = self.df.drop(self.df.columns[2], axis=1)
-
-    def _rename_columns(self):
-        self.df.columns = ["time", "event_type", "size", "price", "direction", "generated"]
+    def zscore(self):
+        self.df['PRICE'] = (self.df['PRICE'] - self.df['PRICE'].mean()) / self.df['PRICE'].std()
+        self.df['SIZE'] = (self.df['SIZE'] - self.df['SIZE'].mean()) / self.df['SIZE'].std()
+        self.df['ask_price_1'] = (self.df['ask_price_1'] - self.df['ask_price_1'].mean()) / self.df['ask_price_1'].std()
+        self.df['ask_size_1'] = (self.df['ask_size_1'] - self.df['ask_size_1'].mean()) / self.df['ask_size_1'].std()
+        self.df['bid_price_1'] = (self.df['bid_price_1'] - self.df['bid_price_1'].mean()) / self.df['bid_price_1'].std()
+        self.df['bid_size_1'] = (self.df['bid_size_1'] - self.df['bid_size_1'].mean()) / self.df['bid_size_1'].std()
+        self.df['ORDER_VOLUME_IMBALANCE'] = (self.df['ORDER_VOLUME_IMBALANCE'] - self.df['ORDER_VOLUME_IMBALANCE'].mean()) / self.df['ORDER_VOLUME_IMBALANCE'].std()
+        self.df['VWAP'] = (self.df['VWAP'] - self.df['VWAP'].mean()) / self.df['VWAP'].std()
+        self.df['MID_PRICE'] = (self.df['MID_PRICE'] - self.df['MID_PRICE'].mean()) / self.df['MID_PRICE'].std() # not in predictive
 
     def _one_hot_encode(self):
-        self.df = pd.get_dummies(self.df, columns=['direction', 'event_type'])
+        self.df = pd.get_dummies(self.df, columns=['TYPE'])
 
-    def _normalize(self):
-        self.df['price'] = (self.df['price'] - self.df['price'].min()) / (self.df['price'].max() - self.df['price'].min())
-        self.df['size'] = (self.df['size'] - self.df['size'].min()) / (self.df['size'].max() - self.df['size'].min())
-
-    def _divide_time(self):
-        self.df['time'] = self.df['time'] / 100000
+    def _remove_columns(self):
+        self.df = self.df.drop(['ORDER_ID', 'SPREAD'], axis=1)
 
 
 class LSTMModel(nn.Module):
@@ -58,6 +58,7 @@ class LSTMModel(nn.Module):
         out, _ = self.lstm(x, (h0, c0))  
         out = self.fc(out[:, -1, :])
         return out
+
 
 
 class Trainer:
@@ -99,9 +100,11 @@ class Trainer:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def merge_dataframes_with_labels(d1, d2):
-    d1['label'] = 0
-    d2['label'] = 1
+    d1['generated'] = 0
+    d2['generated'] = 1
     merged_df = pd.concat([d1, d2])
+    # shuffle the dataset
+    merged_df = merged_df.sample(frac=1).reset_index(drop=True)
     return merged_df
 
 df1 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert real data
@@ -135,5 +138,5 @@ model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, ou
 model.to(device)
 
 trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-trainer.train(epochs=10)
+trainer.train(epochs=100)
 trainer.test()
