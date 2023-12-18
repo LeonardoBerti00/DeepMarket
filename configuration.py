@@ -7,11 +7,11 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
-        self.IS_SWEEP = True
-        self.IS_TRAINING = False
-        self.IS_DEBUG = False
-
+        self.IS_WANDB = False
+        self.IS_SWEEP = False
+        self.IS_TRAINING = True
+        self.IS_DEBUG = True
+        self.PREDICTIVE_SCORE = True
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
         self.VALIDATE_EVERY = 1

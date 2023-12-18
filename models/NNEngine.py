@@ -46,6 +46,7 @@ class NNEngine(L.LightningModule):
         self.min_loss_ema = 10000000
         if self.IS_WANDB:
             self.filename_ckpt = config.FILENAME_CKPT
+            self.save_hyperparameters()
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_depth_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
@@ -70,7 +71,7 @@ class NNEngine(L.LightningModule):
         self.ema.to(cst.DEVICE)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.depth_embedder = nn.Embedding(cst.N_LOB_LEVELS, self.size_depth_emb)
-        self.save_hyperparameters()
+
 
     def forward(self, cond, x_0, is_train):
 

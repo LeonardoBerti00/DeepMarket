@@ -51,3 +51,6 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
+    elif config.PREDICTIVE_SCORE:
+        pass
+

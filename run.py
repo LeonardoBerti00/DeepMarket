@@ -46,6 +46,9 @@ def train(config, trainer):
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
     test_set.encoded_data = one_hot_encode_type(test_set.data)
+    print("size of train set: ", train_set.data.size())
+    print("size of val set: ", val_set.data.size())
+    print("size of test set: ", test_set.data.size())
 
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
@@ -60,7 +63,7 @@ def train(config, trainer):
         test_set=test_set,
         batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE],
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
-        num_workers=8
+        num_workers=4
     )
 
     train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
@@ -166,7 +169,9 @@ def sweep_init(config):
     return sweep_config
 
 def print_setup(config):
+    print("Chosen model is: ", config.CHOSEN_MODEL)
     print("Is augmented: ", config.IS_AUGMENTATION)
     print("Conditioning type: ", config.COND_TYPE)
+    print("Conditioning method: ", config.COND_METHOD)
     if config.CHOSEN_MODEL.name == "CDT":
         print("Conditioning method: ", config.COND_METHOD)

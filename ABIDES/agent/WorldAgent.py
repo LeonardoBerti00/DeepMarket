@@ -27,7 +27,8 @@ class WorldAgent(Agent):
 
 
     def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, starting_time_diffusion='30min'):
+                 cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
+
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
@@ -51,11 +52,14 @@ class WorldAgent(Agent):
         self.cond_seq_size = cond_seq_size
         self.first_generation = True
         self.normalization_terms = normalization_terms
-        self.starting_time_diffusion = starting_time_diffusion
         self.ignored_cancel = 0
         self.generated_orders_out_of_depth = 0
         self.generated_cancel_orders_empty_depth = 0
         self.depth_rounding = 0
+        if using_diffusion:
+            self.starting_time_diffusion = '15min'
+        else:
+            self.starting_time_diffusion = '10000min'
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -105,8 +109,11 @@ class WorldAgent(Agent):
             self.last_offset_time = next_order[0]
             self.placeOrder(currentTime, next_order)
             self.next_historical_orders_index += 1
-            offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
-            self.setWakeup(currentTime + offset + datetime.timedelta(microseconds=1))
+            if self.next_historical_orders_index < len(self.historical_orders):
+                offset = datetime.timedelta(seconds=self.historical_orders[self.next_historical_orders_index, 0])
+                self.setWakeup(currentTime + offset + datetime.timedelta(microseconds=1))
+            else:
+                return
 
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             self.state = 'GENERATING'
@@ -267,7 +274,12 @@ class WorldAgent(Agent):
         # we return the price, the size and the time to the original scale
         price = round(generated[5].item() * self.normalization_terms["event"][0] + self.normalization_terms["event"][1], ndigits=0)*100
         size = round(generated[4].item() * self.normalization_terms["event"][2] + self.normalization_terms["event"][3], ndigits=0)
-        time = abs(generated[0].item() * self.normalization_terms["event"][4] + self.normalization_terms["event"][5])
+        if price < 0 or size < 0:
+            return None
+        time = generated[0].item() * self.normalization_terms["event"][4] + self.normalization_terms["event"][5]
+        # if the time is negative we approximate to 1 microsecond
+        if time <= 0:
+            time = 0.0000001
 
         direction = -1 if size < 0 else 1
         size = abs(size)

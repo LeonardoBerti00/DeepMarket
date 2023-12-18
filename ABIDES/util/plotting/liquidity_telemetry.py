@@ -37,6 +37,11 @@ def create_orderbooks(exchange_path, ob_path):
     print("Constructing orderbook...")
     processed_orderbook = make_orderbook_for_analysis(exchange_path, ob_path, num_levels=1,
                                                       hide_liquidity_collapse=False)
+    exchange_path_splitted = exchange_path.split("/")
+    where_to_save = ""
+    for i in range(len(exchange_path_splitted)-1):
+        where_to_save += exchange_path_splitted[i]+"/"
+    processed_orderbook.to_csv(where_to_save+"processed_orders.csv")
     cleaned_orderbook = processed_orderbook[(processed_orderbook['MID_PRICE'] > - MID_PRICE_CUTOFF) &
                                             (processed_orderbook['MID_PRICE'] < MID_PRICE_CUTOFF)]
     transacted_orders = cleaned_orderbook.loc[cleaned_orderbook.TYPE == "ORDER_EXECUTED"]

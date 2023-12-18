@@ -36,7 +36,8 @@ parser.add_argument('-t',
                     '--ticker',
                     required=True,
                     help='Ticker (symbol) to use for simulation')
-parser.add_argument('-d', '--historical-date',
+parser.add_argument('-date',
+                    '--historical-date',
                     required=True,
                     type=parse,
                     help='historical date being simulated in format YYYYMMDD.')
@@ -46,7 +47,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='16:00:00',
+                    default='9:35:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -74,6 +75,11 @@ parser.add_argument('-p',
                     type=float,
                     default=0.1,
                     help='Participation of Volume level for execution agent')
+parser.add_argument('-d',
+                    '--diffusion',
+                    type=bool,
+                    default=False,
+                    help='Using diffusion')
 
 args, remaining_args = parser.parse_known_args()
 
@@ -142,7 +148,6 @@ chosen_model = args.chosen_model
 param_type = args.param_type
 dir_path = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model)+"/"+param_type)
 best_val_loss = 1000000
-config = configuration.Configuration()
 for file in dir_path.iterdir():
     try:
         val_loss = float(file.name.split("=")[1].split("_")[0])
@@ -152,12 +157,19 @@ for file in dir_path.iterdir():
     except:
         continue
 
-# load checkpoint
-model = NNEngine.load_from_checkpoint(checkpoint_reference)
+checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
+config = checkpoint["hyper_parameters"]["config"]
 
-# we freeze the model
-for param in model.parameters():
-    param.requires_grad = False
+if args.diffusion:
+    # load checkpoint
+    model = NNEngine.load_from_checkpoint(checkpoint_reference, map_location=cst.DEVICE)
+    # we freeze the model
+    for param in model.parameters():
+        param.requires_grad = False
+else:
+    model = None
+
+
 
 agents.extend([WorldAgent(id=1,
                             name="WORLD_AGENT",
@@ -172,7 +184,7 @@ agents.extend([WorldAgent(id=1,
                             log_orders=log_orders,
                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
                             normalization_terms=normalization_terms,
-                            starting_time_diffusion='15min'
+                            using_diffusion=args.diffusion
                           )
                ])
 
