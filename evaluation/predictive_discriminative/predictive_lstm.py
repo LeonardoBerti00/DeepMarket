@@ -172,7 +172,7 @@ model_r = LSTMModel(input_size=train_X_r.shape[2], hidden_size=128, num_layers=2
 model_r.to(device)
 
 trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
-trainer_r.train(epochs=200)
+trainer_r.train(epochs=300)
 print("Real data:")
 trainer_r.test()
 
@@ -204,6 +204,6 @@ model_g = LSTMModel(input_size=train_X_g.shape[2], hidden_size=128, num_layers=2
 model_g.to(device)
 
 trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
-trainer_g.train(epochs=200)
+trainer_g.train(epochs=300)
 print("Generated data:")
 trainer_g.test()

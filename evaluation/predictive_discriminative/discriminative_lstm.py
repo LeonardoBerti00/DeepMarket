@@ -22,7 +22,6 @@ class Preprocessor:
         self.df = df
 
     def preprocess(self):
-        self._check_inf()
         self._remove_columns()
         self._one_hot_encode()
         self.zscore()
@@ -36,7 +35,7 @@ class Preprocessor:
         self.df['ask_size_1'] = (self.df['ask_size_1'] - self.df['ask_size_1'].mean()) / self.df['ask_size_1'].std()
         self.df['bid_price_1'] = (self.df['bid_price_1'] - self.df['bid_price_1'].mean()) / self.df['bid_price_1'].std()
         self.df['bid_size_1'] = (self.df['bid_size_1'] - self.df['bid_size_1'].mean()) / self.df['bid_size_1'].std()
-        self.df['ORDER_VOLUME_IMBALANCE'] = (self.df['ORDER_VOLUME_IMBALANCE'] - self.df['ORDER_VOLUME_IMBALANCE'].mean()) / self.df['ORDER_VOLUME_IMBALANCE'].std()
+        #self.df['ORDER_VOLUME_IMBALANCE'] = (self.df['ORDER_VOLUME_IMBALANCE'] - self.df['ORDER_VOLUME_IMBALANCE'].mean()) / self.df['ORDER_VOLUME_IMBALANCE'].std()
         self.df['VWAP'] = self.df['VWAP'].fillna(0)
         self.df['VWAP'] = (self.df['VWAP'] - self.df['VWAP'].mean()) / self.df['VWAP'].std()
         self.df['MID_PRICE'] = (self.df['MID_PRICE'] - self.df['MID_PRICE'].mean()) / self.df['MID_PRICE'].std() # not in predictive
@@ -45,15 +44,11 @@ class Preprocessor:
         self.df = pd.get_dummies(self.df, columns=['TYPE'])
 
     def _remove_columns(self):
-        self.df = self.df.drop(['ORDER_ID', 'SPREAD'], axis=1)
+        self.df = self.df.drop(['ORDER_ID', 'SPREAD', 'ORDER_VOLUME_IMBALANCE'], axis=1)
         self.df = self.df.drop(['Unnamed: 0'], axis=1)
 
     def _binarization(self):
         self.df['BUY_SELL_FLAG'] = self.df['BUY_SELL_FLAG'].apply(lambda x: 1 if x == 'True' else 0)
-
-    def _check_inf(self):
-        self.df[self.df.ORDER_VOLUME_IMBALANCE != np.inf]
-
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -151,13 +146,13 @@ test_y = torch.tensor(test_y, dtype=torch.float32)
 
 # Create data loaders
 train_data = TensorDataset(train_X, train_y)
-train_loader = DataLoader(train_data, batch_size=72)
+train_loader = DataLoader(train_data, batch_size=48)
 test_data = TensorDataset(test_X, test_y)
-test_loader = DataLoader(test_data, batch_size=72)
+test_loader = DataLoader(test_data, batch_size=48)
 
 model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1)
 model.to(device)
 
 trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-trainer.train(epochs=100)
+trainer.train(epochs=300)
 trainer.test()
