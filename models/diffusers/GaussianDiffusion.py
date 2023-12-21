@@ -1,16 +1,18 @@
-import math
 from typing import Dict, Tuple
 import numpy as np
 import torch
 from einops import rearrange, repeat, reduce
 
-import configuration
 from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from models.diffusers.CDT.CDT import CDT, CDT, DiT
+from models.diffusers.CDT.CDT import CDT, DiT
 
+"""
+Functions -> _vlb_loss, _p_mean, _q_posterior_mean_var, _normal_kl, _gaussian_log_likelihood, _approx_standard_normal_cdf 
+are ported from the original Ho et al. diffusion models codebase: https://github.com/hojonathanho/diffusion
+"""
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
@@ -49,6 +51,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.mlp_ratio,
                 self.cond_dropout_prob,
                 self.IS_AUGMENTATION,
+                self.dropout
             )
         elif (self.type == 'concatenation'):
             self.NN = CDT(
@@ -62,6 +65,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.mlp_ratio,
                 self.cond_dropout_prob,
                 self.IS_AUGMENTATION,
+                self.dropout
             )
         elif (self.type == 'crossattention'):
             pass
@@ -166,13 +170,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     def _mse_loss(self, noise_t, noise_true):
         return torch.norm(noise_t - noise_true, p=2, dim=[1, 2])
 
-    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
+    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs):
         """Computes the loss taken from IDDPM."""
         L_simple = torch.stack(self.mse_losses)
         L_vlb = torch.stack(self.vlb_losses)
-        #compute average differences in orders of magnitude between L_simple e L_vlb
-        L_hybrid = L_simple + L_vlb
-        return L_hybrid
+        #print("L_simple:", torch.mean(L_simple).item(), "L_vlb:", torch.mean(L_vlb).item())
+        L_hybrid = L_simple + self.lambda_*L_vlb
+        return L_hybrid, L_simple, L_vlb
 
 
     #ported from https://github.com/openai/improved-diffusion/blob/main/improved_diffusion/gaussian_diffusion.py
@@ -234,10 +238,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=x_0.shape[-1])
         return true_mean, true_log_var_clipped
 
-    """
-    Ported from the original Ho et al. diffusion models codebase:
-    https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/utils.py
-    """
+
     def _normal_kl(self, mean1, logvar1, mean2, logvar2):
         """
         Compute the KL divergence between two gaussians.

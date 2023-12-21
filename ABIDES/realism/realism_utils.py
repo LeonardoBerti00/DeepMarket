@@ -146,7 +146,14 @@ def make_orderbook_for_analysis(stream_path, orderbook_path, num_levels=5, ignor
     if ignore_cancellations:
         merged = merged[merged.SIZE != 0]
 
-    merged['MID_PRICE'] = (merged['ask_price_1'] + merged['bid_price_1']) / (2 * 10000)
+    merged['MID_PRICE'] = (merged['ask_price_1'] + merged['bid_price_1']) / (10000*2)
+    # loop throigh all the dataframe merged and check if there is a nan value in the columns
+    for i in range(1, merged.shape[0]):
+        if (1 < merged['ask_price_1'].iloc[i] < 20380000) and (1 < merged['bid_price_1'].iloc[i] < 20380000):
+            continue
+        else:
+            merged['MID_PRICE'].iloc[i] = merged['MID_PRICE'].iloc[i-1]
+
     merged['SPREAD'] = (merged['ask_price_1'] - merged['bid_price_1']) / 10000
     merged['ORDER_VOLUME_IMBALANCE'] = merged['ask_size_1'] / (merged['bid_size_1'] + merged['ask_size_1'])
 

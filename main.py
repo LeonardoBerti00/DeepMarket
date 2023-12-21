@@ -40,7 +40,14 @@ if __name__ == "__main__":
 
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)
-            sweep_config.update({"name": f"model_{config.CHOSEN_MODEL.name}_stock_{config.CHOSEN_STOCK.name}_cond_type_{config.COND_TYPE}_cond_method_{config.COND_METHOD}_is_augmentation_{config.IS_AUGMENTATION}"})
+            sweep_config.update({"name":
+                                     f"model_{config.CHOSEN_MODEL.name}_"
+                                     f"stock_{config.CHOSEN_STOCK.name}_"
+                                     f"ct_{config.COND_TYPE}_"
+                                     f"cm_{config.COND_METHOD}_"
+                                     f"aug_{config.IS_AUGMENTATION}_"
+                                     f"ndiffstep_{config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}"
+                                 })
             sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME)
             wandb.agent(sweep_id, run_wandb(config, accelerator), count=sweep_config["run_cap"])
         else:

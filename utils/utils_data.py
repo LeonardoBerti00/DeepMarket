@@ -31,8 +31,6 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
 
 
 def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  std_prices=None, mean_time=None, std_time=None):
-    # we transform the sell market orders in buy market orders and viceversa
-    data.loc[data["event_type"] == 4, "size"] = -data.loc[data["event_type"] == 4, "size"]
 
     #apply z score to prices and size column
     if (mean_size is None) or (std_size is None):
@@ -116,7 +114,6 @@ def preprocess_data(dataframes, n_lob_levels):
             if direction == 1:
                 bid_side = dataframes[i][1].iloc[index, 2::4]
                 depth = np.where(bid_side == order_price)[0][0]
-
             else:
                 ask_side = dataframes[i][1].iloc[index, 0::4]
                 depth = np.where(ask_side == order_price)[0][0]
@@ -128,18 +125,10 @@ def preprocess_data(dataframes, n_lob_levels):
         dataframes[i][0] = dataframes[i][0].iloc[1:, :]
         dataframes[i][1] = dataframes[i][1].iloc[1:, :]
 
-    # if the direction is -1 then we multiply the size by -1, so we can delete the direction column
+    # we transform the execution of a sell limit order in a buy market order and viceversa
     for i in range(len(dataframes)):
-        dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["direction"]
-
-    # if order type is 4, then we transform the execution of a sell limit order in a buy market order
-    for i in range(len(dataframes)):
-        dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["event_type"].apply(
+        dataframes[i][0]["direction"] = dataframes[i][0]["direction"] * dataframes[i][0]["event_type"].apply(
             lambda x: -1 if x == 4 else 1)
-
-    # drop the direction column
-    for i in range(len(dataframes)):
-        dataframes[i][0] = dataframes[i][0].drop(columns=["direction"])
 
     return dataframes[0][1], dataframes[0][0]
 

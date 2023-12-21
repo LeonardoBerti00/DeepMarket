@@ -30,6 +30,7 @@ class WorldAgent(Agent):
                  cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
+        self.count_neg_price_size = 0
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
         self.symbol = symbol
@@ -86,10 +87,11 @@ class WorldAgent(Agent):
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
         #make a print every 10 minutes
-        if currentTime.minute % 5 == 0:
+        if currentTime.minute % 5 == 0 and currentTime.second % 30 == 0:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders empty depth: {}".format(self.generated_cancel_orders_empty_depth))
+            print("Number of negative price or size: {}".format(self.count_neg_price_size))
             print("Number of depth rounding: {}".format(self.depth_rounding))
             now = datetime.datetime.now()
             current_time = now.strftime("%H:%M:%S")
@@ -209,8 +211,8 @@ class WorldAgent(Agent):
                 cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                orders_preprocessed = self._preprocess_orders(orders,
-                                                              np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
+                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders,
+                                                                            np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
                 cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
@@ -274,15 +276,22 @@ class WorldAgent(Agent):
         # we return the price, the size and the time to the original scale
         price = round(generated[5].item() * self.normalization_terms["event"][0] + self.normalization_terms["event"][1], ndigits=0)*100
         size = round(generated[4].item() * self.normalization_terms["event"][2] + self.normalization_terms["event"][3], ndigits=0)
+
+        # if the price or the size are negative we return None and we generate another order
         if price < 0 or size < 0:
+            self.count_neg_price_size += 1
             return None
         time = generated[0].item() * self.normalization_terms["event"][4] + self.normalization_terms["event"][5]
+
         # if the time is negative we approximate to 1 microsecond
         if time <= 0:
             time = 0.0000001
 
-        direction = -1 if size < 0 else 1
-        size = abs(size)
+        direction = generated[-3]
+        if direction < 0:
+            direction = -1
+        else:
+            direction = 1
 
         if order_type == 1:
             order_id = self.unused_order_ids[0]
@@ -348,12 +357,12 @@ class WorldAgent(Agent):
 
     def _z_score_orderbook(self, orderbook):
         orderbook[:, 0::2] = orderbook[:, 0::2] / 100
-        orderbook[:, 0::2] = (orderbook[:, 0::2] - self.normalization_terms["lob"][2]) / self.normalization_terms["event"][3]
-        orderbook[:, 1::2] = (orderbook[:, 1::2] - self.normalization_terms["lob"][0]) / self.normalization_terms["event"][1]
+        orderbook[:, 0::2] = (orderbook[:, 0::2] - self.normalization_terms["lob"][2]) / self.normalization_terms["lob"][3]
+        orderbook[:, 1::2] = (orderbook[:, 1::2] - self.normalization_terms["lob"][0]) / self.normalization_terms["lob"][1]
         return orderbook
 
 
-    def _preprocess_orders(self, orders, lob_snapshots):
+    def _preprocess_orders_for_diff_cond(self, orders, lob_snapshots):
         COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
                                        "sell2", "vsell2", "buy2", "vbuy2",
                                        "sell3", "vsell3", "buy3", "vbuy3",
@@ -385,7 +394,6 @@ class WorldAgent(Agent):
                     index = j
                 if direction == 1:
                     bid_side = dataframes[i][1].iloc[index, 2::4]
-                    indexes = np.where(bid_side == order_price)[0]
                     if len(np.where(bid_side == order_price)[0]) == 0:
                         self.depth_rounding += 1
                         depth = 9
@@ -393,7 +401,6 @@ class WorldAgent(Agent):
                         depth = np.where(bid_side == order_price)[0][0]
                 else:
                     ask_side = dataframes[i][1].iloc[index, 0::4]
-                    indexes = np.where(ask_side == order_price)[0]
                     if len(np.where(ask_side == order_price)[0]) == 0:
                         depth = 9
                         self.depth_rounding += 1
@@ -402,19 +409,14 @@ class WorldAgent(Agent):
 
                 dataframes[i][0].loc[j, "depth"] = depth
 
-        # if the direction is -1 then we multiply the size by -1, so we can delete the direction column
-        for i in range(len(dataframes)):
-            dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["direction"]
-
         # if order type is 4, then we transform the execution of a sell limit order in a buy market order
         for i in range(len(dataframes)):
-            dataframes[i][0]["size"] = dataframes[i][0]["size"] * dataframes[i][0]["event_type"].apply(
+            dataframes[i][0]["direction"] = dataframes[i][0]["direction"] * dataframes[i][0]["event_type"].apply(
                 lambda x: -1 if x == 4 else 1)
 
-        # drop the direction column
+        # drop the order_id column
         for i in range(len(dataframes)):
-            dataframes[i][0] = dataframes[i][0].drop(columns=["direction", "order_id"])
-
+            dataframes[i][0] = dataframes[i][0].drop(columns=["order_id"])
 
         # divide all the price, both of lob and messages, by 100
         for i in range(len(dataframes)):
@@ -423,15 +425,16 @@ class WorldAgent(Agent):
         # apply z score to orders
         for i in range(len(dataframes)):
             dataframes[i][0], _, _, _, _, _, _ = normalize_messages(dataframes[i][0],
-                                                                     cst.TSLA_EVENT_MEAN_SIZE,
-                                                                     cst.TSLA_EVENT_MEAN_PRICE,
-                                                                     cst.TSLA_EVENT_STD_SIZE,
-                                                                     cst.TSLA_EVENT_STD_PRICE,
-                                                                     cst.TSLA_EVENT_MEAN_TIME,
-                                                                     cst.TSLA_EVENT_STD_TIME)
+                                                                    mean_size=self.normalization_terms["event"][0],
+                                                                    mean_prices=self.normalization_terms["event"][1],
+                                                                    std_size=self.normalization_terms["event"][2],
+                                                                    std_prices=self.normalization_terms["event"][3],
+                                                                    mean_time=self.normalization_terms["event"][4],
+                                                                    std_time=self.normalization_terms["event"][5]
+                                                                    )
+
 
         return torch.from_numpy(dataframes[0][0].to_numpy()).to(cst.DEVICE, torch.float32)
-
 
 
     def _load_orders_lob(self, symbol, data_dir, date, date_trading_days):
@@ -466,7 +469,7 @@ class WorldAgent(Agent):
                     raise ValueError("File name not recognized")
 
         dataframes = [[events, lob]]
-        dataframes = self._preprocess_events(dataframes)
+        dataframes = self._preprocess_events_for_market_replay(dataframes)
         events = dataframes[0][0]
         lob = dataframes[0][1]
         # transform to numpy
@@ -475,7 +478,7 @@ class WorldAgent(Agent):
         return events, lob
 
 
-    def _preprocess_events(self, dataframes):
+    def _preprocess_events_for_market_replay(self, dataframes):
 
         for i in range(len(dataframes)):
             indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([5, 6, 7])].index

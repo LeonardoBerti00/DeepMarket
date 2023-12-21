@@ -47,7 +47,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='9:35:00',
+                    default='10:30:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -109,11 +109,28 @@ agent_count, agents, agent_types = 0, [], []
 # Hyperparameters
 symbol = args.ticker
 if symbol == "TSLA":
-    normalization_terms = {"lob": [cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10, cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10],
-                            "event": [cst.TSLA_EVENT_STD_PRICE, cst.TSLA_EVENT_MEAN_PRICE, cst.TSLA_EVENT_STD_SIZE, cst.TSLA_EVENT_MEAN_SIZE, cst.TSLA_EVENT_STD_TIME, cst.TSLA_EVENT_MEAN_TIME]}
+    normalization_terms = {
+        "lob": [
+            cst.TSLA_LOB_MEAN_SIZE_10,
+            cst.TSLA_LOB_STD_SIZE_10,
+            cst.TSLA_LOB_MEAN_PRICE_10,
+            cst.TSLA_LOB_STD_PRICE_10
+        ],
+        "event": [
+            cst.TSLA_EVENT_MEAN_SIZE,
+            cst.TSLA_EVENT_MEAN_PRICE,
+            cst.TSLA_EVENT_STD_SIZE,
+            cst.TSLA_EVENT_STD_PRICE,
+            cst.TSLA_EVENT_MEAN_TIME,
+            cst.TSLA_EVENT_STD_TIME
+        ]
+    }
+
 elif symbol == "INTC":
-    normalization_terms = {"lob": [cst.INTC_LOB_MEAN_SIZE_10, cst.INTC_LOB_STD_SIZE_10, cst.INTC_LOB_MEAN_PRICE_10, cst.INTC_LOB_STD_PRICE_10],
-                            "event": [cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_PRICE, cst.INTC_EVENT_STD_SIZE, cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_TIME, cst.INTC_EVENT_MEAN_TIME]}
+    normalization_terms = {"lob": [cst.INTC_LOB_MEAN_SIZE_10, cst.INTC_LOB_STD_SIZE_10, cst.INTC_LOB_MEAN_PRICE_10,
+                                   cst.INTC_LOB_STD_PRICE_10],
+                           "event": [cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_PRICE, cst.INTC_EVENT_STD_SIZE,
+                                     cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_TIME, cst.INTC_EVENT_MEAN_TIME]}
 
 starting_cash = 1000000000  # Cash in this simulator is always in CENTS.
 
@@ -135,18 +152,17 @@ agents.extend([ExchangeAgent(id=0,
                              stream_history=stream_history_length,
                              book_freq=0,
                              wide_book=True,
-                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))
+                             random_state=np.random.RandomState(
+                                 seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))
                ])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
-
-
 
 # 2) World Agent
 
 chosen_model = args.chosen_model
 param_type = args.param_type
-dir_path = Path(cst.DIR_SAVED_MODEL+"/"+str(chosen_model)+"/"+param_type)
+dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model) + "/" + param_type)
 best_val_loss = 1000000
 for file in dir_path.iterdir():
     try:
@@ -169,29 +185,26 @@ if args.diffusion:
 else:
     model = None
 
-
-
 agents.extend([WorldAgent(id=1,
-                            name="WORLD_AGENT",
-                            type="WorldAgent",
-                            symbol=symbol,
-                            date=str(historical_date.date()),
-                            date_trading_days=cst.DATE_TRADING_DAYS,
-                            diffusion_model=model,
-                            data_dir="C:/Users/leona/PycharmProjects/Diffusion-Models-for-Time-Series/data",
-                            cond_type=config.COND_TYPE,
-                            cond_seq_size=config.COND_SEQ_SIZE,
-                            log_orders=log_orders,
-                            random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
-                            normalization_terms=normalization_terms,
-                            using_diffusion=args.diffusion
+                          name="WORLD_AGENT",
+                          type="WorldAgent",
+                          symbol=symbol,
+                          date=str(historical_date.date()),
+                          date_trading_days=cst.DATE_TRADING_DAYS,
+                          diffusion_model=model,
+                          data_dir="C:/Users/leona/PycharmProjects/Diffusion-Models-for-Time-Series/data",
+                          cond_type=config.COND_TYPE,
+                          cond_seq_size=config.COND_SEQ_SIZE,
+                          log_orders=log_orders,
+                          random_state=np.random.RandomState(
+                              seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
+                          normalization_terms=normalization_terms,
+                          using_diffusion=args.diffusion
                           )
                ])
 
 agent_types.extend("WorldAgent")
 agent_count += 1
-
-
 
 # 3) Execution Agent
 trade_pov = True if args.execution_agents else False
@@ -220,20 +233,17 @@ pov_agent = POVExecutionAgent(id=agent_count,
                               trade=trade_pov,
                               log_orders=True,  # needed for plots so conflicts with others
                               random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                          dtype='uint64')))
-
-#execution_agents = [pov_agent]
-#agents.extend(execution_agents)
-#agent_types.extend("ExecutionAgent")
-#agent_count += 1
-
-
-
+                                                                                        dtype='uint64')))
+if trade_pov:
+    execution_agents = [pov_agent]
+    agents.extend(execution_agents)
+    agent_types.extend("ExecutionAgent")
+    agent_count += 1
 
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
 kernel = Kernel("World Agent Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16,
-                                                                                                  dtype='uint64')))
+                                                                                                dtype='uint64')))
 kernelStartTime = mkt_open
 kernelStopTime = mkt_close + pd.to_timedelta('00:00:01')
 if trade_pov:
@@ -241,13 +251,12 @@ if trade_pov:
 else:
     log_dir = "world_agent_sim_ckpt_" + checkpoint_reference.name
 defaultComputationDelay = 0  # 50 nanoseconds
-#time.sleep(3)
+# time.sleep(3)
 kernel.runner(agents=agents,
               startTime=kernelStartTime,
               stopTime=kernelStopTime,
               defaultComputationDelay=defaultComputationDelay,
               log_dir=log_dir)
-
 
 simulation_end_time = dt.datetime.now()
 print("Simulation End Time: {}".format(simulation_end_time))

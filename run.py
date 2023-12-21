@@ -3,8 +3,6 @@ import torch
 from lightning.pytorch.loggers import WandbLogger
 
 import wandb
-from lightning.pytorch.callbacks import ModelCheckpoint
-from torch.utils.data import DataLoader
 import constants as cst
 from preprocessing.DataModule import DataModule
 from preprocessing.LOB.LOBDataset import LOBDataset
@@ -13,7 +11,7 @@ from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
 from models.diffusers.CSDI.CSDI_hparam import HP_CSDI, HP_CSDI_FIXED
-from utils.utils_data import one_hot_encode_type
+
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
@@ -29,7 +27,6 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    train_set.encoded_data = one_hot_encode_type(train_set.data)
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
@@ -37,7 +34,6 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    val_set.encoded_data = one_hot_encode_type(val_set.data)
 
     test_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
@@ -45,10 +41,9 @@ def train(config, trainer):
         cond_type=config.COND_TYPE,
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    test_set.encoded_data = one_hot_encode_type(test_set.data)
-    print("size of train set: ", train_set.data.size())
-    print("size of val set: ", val_set.data.size())
-    print("size of test set: ", test_set.data.size())
+    #print("size of train set: ", train_set.data.size())
+    #print("size of val set: ", val_set.data.size())
+    #print("size of test set: ", test_set.data.size())
 
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
@@ -81,7 +76,8 @@ def run(config, accelerator, model=None):
             EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)
         ],
         num_sanity_val_steps=0,
-        detect_anomaly=False
+        detect_anomaly=False,
+        profiler="simple"
     )
     train(config, trainer)
 
@@ -101,12 +97,14 @@ def run_wandb(config, accelerator):
 
             # log simulation details in WANDB console
             wandb_instance.log({"model": config.CHOSEN_MODEL.name}, commit=False)
-            wandb_instance.log({"stock_train": config.CHOSEN_STOCK.name}, commit=False)
-            wandb_instance.log({"stock_test": config.CHOSEN_STOCK.name}, commit=False)
-            wandb_instance.log({"cond_type": config.COND_TYPE}, commit=False)
-            wandb_instance.log({"cond_method": config.COND_METHOD}, commit=False)
-            wandb_instance.log({"num_diff_steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
-            wandb_instance.log({"is_augmentation": config.IS_AUGMENTATION}, commit=False)
+            wandb_instance.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
+            wandb_instance.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
+            wandb_instance.log({"cond type": config.COND_TYPE}, commit=False)
+            wandb_instance.log({"cond method": config.COND_METHOD}, commit=False)
+            wandb_instance.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
+            wandb_instance.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
+            wandb_instance.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
+            wandb_instance.log({"augmentation size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
 
             if config.IS_SWEEP:
                 model_params = wandb.config
@@ -120,31 +118,16 @@ def run_wandb(config, accelerator):
             cond_type = config.COND_TYPE
             is_augmentation = config.IS_AUGMENTATION
             diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-            filename_ckpt = str(config.CHOSEN_MODEL.name) + "/normal/{val_loss:.2f}_{epoch}_" + str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
             config.FILENAME_CKPT = str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
 
-            checkpoint_callback = ModelCheckpoint(
-                dirpath=cst.DIR_SAVED_MODEL,
-                monitor="val_loss",
-                mode="min",
-                save_last=False,
-                save_top_k=1,
-                every_n_epochs=1,
-                filename=filename_ckpt
-            )
-
-            checkpoint_callback.CHECKPOINT_NAME_LAST = filename_ckpt+"_last"
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
-                callbacks=[
-                    EarlyStopping(monitor="val_loss", mode="min", patience=3, verbose=True),
-                    checkpoint_callback,
-                ],
+                callbacks=EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.001),
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
-                detect_anomaly=False
+                detect_anomaly=False,
             )
             train(config, trainer)
 
@@ -153,10 +136,10 @@ def run_wandb(config, accelerator):
 def sweep_init(config):
     #wandb.login("d29d51017f4231b5149d36ad242526b374c9c60a")
     sweep_config = {
-        'method': 'bayes',
+        'method': 'grid',
         'metric': {
             'goal': 'minimize',
-            'name': 'validation_loss'
+            'name': 'val_ema_loss'
         },
         'early_terminate': {
             'type': 'hyperband',
@@ -169,9 +152,8 @@ def sweep_init(config):
     return sweep_config
 
 def print_setup(config):
-    print("Chosen model is: ", config.CHOSEN_MODEL)
+    print("Chosen model is: ", config.CHOSEN_MODEL.name)
     print("Is augmented: ", config.IS_AUGMENTATION)
     print("Conditioning type: ", config.COND_TYPE)
     print("Conditioning method: ", config.COND_METHOD)
-    if config.CHOSEN_MODEL.name == "CDT":
-        print("Conditioning method: ", config.COND_METHOD)
+    print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])

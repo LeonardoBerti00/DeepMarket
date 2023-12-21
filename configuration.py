@@ -32,8 +32,6 @@ class Configuration:
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
 
-        self.HP_SEARCH_METHOD = 'bayes'  # 'bayes'
-
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
         self.WANDB_SWEEP_NAME = None
@@ -45,7 +43,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
         self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 512
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
-        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 20
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
@@ -57,7 +55,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.0001       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
+        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.1       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 12
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
@@ -71,13 +69,9 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_EMBEDDING_FEATURE_DIM] = 16
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_LAYERS] = 1
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
-
+        self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
         self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
-        self.BETAS = noise_scheduler(
-        num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS],
-        )
-
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 44

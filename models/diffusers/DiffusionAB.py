@@ -1,12 +1,8 @@
-import math
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 import torch
-from torch import nn
 
-import configuration
 import constants as cst
-from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 
 class DiffusionAB(ABC):
@@ -23,7 +19,7 @@ class DiffusionAB(ABC):
         self.cond_seq_size = self.SEQ_size - self.x_SEQ_size
 
     @abstractmethod
-    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
+    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs):
         """Computes the loss given the true and predicted values."""
         pass
 

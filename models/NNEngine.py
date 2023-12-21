@@ -41,7 +41,7 @@ class NNEngine(L.LightningModule):
         self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
-        self.train_losses, self.val_losses, self.test_losses = [], [], []
+        self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = 10000000
         if self.IS_WANDB:
@@ -77,22 +77,19 @@ class NNEngine(L.LightningModule):
 
         x_0, cond = self.depth_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
-        self.t = torch.zeros(size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
-        if isinstance(self.diffuser, CSDIDiffuser) and is_train:
-            self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
-        elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
-            self.t, _ = self.sampler.sample(x_0.shape[0])
-
         if is_train:
+            if isinstance(self.diffuser, CSDIDiffuser) and is_train:
+                self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
+            elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
+                self.t, _ = self.sampler.sample(x_0.shape[0])
             recon, context = self.single_step(cond, x_0, is_train, real_cond)
         else:
-            for i in range(self.num_diffusionsteps):
-                if i == 0 and self.IS_AUGMENTATION and self.cond_type == 'full':
-                    cond = self.conditioning_augmenter.augment(cond)
-                if i == self.num_diffusionsteps - 1:
-                    pass
+            self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
+            if self.IS_AUGMENTATION and self.cond_type == 'full':
+                cond = self.conditioning_augmenter.augment(cond)
+            for i in range(self.num_diffusionsteps-1, -1, -1):
                 recon, context = self.single_step(cond, x_0, is_train, real_cond)
-                self.t += 1
+                self.t -= 1
 
         return recon, context
 
@@ -158,65 +155,83 @@ class NNEngine(L.LightningModule):
         cond = self._select_cond(full_cond, self.cond_type)
         recon, reverse_context = self.forward(cond, x_0, is_train=True)
         reverse_context.update({'is_train': True})
-        batch_losses = self.loss(x_0, recon, **reverse_context)[0]
-        batch_loss_mean = torch.mean(batch_losses)
+        if isinstance(self.diffuser, GaussianDiffusion):
+            batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+            self.simple_train_losses.append(torch.mean(L_simple).item())
+            self.vlb_train_losses.append(torch.mean(L_vlb).item())
+        else:
+            batch_loss = self.loss(x_0, recon, **reverse_context)
+        batch_loss_mean = torch.mean(batch_loss)
         self.train_losses.append(batch_loss_mean.item())
-        self.sampler.update_losses(self.t, batch_losses)
+        self.sampler.update_losses(self.t, batch_loss[0])
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         self.ema.update()
         return batch_loss_mean
 
+
     def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
-        self.val_losses = []
+        if isinstance(self.diffuser, GaussianDiffusion):
+            L_simple = sum(self.simple_train_losses) / len(self.simple_train_losses)
+            L_vlb = sum(self.vlb_train_losses) / len(self.vlb_train_losses)
+            if self.IS_WANDB:
+                wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
+                wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)
+            print(f'\ntrain loss simple on epoch {self.current_epoch} is {L_simple}\n')
+            print(f'\ntrain loss vlb on epoch {self.current_epoch} is {L_vlb}\n')
+        self.train_losses = []
+        self.simple_train_losses = []
+        self.vlb_train_losses = []
         self.val_ema_losses = []
+        self.simple_val_losses = []
+        self.vlb_val_losses = []
         if self.IS_WANDB:
             wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
         print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
+
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
         full_cond = input[0]
         cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=False)
-        reverse_context.update({'is_train': False})
-        batch_losses = self.loss(x_0, recon, **reverse_context)
-        batch_loss_mean = torch.mean(batch_losses)
-        self.val_losses.append(batch_loss_mean.item())
-        if isinstance(self.diffuser, GaussianDiffusion):
-            self.diffuser.init_losses()
         # Validation: with EMA
         with self.ema.average_parameters():
             recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
-            batch_ema_losses = self.loss(x_0, recon, **reverse_context)
-            #recon = self._check_constraints(full_cond, recon)
-            batch_ema_loss_mean = torch.mean(batch_ema_losses)
-            self.val_ema_losses.append(batch_ema_loss_mean.item())
+            if isinstance(self.diffuser, GaussianDiffusion):
+                batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+                self.simple_val_losses.append(torch.mean(L_simple).item())
+                self.vlb_val_losses.append(torch.mean(L_vlb).item())
+            else:
+                batch_loss = self.loss(x_0, recon, **reverse_context)
+            batch_loss_mean = torch.mean(batch_loss)
+            self.val_ema_losses.append(batch_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean
 
+
     def on_validation_epoch_end(self) -> None:
-        self.val_loss = sum(self.val_losses) / len(self.val_losses)
         loss_ema = sum(self.val_ema_losses) / len(self.val_ema_losses)
+
+        # model checkpointing
         if loss_ema < self.min_loss_ema:
             self.min_loss_ema = loss_ema
-            if self.IS_WANDB:
-                if self.last_path_ckpt_ema is not None:
-                    os.remove(self.last_path_ckpt_ema)
-                filename_ckpt_ema = "val_ema=" + str(round(loss_ema, 3)) + "_epoch=" + str(self.current_epoch) + "_" + self.filename_ckpt + "_ema.ckpt"
-                path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/ema/" + filename_ckpt_ema
-                with self.ema.average_parameters():
-                    self.trainer.save_checkpoint(path_ckpt_ema)
-                self.last_path_ckpt_ema = path_ckpt_ema
+            self._model_checkpointing(loss_ema)
 
-        self.log('val_loss', self.val_loss)
-        if self.IS_WANDB:
-            wandb.log({'val_ema_loss': loss_ema}, step=self.current_epoch + 1)
-        print(f"\n val loss on epoch {self.current_epoch} is {self.val_loss}")
+        if isinstance(self.diffuser, GaussianDiffusion):
+            L_simple = sum(self.simple_val_losses) / len(self.simple_val_losses)
+            L_vlb = sum(self.vlb_val_losses) / len(self.vlb_val_losses)
+            if self.IS_WANDB:
+                wandb.log({'val_loss_simple': L_simple}, step=self.current_epoch + 1)
+                wandb.log({'val_loss_vlb': L_vlb}, step=self.current_epoch + 1)
+            print(f'\nval loss simple on epoch {self.current_epoch} is {L_simple}\n')
+            print(f'\nval loss vlb on epoch {self.current_epoch} is {L_vlb}\n')
+
+        self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+
 
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
@@ -229,15 +244,6 @@ class NNEngine(L.LightningModule):
             self.optimizer = Lion(self.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)
         return {"optimizer": self.optimizer, "lr_scheduler": scheduler}
-
-    def inference_time(self, cond, x):
-        t0 = time.time()
-        _ = self.forward(cond, x)
-        torch.cuda.current_stream().synchronize()
-        t1 = time.time()
-        elapsed = t1 - t0
-        # print("Inference for the model:", elapsed, "ms")
-        return elapsed
 
     def on_before_zero_grad(self, *args, **kwargs):
         self.ema.update()
@@ -252,5 +258,18 @@ class NNEngine(L.LightningModule):
         elif cond_type == 'only_lob':
             cond = cond[:, :, cst.LEN_EVENT_ONE_HOT:]
         return cond
+
+    def _model_checkpointing(self, loss):
+        if self.last_path_ckpt_ema is not None:
+            os.remove(self.last_path_ckpt_ema)
+        filename_ckpt_ema = ("val_ema=" + str(round(loss, 3)) +
+                             "_epoch=" + str(self.current_epoch) +
+                             "_" + self.filename_ckpt +
+                             "_ema.ckpt"
+                             )
+        path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/ema/" + filename_ckpt_ema
+        with self.ema.average_parameters():
+            self.trainer.save_checkpoint(path_ckpt_ema)
+        self.last_path_ckpt_ema = path_ckpt_ema
 
 

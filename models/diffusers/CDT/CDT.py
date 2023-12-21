@@ -6,6 +6,10 @@ from models.diffusers.CDT.Embedders import TimestepEmbedder, ConditionEmbedder
 from utils.utils import sinusoidal_positional_embedding
 import constants as cst
 
+"""
+Some of the code is ported from https://github.com/facebookresearch/DiT and adapted to our needs
+"""
+
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
@@ -14,15 +18,15 @@ class adaLN_Zero(nn.Module):
     """
     A CDT block with adaptive layer norm zero (adaLN-Zero) conditioning.
     """
-    def __init__(self, input_size, num_heads, cond_len, is_augmented, mlp_ratio=4.0):
+    def __init__(self, input_size, num_heads, cond_len, is_augmented, dropout, mlp_ratio=4.0):
         super().__init__()
         self.norm1 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
         if not is_augmented: num_heads = 1
-        self.attn = nn.MultiheadAttention(input_size, num_heads=num_heads, bias=True, batch_first=True, device=cst.DEVICE)
+        self.attn = nn.MultiheadAttention(input_size, dropout=dropout, num_heads=num_heads, bias=True, batch_first=True, device=cst.DEVICE)
         self.norm2 = nn.LayerNorm(input_size, elementwise_affine=False, eps=1e-6, device=cst.DEVICE)
         mlp_hidden_dim = int(input_size * mlp_ratio)
         approx_gelu = lambda: nn.GELU(approximate="tanh")
-        self.mlp = Mlp(in_features=input_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
+        self.mlp = Mlp(in_features=input_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=dropout)
         self.adaLN_modulation = nn.Sequential(               #it's the MLP in the figure 3 of the paper
             nn.LeakyReLU(),
             nn.Linear(input_size*cond_len, 6 * input_size, bias=True, device=cst.DEVICE)
@@ -79,7 +83,7 @@ class FinalLayer_adaLN_Zero(nn.Module):
 
 class DiT(nn.Module):
     """
-    Diffusion model with a Transformer backbone.
+    Scalable Diffusion Models with Transformers
     """
     def __init__(
         self,
@@ -93,6 +97,7 @@ class DiT(nn.Module):
         mlp_ratio,
         cond_dropout_prob,
         is_augmented,
+        dropout
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -101,7 +106,7 @@ class DiT(nn.Module):
         if (token_sequence_size != 1):
             self.pos_embed = sinusoidal_positional_embedding(token_sequence_size, input_size)
         self.blocks = nn.ModuleList([
-            adaLN_Zero(input_size, num_heads, cond_seq_len+1, is_augmented=is_augmented, mlp_ratio=mlp_ratio) for _ in range(depth)
+            adaLN_Zero(input_size, num_heads, cond_seq_len+1, is_augmented=is_augmented, mlp_ratio=mlp_ratio, dropout=dropout) for _ in range(depth)
         ])
         self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1, token_sequence_size)
         self.initialize_weights()
@@ -144,24 +149,11 @@ class DiT(nn.Module):
         noise, var = self.final_layer(x, c)
         return noise, var
 
-    #TODO: implement forward_with_cfg
-    def forward_with_cfg(self, x, t, y, cfg_scale):
-        """
-        Forward pass of CDT, but also batches the unconditional forward pass for classifier-free guidance.
-        """
-        half = x[: len(x) // 2]
-        combined = torch.cat([half, half], dim=0)
-        model_out = self.forward(combined, t, y)
-        noise, rest = model_out[:, :3], model_out[:, 3:]
-        cond_noise, uncond_noise = torch.split(noise, len(noise) // 2, dim=0)
-        half_noise = uncond_noise + cfg_scale * (cond_noise - uncond_eps)
-        eps = torch.cat([half_eps, half_eps], dim=0)
-        return torch.cat([eps, rest], dim=1)
-
 
 class CDT(nn.Module):
     """
-    Diffusion model with a Transformer backbone.
+    The difference with DiT is that the conditioning is concatenated to the input sequence, and to compute the ada terms
+    we use only the diffusion step conditioning
     """
     def __init__(
         self,
@@ -174,7 +166,8 @@ class CDT(nn.Module):
         masked_sequence_size,
         mlp_ratio,
         cond_dropout_prob,
-        is_augmented
+        is_augmented,
+        dropout
     ):
         super().__init__()
         assert cond_size == input_size
@@ -184,7 +177,7 @@ class CDT(nn.Module):
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
         self.blocks = nn.ModuleList([
-            adaLN_Zero(input_size, num_heads, 1, is_augmented=is_augmented, mlp_ratio=mlp_ratio) for _ in range(depth)
+            adaLN_Zero(input_size, num_heads, 1, is_augmented=is_augmented, mlp_ratio=mlp_ratio, dropout=dropout) for _ in range(depth)
         ])
         self.final_layer = FinalLayer_adaLN_Zero(input_size, 1, masked_sequence_size)
         self.initialize_weights()
@@ -223,22 +216,8 @@ class CDT(nn.Module):
             drop_ids = torch.rand(cond.shape[0], device=cond.device) < self.cond_dropout_prob
         else:
             drop_ids = force_drop_ids == 1
-        #create a mask of zeros for the rows to drop
+        # create a mask of zeros for the rows to drop
         mask = torch.ones((cond.shape), device=cond.device)
         mask[drop_ids] = 0
         cond = torch.einsum('bld, bld -> bld', cond, mask)
         return cond
-
-    #TODO: implement forward_with_cfg
-    def forward_with_cfg(self, x, t, y, cfg_scale):
-        """
-        Forward pass of CDT, but also batches the unconditional forward pass for classifier-free guidance.
-        """
-        half = x[: len(x) // 2]
-        combined = torch.cat([half, half], dim=0)
-        model_out = self.forward(combined, t, y)
-        noise, rest = model_out[:, :3], model_out[:, 3:]
-        cond_noise, uncond_noise = torch.split(noise, len(noise) // 2, dim=0)
-        half_noise = uncond_noise + cfg_scale * (cond_noise - uncond_eps)
-        eps = torch.cat([half_eps, half_eps], dim=0)
-        return torch.cat([eps, rest], dim=1)

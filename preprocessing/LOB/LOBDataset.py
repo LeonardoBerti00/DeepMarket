@@ -4,6 +4,8 @@ from torch.utils import data
 import numpy as np
 import torch
 import constants as cst
+from utils.utils_data import one_hot_encode_type
+
 
 class LOBDataset(data.Dataset):
     """ Characterizes a dataset for PyTorch. """
@@ -20,6 +22,7 @@ class LOBDataset(data.Dataset):
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
+        self.encoded_data = one_hot_encode_type(self.data)
 
     def __len__(self):
         """ Denotes the total number of samples. """
