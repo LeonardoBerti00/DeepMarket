@@ -2,3 +2,5 @@ __pycache__
 data/reconstructions
 data/TSLA
 lightning_logs/
+data/generated_orders.csv
+data/real_orders.csv

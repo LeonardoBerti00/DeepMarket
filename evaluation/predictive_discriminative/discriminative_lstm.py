@@ -4,17 +4,18 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
+import numpy as np
 
 
 # REFERENCE: Time-series Generative Adversarial Networks
 
 # merge gen and not gen datased adding a binary label column
-# train a lstm model to predict the binary label
+# train a lstm model to predict the binary label 
 # test the model on the test set
 # if the accuracy is high, the model is able to discriminate between generated and not generated data (the dataset are different) otherwise the model is not able to discriminate between
 #    the two datasets (the dataset are similar)
 # ho fatto una prova con solo il dataset non generato e l'accuracy è ovviamente di circa il 50% (TODELETE)
-
+ 
 
 class Preprocessor:
     def __init__(self, df): # df in input is the merged dataset with the binary label "generated"
@@ -24,6 +25,7 @@ class Preprocessor:
         self._remove_columns()
         self._one_hot_encode()
         self.zscore()
+        self._binarization()
         return self.df
     
     def zscore(self):
@@ -33,7 +35,8 @@ class Preprocessor:
         self.df['ask_size_1'] = (self.df['ask_size_1'] - self.df['ask_size_1'].mean()) / self.df['ask_size_1'].std()
         self.df['bid_price_1'] = (self.df['bid_price_1'] - self.df['bid_price_1'].mean()) / self.df['bid_price_1'].std()
         self.df['bid_size_1'] = (self.df['bid_size_1'] - self.df['bid_size_1'].mean()) / self.df['bid_size_1'].std()
-        self.df['ORDER_VOLUME_IMBALANCE'] = (self.df['ORDER_VOLUME_IMBALANCE'] - self.df['ORDER_VOLUME_IMBALANCE'].mean()) / self.df['ORDER_VOLUME_IMBALANCE'].std()
+        #self.df['ORDER_VOLUME_IMBALANCE'] = (self.df['ORDER_VOLUME_IMBALANCE'] - self.df['ORDER_VOLUME_IMBALANCE'].mean()) / self.df['ORDER_VOLUME_IMBALANCE'].std()
+        self.df['VWAP'] = self.df['VWAP'].fillna(0)
         self.df['VWAP'] = (self.df['VWAP'] - self.df['VWAP'].mean()) / self.df['VWAP'].std()
         self.df['MID_PRICE'] = (self.df['MID_PRICE'] - self.df['MID_PRICE'].mean()) / self.df['MID_PRICE'].std() # not in predictive
 
@@ -41,8 +44,11 @@ class Preprocessor:
         self.df = pd.get_dummies(self.df, columns=['TYPE'])
 
     def _remove_columns(self):
-        self.df = self.df.drop(['ORDER_ID', 'SPREAD'], axis=1)
+        self.df = self.df.drop(['ORDER_ID', 'SPREAD', 'ORDER_VOLUME_IMBALANCE'], axis=1)
+        self.df = self.df.drop(['Unnamed: 0'], axis=1)
 
+    def _binarization(self):
+        self.df['BUY_SELL_FLAG'] = self.df['BUY_SELL_FLAG'].apply(lambda x: 1 if x == 'True' else 0)
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -107,8 +113,18 @@ def merge_dataframes_with_labels(d1, d2):
     merged_df = merged_df.sample(frac=1).reset_index(drop=True)
     return merged_df
 
-df1 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert real data
-df2 = pd.read_csv('data/TSLA/TSLA_2015-01-02_2015-01-30/TSLA_2015-01-02_34200000_57600000_message_10.csv') ######################### TO DELETE ######################### insert generated data
+df1 = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\real_orders.csv') 
+df2 = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\generated_orders.csv')  
+
+# remove the first 15 minutes of the generated dataset
+df2["Time"] = df2['Unnamed: 0'].str.slice(11, 19)
+df2 = df2.query("Time >= '09:45:00'")
+df2 = df2.drop(['Time'], axis=1)
+
+# undersampling on the real dataset
+n_remove = len(df1) - len(df2)
+drop_indices = np.random.choice(df1.index, n_remove, replace=False)
+df1 = df1.drop(drop_indices)
 
 df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
 
@@ -130,13 +146,13 @@ test_y = torch.tensor(test_y, dtype=torch.float32)
 
 # Create data loaders
 train_data = TensorDataset(train_X, train_y)
-train_loader = DataLoader(train_data, batch_size=72)
+train_loader = DataLoader(train_data, batch_size=48)
 test_data = TensorDataset(test_X, test_y)
-test_loader = DataLoader(test_data, batch_size=72)
+test_loader = DataLoader(test_data, batch_size=48)
 
-model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1, device=device)
+model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1)
 model.to(device)
 
 trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-trainer.train(epochs=100)
+trainer.train(epochs=300)
 trainer.test()
