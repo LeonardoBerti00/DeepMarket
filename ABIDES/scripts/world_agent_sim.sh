@@ -2,10 +2,9 @@
 NUM_JOBS=32
 #python printf "Hello World"
 python -u abides.py -c world_agent_sim -t TSLA -d 20150130 -s 1234 -pt ema
-
 cd util/plotting
 # you may need to change the name of the log directory that now is market_replay_sim_11_30
-python -u liquidity_telemetry.py ../../log/market_replay_sim_full_day/EXCHANGE_AGENT.bz2 ../../log/market_replay_sim_full_day/ORDERBOOK_TSLA_FULL.bz2 -o ../../log/market_replay_sim_full_day/world_agent_sim.png -c configs/plot_09.30_11.30.json
+python -u liquidity_telemetry.py ../../log/market_replay_TSLA_2015-01-30_12-00-00/EXCHANGE_AGENT.bz2 ../../log/market_replay_TSLA_2015-01-30_12-00-00/ORDERBOOK_TSLA_FULL.bz2 -o ../../log/market_replay_TSLA_2015-01-30_12-00-00/world_agent_sim.png -c configs/plot_09.30_11.30.json
 ../../log/world_agent_sim_ckpt_val_ema=1.755_epoch=1_only_event_op_LION_lr_0.0001_co_0.1_dr_0.1_au_32_CD_8_CD_8_aug_True_diffsteps_100_ema/EXCHANGE_AGENT.bz2 ../../log/world_agent_sim_ckpt_val_ema=1.755_epoch=1_only_event_op_LION_lr_0.0001_co_0.1_dr_0.1_au_32_CD_8_CD_8_aug_True_diffsteps_100_ema/ORDERBOOK_TSLA_FULL.bz2 -o ../../log/world_agent_sim_ckpt_val_ema=1.755_epoch=1_only_event_op_LION_lr_0.0001_co_0.1_dr_0.1_au_32_CD_8_CD_8_aug_True_diffsteps_100_ema/world_agent_sim.png -c configs/plot_09.30_11.30.json
 cd ../../
 

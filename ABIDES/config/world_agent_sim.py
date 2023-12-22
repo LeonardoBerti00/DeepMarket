@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import time
 
 import numpy as np
@@ -47,7 +48,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='10:30:00',
+                    default='12:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -246,10 +247,25 @@ kernel = Kernel("World Agent Kernel", random_state=np.random.RandomState(seed=np
                                                                                                 dtype='uint64')))
 kernelStartTime = mkt_open
 kernelStopTime = mkt_close + pd.to_timedelta('00:00:01')
+
+# parse the string into a datetime object
+tmp = datetime.strptime(str(mkt_close), "%Y-%m-%d %H:%M:%S")
+
+# extract the date and time components
+date = tmp.date()
+time_mkt_close = str(tmp.time()).replace(':', '-')
+
 if trade_pov:
-    log_dir = "world_agent_sim_pov_{}_ckpt_".format(pov_proportion_of_volume) + checkpoint_reference.name
+    if args.diffusion:
+        log_dir = "world_agent_{}_{}_{}_pov_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume) + checkpoint_reference.name
+    else:
+        log_dir = "market_replay_{}_{}_{}_pov_{}".format(symbol, date, time_mkt_close, args.pov_proportion_of_volume)
 else:
-    log_dir = "world_agent_sim_ckpt_" + checkpoint_reference.name
+    if args.diffusion:
+        log_dir = "world_agent_{}_{}_{}_".format(symbol, date, time_mkt_close) + checkpoint_reference.name
+    else:
+        log_dir = "market_replay_{}_{}_{}".format(symbol, date, time_mkt_close)
+
 defaultComputationDelay = 0  # 50 nanoseconds
 # time.sleep(3)
 kernel.runner(agents=agents,
