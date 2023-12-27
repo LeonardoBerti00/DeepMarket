@@ -5,6 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 import numpy as np
+import constants as cst
 
 # given real data and generated data
 # train a lstm with real data, train a lstm with generated data
@@ -101,109 +102,114 @@ class Trainer:
         #print(f'Test MAE: {mae}')
 
 #################################################################################################################################################################################################
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def main():
 
-df_r = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\real_orders.csv')
-df_g = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\generated_orders.csv')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# remove the first 15 minutes of the generated dataset
-df_g["Time"] = df_g['Unnamed: 0'].str.slice(11, 19)
-df_g = df_g.query("Time >= '09:45:00'")
-df_g = df_g.drop(['Time'], axis=1)
+    df_r = pd.read_csv(cst.REAL_PATH)
+    df_g = pd.read_csv(cst.GENERATED_PATH)
 
-# undersampling on the real dataset
-n_remove = len(df_r) - len(df_g)
-drop_indices = np.random.choice(df_r.index, n_remove, replace=False)
-df_r = df_r.drop(drop_indices)
+    # remove the first 15 minutes of the generated dataset
+    df_g["Time"] = df_g['Unnamed: 0'].str.slice(11, 19)
+    df_g = df_g.query("Time >= '09:45:00'")
+    df_g = df_g.drop(['Time'], axis=1)
 
-
-df_r = Preprocessor(df_r).preprocess()
-df_g = Preprocessor(df_g).preprocess()
-
-'''
-# Check for NaN, null, inf, and missing values in df_g
-nan_columns = df_g.columns[df_g.isna().any()].tolist()
-null_columns = df_g.columns[df_g.isnull().any()].tolist()
-inf_columns = df_g.columns[(df_g == np.inf).any()].tolist()
-missing_columns = df_g.columns[df_g.isin([np.nan, np.inf, -np.inf, None]).any()].tolist()
-
-# Print the columns with NaN values
-print("Columns with NaN values:", nan_columns)
-
-# Print the columns with null values
-print("Columns with null values:", null_columns)
-
-# Print the columns with inf values
-print("Columns with inf values:", inf_columns)
-
-# Print the columns with missing values (NaN, null, inf)
-print("Columns with missing values:", missing_columns)
+    # undersampling on the real dataset
+    n_remove = len(df_r) - len(df_g)
+    drop_indices = np.random.choice(df_r.index, n_remove, replace=False)
+    df_r = df_r.drop(drop_indices)
 
 
-# stampa colonne di df_r e df_g e i loro tipi
-# print(df_r.columns, df_g.columns)
-'''
+    df_r = Preprocessor(df_r).preprocess()
+    df_g = Preprocessor(df_g).preprocess()
 
-############ TEST "real" lstm on "real" test set ############
+    '''
+    # Check for NaN, null, inf, and missing values in df_g
+    nan_columns = df_g.columns[df_g.isna().any()].tolist()
+    null_columns = df_g.columns[df_g.isnull().any()].tolist()
+    inf_columns = df_g.columns[(df_g == np.inf).any()].tolist()
+    missing_columns = df_g.columns[df_g.isin([np.nan, np.inf, -np.inf, None]).any()].tolist()
 
-# Assuming df is already preprocessed
-features_r = df_r.drop('MID_PRICE', axis=1).values
-labels_r = df_r['MID_PRICE'].values
+    # Print the columns with NaN values
+    print("Columns with NaN values:", nan_columns)
 
-# Reshape input to be 3D [samples, timesteps, features]
-features_r = features_r.reshape((features_r.shape[0], 1, features_r.shape[1]))
+    # Print the columns with null values
+    print("Columns with null values:", null_columns)
 
-# Split the data into training and test sets
-train_X_r, test_X_r, train_y_r, test_y_r = train_test_split(features_r, labels_r, test_size=0.2, random_state=42)
+    # Print the columns with inf values
+    print("Columns with inf values:", inf_columns)
 
-# Convert to PyTorch tensors
-train_X_r = torch.tensor(train_X_r, dtype=torch.float32)
-train_y_r = torch.tensor(train_y_r, dtype=torch.float32)
-test_X_r = torch.tensor(test_X_r, dtype=torch.float32)
-test_y_r = torch.tensor(test_y_r, dtype=torch.float32)
+    # Print the columns with missing values (NaN, null, inf)
+    print("Columns with missing values:", missing_columns)
 
-# Create data loaders
-train_data_r = TensorDataset(train_X_r, train_y_r)
-train_loader_r = DataLoader(train_data_r, batch_size=48)
-test_data_r = TensorDataset(test_X_r, test_y_r)
-test_loader_r = DataLoader(test_data_r, batch_size=48)
 
-model_r = LSTMModel(input_size=train_X_r.shape[2], hidden_size=128, num_layers=2, output_size=1)
-model_r.to(device)
+    # stampa colonne di df_r e df_g e i loro tipi
+    # print(df_r.columns, df_g.columns)
+    '''
 
-trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
-trainer_r.train(epochs=300)
-print("Real data:")
-trainer_r.test()
+    ############ TEST "real" lstm on "real" test set ############
 
-############ TEST "generated" lstm on "real" test set ############
+    # Assuming df is already preprocessed
+    features_r = df_r.drop('MID_PRICE', axis=1).values
+    labels_r = df_r['MID_PRICE'].values
 
-# Assuming df is already preprocessed
-features_g = df_g.drop('MID_PRICE', axis=1).values
-labels_g = df_g['MID_PRICE'].values
+    # Reshape input to be 3D [samples, timesteps, features]
+    features_r = features_r.reshape((features_r.shape[0], 1, features_r.shape[1]))
 
-# Reshape input to be 3D [samples, timesteps, features]
-features_g = features_g.reshape((features_g.shape[0], 1, features_g.shape[1]))
+    # Split the data into training and test sets
+    train_X_r, test_X_r, train_y_r, test_y_r = train_test_split(features_r, labels_r, test_size=0.2, random_state=42)
 
-# Split the data into training and test sets
-train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
+    # Convert to PyTorch tensors
+    train_X_r = torch.tensor(train_X_r, dtype=torch.float32)
+    train_y_r = torch.tensor(train_y_r, dtype=torch.float32)
+    test_X_r = torch.tensor(test_X_r, dtype=torch.float32)
+    test_y_r = torch.tensor(test_y_r, dtype=torch.float32)
 
-# Convert to PyTorch tensors
-train_X_g = torch.tensor(train_X_g, dtype=torch.float32)
-train_y_g = torch.tensor(train_y_g, dtype=torch.float32)
-test_X_g = torch.tensor(test_X_g, dtype=torch.float32)
-test_y_g = torch.tensor(test_y_g, dtype=torch.float32)
+    # Create data loaders
+    train_data_r = TensorDataset(train_X_r, train_y_r)
+    train_loader_r = DataLoader(train_data_r, batch_size=48)
+    test_data_r = TensorDataset(test_X_r, test_y_r)
+    test_loader_r = DataLoader(test_data_r, batch_size=48)
 
-# Create data loaders
-train_data_g = TensorDataset(train_X_g, train_y_g)
-train_loader_g = DataLoader(train_data_g, batch_size=48)
-test_data_g = TensorDataset(test_X_g, test_y_g)
-test_loader_g = DataLoader(test_data_g, batch_size=48)
+    model_r = LSTMModel(input_size=train_X_r.shape[2], hidden_size=128, num_layers=2, output_size=1)
+    model_r.to(device)
 
-model_g = LSTMModel(input_size=train_X_g.shape[2], hidden_size=128, num_layers=2, output_size=1)
-model_g.to(device)
+    trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
+    trainer_r.train(epochs=300)
+    print("Real data:")
+    trainer_r.test()
 
-trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
-trainer_g.train(epochs=300)
-print("Generated data:")
-trainer_g.test()
+    ############ TEST "generated" lstm on "real" test set ############
+
+    # Assuming df is already preprocessed
+    features_g = df_g.drop('MID_PRICE', axis=1).values
+    labels_g = df_g['MID_PRICE'].values
+
+    # Reshape input to be 3D [samples, timesteps, features]
+    features_g = features_g.reshape((features_g.shape[0], 1, features_g.shape[1]))
+
+    # Split the data into training and test sets
+    train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
+
+    # Convert to PyTorch tensors
+    train_X_g = torch.tensor(train_X_g, dtype=torch.float32)
+    train_y_g = torch.tensor(train_y_g, dtype=torch.float32)
+    test_X_g = torch.tensor(test_X_g, dtype=torch.float32)
+    test_y_g = torch.tensor(test_y_g, dtype=torch.float32)
+
+    # Create data loaders
+    train_data_g = TensorDataset(train_X_g, train_y_g)
+    train_loader_g = DataLoader(train_data_g, batch_size=48)
+    test_data_g = TensorDataset(test_X_g, test_y_g)
+    test_loader_g = DataLoader(test_data_g, batch_size=48)
+
+    model_g = LSTMModel(input_size=train_X_g.shape[2], hidden_size=128, num_layers=2, output_size=1)
+    model_g.to(device)
+
+    trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
+    trainer_g.train(epochs=300)
+    print("Generated data:")
+    trainer_g.test()
+
+if __name__ == '__main__':
+    main()

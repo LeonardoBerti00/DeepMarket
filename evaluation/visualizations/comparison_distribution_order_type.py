@@ -1,0 +1,44 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import constants as cst
+
+
+def main():
+    # Leggi i due file csv
+    df1 = pd.read_csv(cst.GENERATED_PATH)
+    df2 = pd.read_csv(cst.REAL_PATH)
+
+    # select the column that contains the feature
+    column = "TYPE"
+
+    # compute the percentage of each value of the feature in the two dataframes
+    percentage_gen = df1[column].value_counts(normalize=True)
+    percentage_real = df2[column].value_counts(normalize=True)
+
+    # join the two percentages in a single dataframe
+    df_combined = pd.DataFrame({
+        'Features values': percentage_gen.index,
+        'Percentage_gen': percentage_gen.values,
+        'Percentage_real': percentage_real.values
+    })
+
+    plt.figure()
+
+    bar_width = 0.35
+
+    ind = np.arange(len(df_combined['Features values']))
+
+    plt.bar(ind, df_combined['Percentage_gen'], width=bar_width, color="blue", label="generated")
+    plt.bar(ind + bar_width, df_combined['Percentage_real'], width=bar_width, color="red", label="realized")
+
+    plt.title("Comparison distribution order type")
+    plt.xlabel("Order Type")
+    plt.ylabel("Percentage")
+    plt.xticks(ind + bar_width / 2, df_combined['Features values'])
+    plt.legend()
+
+    plt.show()
+
+if __name__ == '__main__':
+    main()

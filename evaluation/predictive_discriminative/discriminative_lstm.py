@@ -5,6 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 import numpy as np
+import constants as cst
 
 
 # REFERENCE: Time-series Generative Adversarial Networks
@@ -102,57 +103,62 @@ class Trainer:
 
 #################################################################################################################################################################################################
 
+def main():
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def merge_dataframes_with_labels(d1, d2):
-    d1['generated'] = 0
-    d2['generated'] = 1
-    merged_df = pd.concat([d1, d2])
-    # shuffle the dataset
-    merged_df = merged_df.sample(frac=1).reset_index(drop=True)
-    return merged_df
+    def merge_dataframes_with_labels(d1, d2):
+        d1['generated'] = 0
+        d2['generated'] = 1
+        merged_df = pd.concat([d1, d2])
+        # shuffle the dataset
+        merged_df = merged_df.sample(frac=1).reset_index(drop=True)
+        return merged_df
 
-df1 = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\real_orders.csv') 
-df2 = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\AFC\afc_project\Diffusion-Models-for-Time-Series\data\generated_orders.csv')  
+    df1 = pd.read_csv(cst.REAL_PATH) 
+    df2 = pd.read_csv(cst.GENERATED_PATH)  
 
-# remove the first 15 minutes of the generated dataset
-df2["Time"] = df2['Unnamed: 0'].str.slice(11, 19)
-df2 = df2.query("Time >= '09:45:00'")
-df2 = df2.drop(['Time'], axis=1)
+    # remove the first 15 minutes of the generated dataset
+    df2["Time"] = df2['Unnamed: 0'].str.slice(11, 19)
+    df2 = df2.query("Time >= '09:45:00'")
+    df2 = df2.drop(['Time'], axis=1)
 
-# undersampling on the real dataset
-n_remove = len(df1) - len(df2)
-drop_indices = np.random.choice(df1.index, n_remove, replace=False)
-df1 = df1.drop(drop_indices)
+    # undersampling on the real dataset
+    n_remove = len(df1) - len(df2)
+    drop_indices = np.random.choice(df1.index, n_remove, replace=False)
+    df1 = df1.drop(drop_indices)
 
-df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
+    df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
 
-# Assuming df is already preprocessed
-features = df.drop('generated', axis=1).values
-labels = df['generated'].values
+    # Assuming df is already preprocessed
+    features = df.drop('generated', axis=1).values
+    labels = df['generated'].values
 
-# Reshape input to be 3D [samples, timesteps, features]
-features = features.reshape((features.shape[0], 1, features.shape[1]))
+    # Reshape input to be 3D [samples, timesteps, features]
+    features = features.reshape((features.shape[0], 1, features.shape[1]))
 
-# Split the data into training and test sets
-train_X, test_X, train_y, test_y = train_test_split(features, labels, test_size=0.2, random_state=42)
+    # Split the data into training and test sets
+    train_X, test_X, train_y, test_y = train_test_split(features, labels, test_size=0.2, random_state=42)
 
-# Convert to PyTorch tensors
-train_X = torch.tensor(train_X, dtype=torch.float32)
-train_y = torch.tensor(train_y, dtype=torch.float32)
-test_X = torch.tensor(test_X, dtype=torch.float32)
-test_y = torch.tensor(test_y, dtype=torch.float32)
+    # Convert to PyTorch tensors
+    train_X = torch.tensor(train_X, dtype=torch.float32)
+    train_y = torch.tensor(train_y, dtype=torch.float32)
+    test_X = torch.tensor(test_X, dtype=torch.float32)
+    test_y = torch.tensor(test_y, dtype=torch.float32)
 
-# Create data loaders
-train_data = TensorDataset(train_X, train_y)
-train_loader = DataLoader(train_data, batch_size=48)
-test_data = TensorDataset(test_X, test_y)
-test_loader = DataLoader(test_data, batch_size=48)
+    # Create data loaders
+    train_data = TensorDataset(train_X, train_y)
+    train_loader = DataLoader(train_data, batch_size=48)
+    test_data = TensorDataset(test_X, test_y)
+    test_loader = DataLoader(test_data, batch_size=48)
 
-model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1)
-model.to(device)
+    model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1)
+    model.to(device)
 
-trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-trainer.train(epochs=300)
-trainer.test()
+    trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
+    trainer.train(epochs=300)
+    trainer.test()
+
+
+if __name__ == '__main__':
+    main()

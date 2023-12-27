@@ -8,6 +8,9 @@ import constants as cst
 import configuration
 from preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
 from models.NNEngine import NNEngine
+import evaluation.predictive_discriminative.predictive_lstm as predictive_lstm
+import evaluation.predictive_discriminative.discriminative_lstm as discriminative_lstm
+import evaluation.visualizations.comparison_distribution_order_type as comparison_distribution_order_type
 
 def set_torch():
     #torch.manual_seed(cst.SEED)
@@ -58,9 +61,13 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
+    
+    # evaluation
     elif config.IS_DISCRIMINATIVE:
-        pass
+        discriminative_lstm.main()
 
     elif config.IS_PREDICTIVE:
-        pass
+        predictive_lstm.main()
 
+    elif config.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE:
+        comparison_distribution_order_type.main()

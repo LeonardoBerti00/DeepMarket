@@ -16,8 +16,8 @@ class TSNE2D(torch.nn.Module):
     
 
 # open a file csv as pandas dataframe
-df = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\afc\afc_project\Diffusion-Models-for-Time-Series\data\TSLA\TSLA_2015-01-02_2015-01-30\TSLA_2015-01-05_34200000_57600000_message_10.csv', header=None) # insert real data
-df_ = pd.read_csv(r'C:\Users\marco\OneDrive\Documenti\afc\afc_project\Diffusion-Models-for-Time-Series\data\TSLA\TSLA_2015-01-02_2015-01-30\TSLA_2015-01-06_34200000_57600000_message_10.csv', header=None) # insert synthetic data
+df = pd.read_csv(r"C:\Users\marco\Documents\AFC\Diffusion-Models-for-Time-Series\data\generated_orders.csv", header=None) # insert real data
+df_ = pd.read_csv(r"C:\Users\marco\Documents\AFC\Diffusion-Models-for-Time-Series\data\real_orders.csv", header=None) # insert synthetic data
 
 def preprocess_data(df):
     # Rename the columns into time, event_type, size, price, direction
