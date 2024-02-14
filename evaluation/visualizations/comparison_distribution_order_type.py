@@ -1,11 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import constants as cst
+import visualizations_constants as cst
 
 
 def main():
-    # Leggi i due file csv
     df1 = pd.read_csv(cst.GENERATED_PATH)
     df2 = pd.read_csv(cst.REAL_PATH)
 

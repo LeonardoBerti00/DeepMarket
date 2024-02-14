@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import constants as cst
+import visualizations_constants as cst
 import seaborn as sns
 
 def main():
