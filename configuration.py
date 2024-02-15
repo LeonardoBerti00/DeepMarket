@@ -19,6 +19,7 @@ class Configuration:
         self.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE = False
         self.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE = False
         self.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD = False
+        self.IS_COMPARISON_MIDPRICE = False
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 

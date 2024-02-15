@@ -14,6 +14,7 @@ import evaluation.visualizations.comparison_distribution_order_type as compariso
 import evaluation.visualizations.comparison_distribution_volume_price as comparison_distribution_volume_price
 import evaluation.visualizations.comparison_distribution_market_spread as comparison_distribution_market_spread
 import evaluation.visualizations.PCA_plots as PCA_plots
+import evaluation.visualizations.comparison_midprice as comparison_midprice
 
 def set_torch():
     #torch.manual_seed(cst.SEED)
@@ -83,3 +84,6 @@ if __name__ == "__main__":
 
     elif config.IS_PCA:
         PCA_plots.main()
+
+    elif config.IS_COMPARISON_MIDPRICE:
+        comparison_midprice.main()
