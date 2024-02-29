@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import visualizations_constants as cst
 import seaborn as sns
+import os
 
 def main():
     df1 = pd.read_csv(cst.GENERATED_PATH)
@@ -20,7 +21,9 @@ def main():
     plt.ylabel("Density")
 
     plt.legend()
-
+    file_name = "comparison_distribution_volume.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
     df1 = pd.read_csv(cst.GENERATED_PATH)
@@ -38,7 +41,9 @@ def main():
     plt.ylabel("Density")
 
     plt.legend()
-
+    file_name = "comparison_distribution_price.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
 

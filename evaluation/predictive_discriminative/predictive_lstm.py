@@ -5,7 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 import numpy as np
-import constants as cst
+import evaluation_constants as cst
 
 # given real data and generated data
 # train a lstm with real data, train a lstm with generated data

@@ -27,6 +27,37 @@ def set_torch():
     torch.autograd.set_detect_anomaly(True)
     torch.set_float32_matmul_precision('high')
 
+def plot_graphs():
+    if config.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE:
+        comparison_distribution_order_type.main()
+
+    elif config.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE:
+        comparison_distribution_volume_price.main()
+
+    elif config.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD:
+        comparison_distribution_market_spread.main()
+
+    elif config.IS_PCA:
+        PCA_plots.main()
+
+    elif config.IS_TSNE:
+        TSNE_plots.main()
+
+    elif config.IS_COMPARISON_MIDPRICE:
+        comparison_midprice.main()
+
+    elif config.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE:
+        comparison_multiple_days_midprice.main()
+
+    elif config.IS_COMPARISON_VOLUME_DISTRIBUTION:
+        comparison_volume_distribution.main()
+
+def pred_discrim():
+    if config.IS_PREDICTIVE:
+        predictive_lstm.main()
+    elif config.IS_DISCRIMINATIVE:
+        discriminative_lstm.main()
+
 
 if __name__ == "__main__":
     set_torch()
@@ -68,35 +99,11 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
-    
-    # evaluation
-    elif config.IS_DISCRIMINATIVE:
-        discriminative_lstm.main()
+    elif config.PRED_DISC:
+        pred_discrim()
 
-    elif config.IS_PREDICTIVE:
-        predictive_lstm.main()
+    elif config.PLOT_GRAPHS:
+        plot_graphs()
 
-    elif config.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE:
-        comparison_distribution_order_type.main()
 
-    elif config.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE:
-        comparison_distribution_volume_price.main()
-
-    elif config.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD:
-        comparison_distribution_market_spread.main()
-
-    elif config.IS_PCA:
-        PCA_plots.main()
-
-    elif config.IS_TSNE:
-        TSNE_plots.main()
-
-    elif config.IS_COMPARISON_MIDPRICE:
-        comparison_midprice.main()
-
-    elif config.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE:
-        comparison_multiple_days_midprice.main()
-
-    elif config.IS_COMPARISON_VOLUME_DISTRIBUTION:
-        comparison_volume_distribution.main()
 

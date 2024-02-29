@@ -4,6 +4,7 @@ import numpy as np
 import visualizations_constants as cst
 import seaborn as sns
 import visualizations_constants as cst
+import os
 
 def main():
     df1 = pd.read_csv(cst.REAL_PATH)
@@ -28,6 +29,9 @@ def main():
     plt.grid(True)
     plt.xticks(rotation=45)
     plt.tight_layout()
+    file_name = "comparison_midprice.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
 

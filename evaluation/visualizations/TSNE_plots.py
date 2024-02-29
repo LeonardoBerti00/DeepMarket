@@ -5,6 +5,7 @@ import visualizations_constants as cst
 import seaborn as sns
 import torch
 from sklearn.manifold import TSNE
+import os 
 
     
 class TSNE2D(torch.nn.Module):
@@ -50,6 +51,9 @@ def plot_data(tsna2d, tsna2d_):
 
     # Add legend and title
     plt.legend()
+    file_name = "TSNA_plot.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.title('TSNA2D Plot')
 
     # Show the plot

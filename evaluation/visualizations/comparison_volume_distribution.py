@@ -5,6 +5,7 @@ import numpy as np
 import scipy.stats as st
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.dates as mdates
+import os
 
 def ci(row, n, alpha):
     mean = row['asksize1_mean']
@@ -77,6 +78,9 @@ def main():
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
+    file_name = "comparison_volume_distribution.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
 

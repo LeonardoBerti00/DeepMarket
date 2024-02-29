@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import visualizations_constants as cst
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import os
 
 def main():
     dfs = []
@@ -30,6 +31,9 @@ def main():
     plt.grid(True)
     plt.xticks(rotation=45)
     plt.tight_layout()
+    file_name = "comparison_multiple_days_midprice.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
 if __name__ == '__main__':

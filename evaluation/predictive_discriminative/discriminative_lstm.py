@@ -5,7 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
 import numpy as np
-import constants as cst
+import evaluation_constants as cst
 
 
 # REFERENCE: Time-series Generative Adversarial Networks

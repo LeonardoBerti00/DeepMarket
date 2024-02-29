@@ -7,22 +7,25 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
-        self.IS_SWEEP = True
+        self.IS_WANDB = False
+        self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
 
         # evaluation
-        self.IS_DISCRIMINATIVE = False
-        self.IS_PREDICTIVE = False
-        self.IS_PCA = False
-        self.IS_TSNE = False
-        self.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE = False
-        self.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE = False
-        self.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD = False
-        self.IS_COMPARISON_MIDPRICE = False
-        self.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE = False
-        self.IS_COMPARISON_VOLUME_DISTRIBUTION = False
+        self.PRED_DISC = False # to activate the predictive and discriminative evaluation
+        self.IS_DISCRIMINATIVE = True 
+        self.IS_PREDICTIVE = True
+
+        self.PLOT_GRAPHS = False #to activate the plot of the graphs
+        self.IS_PCA = True
+        self.IS_TSNE = True
+        self.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE = True
+        self.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE = True
+        self.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD = True
+        self.IS_COMPARISON_MIDPRICE = True
+        self.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE = True
+        self.IS_COMPARISON_VOLUME_DISTRIBUTION = True
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 

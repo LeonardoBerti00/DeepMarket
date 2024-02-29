@@ -5,6 +5,7 @@ import visualizations_constants as cst
 import seaborn as sns
 import scipy.stats as st
 import matplotlib.dates as mdates
+import os
 
 
 def ci(row, n, alpha):
@@ -68,6 +69,9 @@ def main():
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
+    file_name = "comparison_distribution_market_spread.png"
+    file_path = os.path.join(cst.folder_save_path, file_name)
+    plt.savefig(file_path)
     plt.show()
 
 if __name__ == '__main__':
