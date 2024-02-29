@@ -1,12 +1,13 @@
 import argparse
 import importlib
+import os
 import sys
 
 if __name__ == '__main__':
 
   # Print system banner.
-  system_name = "ABIDES: Agent-Based Interactive Discrete Event Simulation"
-
+  system_name = "ABIDES: Agent-Based Interactive Discrete Event Simulation"  
+  sys.path.insert(0, os.getcwd())
   print ("=" * len(system_name))
   print (system_name)
   print ("=" * len(system_name))

@@ -146,7 +146,7 @@ class WorldAgent(Agent):
             self._update_lob_snapshot(msg)
             self._update_active_limit_orders()
 
-        # if we had placed a market order and it is executed we receive the message of the limit order order filled
+        # if we had placed a market order and it is executed we receive the message of the limit order filled, so if it was a buy we receive a sell
         elif msg.body['msg'] == 'ORDER_EXECUTED':
             direction = 1 if msg.body['order'].is_buy_order else -1
             self.placed_orders.append(np.array([self.last_offset_time, 4, msg.body['order'].order_id, msg.body['order'].quantity, msg.body['order'].limit_price, direction]))
@@ -186,7 +186,16 @@ class WorldAgent(Agent):
                     self.cancelOrder(old_order)
                 elif type == 2:
                     # partial deletion of a limit order
-                    new_order = LimitOrder(self.id, self.currentTime, self.symbol, old_order.quantity-quantity, old_order.is_buy_order, old_order.limit_price, old_order.order_id, None)
+                    new_order = LimitOrder(
+                        agent_id=self.id, 
+                        time_placed=self.currentTime, 
+                        symbol=self.symbol, 
+                        quantity=old_order.quantity-quantity, 
+                        is_buy_order=old_order.is_buy_order, 
+                        limit_price=old_order.limit_price, 
+                        order_id=old_order.order_id, 
+                        tag=None
+                    )
                     self.modifyOrder(old_order, new_order)
                     self.placed_orders.append(np.array([order[0], 2, new_order.order_id, quantity, new_order.limit_price, direction]))
 
@@ -194,8 +203,8 @@ class WorldAgent(Agent):
                 # if type == 4 it means that it is an execution order, so if it is an execution order of a sell limit order
                 # we place a buy market order of the same quantity and viceversa
                 is_buy_order = False if direction else True
-                # the curren order_id is the order_id of the sell (buy) limit order filled, so we need to assign to
-                # the market order another order_id
+                # the current order_id is the order_id of the sell (buy) limit order filled, 
+                # so we need to assign to the market order another order_id
                 order_id = self.unused_order_ids[0]
                 self.unused_order_ids = self.unused_order_ids[1:]
                 self.placeMarketOrder(self.symbol, quantity, is_buy_order=is_buy_order, order_id=order_id)
@@ -260,12 +269,15 @@ class WorldAgent(Agent):
 
 
     def _postprocess_generated(self, generated):
-        # we need to go from the output of the diffusion model to the order
+        ''' we need to go from the output of the diffusion model to an actual order '''
+
         # we select the depth with the minimum distance from the nn.Embedding layer
+        # the depth will be used only in the case of a cancel order
         depth_emb = generated[-2:]
         depth = torch.argmin(torch.sum(torch.abs(self.diffusion_model.depth_embedder.weight.data - depth_emb), dim=1)).item()
 
-        # we need to convert the order type from one hot encoding to the original encoding, so we select the nearest to 1
+        # we need to convert the order type from one hot encoding to the original encoding, so we select the nearest of the tuple to 1
+        # for example if we have (0.1, 0.9, 0.1) the order type is 2
         order_type = torch.argmin(torch.abs(generated[1:4] - 1.0)).item() + 1
         if order_type == 3 or order_type == 2:
             order_type += 1
@@ -299,6 +311,8 @@ class WorldAgent(Agent):
             if direction == 1:
                 bid_side = self.lob_snapshots[-1][2::4]
                 last_price = bid_side[-1]
+                # if the first 10 levels are full and the price is less than the last price we generate another order
+                # because we consider only the first 10 levels
                 if price < last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
@@ -315,11 +329,11 @@ class WorldAgent(Agent):
                 price = bid_side[depth]
                 # search all the active limit orders with the same price
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
-                # if there are no orders with the same price then we raise an exception
+                # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
                     return None
-                # we select the order with the quantity near to the quantity generated
+                # we select the order with the quantity closer to the quantity generated
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
             else:
@@ -327,7 +341,7 @@ class WorldAgent(Agent):
                 price = ask_side[depth]
                 # search all the active limit orders in the same level
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
-                # if there are no orders with the same price then we raise an exception
+                # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
                     return None

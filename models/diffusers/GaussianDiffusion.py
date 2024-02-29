@@ -77,7 +77,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
         self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE, non_blocking=True), self.alphas_cumprod[:-1]])
 
-        #calculation for posterior q(x_{t-1} | x_t, x_0)
+        # calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
         self.posterior_log_var_clipped = torch.log(
             torch.cat([self.posterior_var[:1], self.posterior_var[1:]])
@@ -135,11 +135,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         min_log = repeat(min_log, 'b -> b 1 d', d=x_0.shape[-1])
         log_var_t = frac * max_log + (1 - frac) * min_log
         var_t = torch.exp(log_var_t)
-
+        std_t = torch.sqrt(var_t)
         # Sample a standard normal random variable z
         z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE, non_blocking=True)
-        # Compute x_{t-1} from x_t the reverse diffusion process for the current time step
-        x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (var_t * z)
+        # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
+        x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
 
         # Compute the mean squared error loss between the noise and the true noise
         L_mse = self._mse_loss(noise_t, noise_true)
@@ -185,13 +185,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     ):
         """
         Get a term for the variational lower-bound.
-
         The resulting units are bits.
         This allows for comparison to other papers.
-
-        :return: a dict with the following keys:
-                 - 'output': a shape [N] tensor of NLLs or KLs.
-                 - 'pred_xstart': the x_0 predictions.
         """
         true_mean, true_log_variance_clipped = self._q_posterior_mean_var(x_0=x_0, x_t=x_t, t=t)
         pred_mean = self._p_mean(

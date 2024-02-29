@@ -79,7 +79,9 @@ def preprocess_data(dataframes, n_lob_levels):
     for i in range(len(dataframes)):
         dataframes[i][1] = dataframes[i][1].iloc[:, :n_lob_levels * cst.LEN_LEVEL]
 
-    # take the indexes of the dataframes that are of type 2, 5, 6, 7 and drop it
+    # take the indexes of the dataframes that are of type 
+    # 2 (partial deletion), 5 (execution of a hidden limit order), 
+    # 6 (cross trade), 7 (trading halt) and drop it
     for i in range(len(dataframes)):
         indexes_to_drop = dataframes[i][0][dataframes[i][0]["event_type"].isin([2, 5, 6, 7])].index
         dataframes[i][0] = dataframes[i][0].drop(indexes_to_drop)

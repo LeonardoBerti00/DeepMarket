@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
-        self.IS_SWEEP = True
-        self.IS_TRAINING = False
+        self.IS_WANDB = False
+        self.IS_SWEEP = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
         self.IS_DISCRIMINATIVE = False
         self.IS_PREDICTIVE = False
@@ -53,7 +53,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2     # try higher values
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.1       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 

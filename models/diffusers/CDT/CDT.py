@@ -111,8 +111,6 @@ class DiT(nn.Module):
         self.final_layer = FinalLayer_adaLN_Zero(input_size, cond_seq_len+1, token_sequence_size)
         self.initialize_weights()
 
-
-
     def initialize_weights(self):
         # Initialize transformer layers:
         def _basic_init(module):
@@ -211,13 +209,15 @@ class CDT(nn.Module):
         noise, var = self.final_layer(full_input, t)
         return noise, var
 
-    def token_drop(self, cond, force_drop_ids=None):
-        if force_drop_ids is None:
-            drop_ids = torch.rand(cond.shape[0], device=cond.device) < self.cond_dropout_prob
+    def token_drop(self, cond):
+        random = torch.rand(1, device=cond.device)
+        if random < self.cond_dropout_prob:
+            # create a mask of zeros for the rows to drop
+            mask = torch.zeros((cond.shape), device=cond.device)
+            cond = torch.einsum('bld, bld -> bld', cond, mask)
+            return cond
         else:
-            drop_ids = force_drop_ids == 1
-        # create a mask of zeros for the rows to drop
-        mask = torch.ones((cond.shape), device=cond.device)
-        mask[drop_ids] = 0
-        cond = torch.einsum('bld, bld -> bld', cond, mask)
-        return cond
+            # no tokens are dropped
+            return cond 
+        
+ 

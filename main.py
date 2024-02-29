@@ -6,7 +6,7 @@ import torch
 from utils.utils import noise_scheduler
 import constants as cst
 import configuration
-from preprocessing.LOB.LOBSTERDataBuilder import LOBSTERDataBuilder
+from preprocessing.LOBSTERDataBuilder import LOBSTERDataBuilder
 from models.NNEngine import NNEngine
 
 def set_torch():
@@ -20,7 +20,6 @@ def set_torch():
 
 if __name__ == "__main__":
     set_torch()
-    torch.autograd.set_detect_anomaly(True)
     config = configuration.Configuration()
     if (cst.DEVICE == "cpu"):
         accelerator = "cpu"
@@ -35,19 +34,10 @@ if __name__ == "__main__":
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-        exit()
+        
     if config.IS_WANDB:
-
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)
-            sweep_config.update({"name":
-                                     f"model_{config.CHOSEN_MODEL.name}_"
-                                     f"stock_{config.CHOSEN_STOCK.name}_"
-                                     f"ct_{config.COND_TYPE}_"
-                                     f"cm_{config.COND_METHOD}_"
-                                     f"aug_{config.IS_AUGMENTATION}_"
-                                     f"ndiffstep_{config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}"
-                                 })
             sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME)
             wandb.agent(sweep_id, run_wandb(config, accelerator), count=sweep_config["run_cap"])
         else:

@@ -74,7 +74,7 @@ class NNEngine(L.LightningModule):
 
 
     def forward(self, cond, x_0, is_train):
-
+        # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
         x_0, cond = self.depth_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
         if is_train:
@@ -93,6 +93,9 @@ class NNEngine(L.LightningModule):
 
         return recon, context
 
+    def sampling(self, cond, x_T):
+        # TODO: implement sampling
+        return 
 
     def single_step(self, cond, x_0, is_train, real_cond):
         # forward process
@@ -115,6 +118,7 @@ class NNEngine(L.LightningModule):
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
         return x_recon, reverse_context
+
 
     def augment(self, x_t: torch.Tensor, cond: torch.Tensor, is_train: bool):
         if self.IS_AUGMENTATION and self.cond_type == 'only_event':
@@ -178,18 +182,17 @@ class NNEngine(L.LightningModule):
             if self.IS_WANDB:
                 wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
                 wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)
+                wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
             print(f'\ntrain loss simple on epoch {self.current_epoch} is {L_simple}\n')
             print(f'\ntrain loss vlb on epoch {self.current_epoch} is {L_vlb}\n')
+            print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
         self.train_losses = []
         self.simple_train_losses = []
         self.vlb_train_losses = []
         self.val_ema_losses = []
         self.simple_val_losses = []
         self.vlb_val_losses = []
-        if self.IS_WANDB:
-            wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
-        print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
-
+        
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]

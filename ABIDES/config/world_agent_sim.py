@@ -64,9 +64,11 @@ parser.add_argument('--config_help',
 parser.add_argument('-e',
                     '--execution-agents',
                     action='store_true',
+                    default=False,
                     help='Flag to allow the execution agent to trade.')
-parser.add_argument('-cm',
+parser.add_argument('-m',
                     '--chosen-model',
+                    type=str,
                     default='CDT')
 parser.add_argument('-pt',
                     '--param-type',
@@ -193,7 +195,7 @@ agents.extend([WorldAgent(id=1,
                           date=str(historical_date.date()),
                           date_trading_days=cst.DATE_TRADING_DAYS,
                           diffusion_model=model,
-                          data_dir="C:/Users/leona/PycharmProjects/Diffusion-Models-for-Time-Series/data",
+                          data_dir=cst.DATA_DIR,
                           cond_type=config.COND_TYPE,
                           cond_seq_size=config.COND_SEQ_SIZE,
                           log_orders=log_orders,
@@ -211,7 +213,7 @@ agent_count += 1
 trade_pov = True if args.execution_agents else False
 
 #### Participation of Volume Agent parameters
-
+# POV agent start one hour after market open and ends 30 minutes after 
 pov_agent_start_time = mkt_open + pd.to_timedelta('01:00:00')
 pov_agent_end_time = mkt_open + pd.to_timedelta('01:30:00')
 pov_proportion_of_volume = args.execution_pov

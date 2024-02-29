@@ -1,6 +1,8 @@
 __pycache__
 data/reconstructions
 data/TSLA
+data/checkpoints
 lightning_logs/
 data/generated_orders.csv
 data/real_orders.csv
+wandb/

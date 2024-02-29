@@ -5,7 +5,7 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 import constants as cst
 from preprocessing.DataModule import DataModule
-from preprocessing.LOB.LOBDataset import LOBDataset
+from preprocessing.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from models.NNEngine import NNEngine
 from collections import namedtuple
@@ -73,7 +73,7 @@ def run(config, accelerator, model=None):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_loss", mode="min", patience=10, verbose=True)
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True)
         ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
@@ -117,14 +117,15 @@ def run_wandb(config, accelerator):
 
             cond_type = config.COND_TYPE
             is_augmentation = config.IS_AUGMENTATION
+            stock_name = config.CHOSEN_STOCK.name
             diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-            config.FILENAME_CKPT = str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
+            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps)
 
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
-                callbacks=EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.001),
+                callbacks=EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
                 detect_anomaly=False,
