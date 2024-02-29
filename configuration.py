@@ -11,8 +11,21 @@ class Configuration:
         self.IS_SWEEP = False
         self.IS_TRAINING = True
         self.IS_DEBUG = False
-        self.IS_DISCRIMINATIVE = False
-        self.IS_PREDICTIVE = False
+
+        # evaluation
+        self.PRED_DISC = False # to activate the predictive and discriminative evaluation
+        self.IS_DISCRIMINATIVE = True 
+        self.IS_PREDICTIVE = True
+
+        self.PLOT_GRAPHS = False #to activate the plot of the graphs
+        self.IS_PCA = True
+        self.IS_TSNE = True
+        self.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE = True
+        self.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE = True
+        self.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD = True
+        self.IS_COMPARISON_MIDPRICE = True
+        self.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE = True
+        self.IS_COMPARISON_VOLUME_DISTRIBUTION = True
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 

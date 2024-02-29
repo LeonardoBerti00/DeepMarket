@@ -8,6 +8,16 @@ import constants as cst
 import configuration
 from preprocessing.LOBSTERDataBuilder import LOBSTERDataBuilder
 from models.NNEngine import NNEngine
+import evaluation.predictive_discriminative.predictive_lstm as predictive_lstm
+import evaluation.predictive_discriminative.discriminative_lstm as discriminative_lstm
+import evaluation.visualizations.comparison_distribution_order_type as comparison_distribution_order_type
+import evaluation.visualizations.comparison_distribution_volume_price as comparison_distribution_volume_price
+import evaluation.visualizations.comparison_distribution_market_spread as comparison_distribution_market_spread
+import evaluation.visualizations.PCA_plots as PCA_plots
+import evaluation.visualizations.comparison_midprice as comparison_midprice
+import evaluation.visualizations.comparison_multiple_days_midprice as comparison_multiple_days_midprice
+import evaluation.visualizations.TSNE_plots as TSNE_plots
+import evaluation.visualizations.comparison_volume_distribution as comparison_volume_distribution
 
 def set_torch():
     #torch.manual_seed(cst.SEED)
@@ -16,6 +26,37 @@ def set_torch():
     torch.backends.cudnn.allow_tf32 = True
     torch.autograd.set_detect_anomaly(True)
     torch.set_float32_matmul_precision('high')
+
+def plot_graphs():
+    if config.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE:
+        comparison_distribution_order_type.main()
+
+    elif config.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE:
+        comparison_distribution_volume_price.main()
+
+    elif config.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD:
+        comparison_distribution_market_spread.main()
+
+    elif config.IS_PCA:
+        PCA_plots.main()
+
+    elif config.IS_TSNE:
+        TSNE_plots.main()
+
+    elif config.IS_COMPARISON_MIDPRICE:
+        comparison_midprice.main()
+
+    elif config.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE:
+        comparison_multiple_days_midprice.main()
+
+    elif config.IS_COMPARISON_VOLUME_DISTRIBUTION:
+        comparison_volume_distribution.main()
+
+def pred_discrim():
+    if config.IS_PREDICTIVE:
+        predictive_lstm.main()
+    elif config.IS_DISCRIMINATIVE:
+        discriminative_lstm.main()
 
 
 if __name__ == "__main__":
@@ -48,9 +89,11 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
-    elif config.IS_DISCRIMINATIVE:
-        pass
+    elif config.PRED_DISC:
+        pred_discrim()
 
-    elif config.IS_PREDICTIVE:
-        pass
+    elif config.PLOT_GRAPHS:
+        plot_graphs()
+
+
 
