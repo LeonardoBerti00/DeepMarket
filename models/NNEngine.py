@@ -40,11 +40,12 @@ class NNEngine(L.LightningModule):
         self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.COND_SEQ_SIZE
+        self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = 10000000
+        self.filename_ckpt = config.FILENAME_CKPT
         if self.IS_WANDB:
-            self.filename_ckpt = config.FILENAME_CKPT
             self.save_hyperparameters()
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
@@ -161,7 +162,8 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        return self.diffuser.loss(real, recon, **kwargs)
+        regularization_term = torch.norm(recon[:, 0, 5], p=1) // recon.shape[0]
+        return self.diffuser.loss(real, recon, **kwargs) + self.reg_term_weight * regularization_term
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
