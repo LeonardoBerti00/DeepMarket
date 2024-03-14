@@ -1,15 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import visualizations_constants as cst
 import seaborn as sns
 import os
 
-def main():
-    df1 = pd.read_csv(cst.GENERATED_PATH)
+def main(real_path, generated_path):
+    df1 = pd.read_csv(generated_path)
     data1 = df1["ORDER_VOLUME_IMBALANCE"]
 
-    df2 = pd.read_csv(cst.REAL_PATH)
+    df2 = pd.read_csv(real_path)
     data2 = df2["ORDER_VOLUME_IMBALANCE"]
 
     sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
@@ -22,14 +21,14 @@ def main():
 
     plt.legend()
     file_name = "comparison_distribution_volume.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
     plt.show()
 
-    df1 = pd.read_csv(cst.GENERATED_PATH)
+    df1 = pd.read_csv(generated_path)
     data1 = df1["PRICE"]
 
-    df2 = pd.read_csv(cst.REAL_PATH)
+    df2 = pd.read_csv(real_path)
     data2 = df2["PRICE"]
 
     sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
@@ -42,7 +41,7 @@ def main():
 
     plt.legend()
     file_name = "comparison_distribution_price.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
     plt.show()
 

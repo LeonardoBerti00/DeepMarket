@@ -30,7 +30,7 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
     return data, mean_size, mean_prices, std_size,  std_prices
 
 
-def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  std_prices=None, mean_time=None, std_time=None):
+def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  std_prices=None, mean_time=None, std_time=None, mean_depth=None, std_depth=None):
 
     #apply z score to prices and size column
     if (mean_size is None) or (std_size is None):
@@ -45,10 +45,15 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
         mean_time = data["time"].mean()
         std_time = data["time"].std()
 
+    if (mean_depth is None) or (std_depth is None):
+        mean_depth = data["depth"].mean()
+        std_depth = data["depth"].std()
+
     #apply the z score to the original data
     data["time"] = (data["time"] - mean_time) / std_time
     data["size"] = (data["size"] - mean_size) / std_size
     data["price"] = (data["price"] - mean_prices) / std_prices
+    data["depth"] = (data["depth"] - mean_depth) / std_depth
 
     # check if there are null values, then raise value error
     if data.isnull().values.any():
@@ -59,9 +64,9 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     data["event_type"] = data["event_type"].replace(3, 2)
     # order_type = 0 -> limit order
     # order_type = 1 -> cancel order
-    # order_type = 2 -> market order
-
-    return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time
+    # order_type = 2 -> ma rket order
+    
+    return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth
 
 
 def reset_indexes(dataframes):
@@ -115,11 +120,16 @@ def preprocess_data(dataframes, n_lob_levels):
                 index = j - 1
             if direction == 1:
                 bid_side = dataframes[i][1].iloc[index, 2::4]
-                depth = np.where(bid_side == order_price)[0][0]
+                bid_price = bid_side[0]
+                depth = (bid_price - order_price) // 100
+                if depth < 0:
+                    depth = 0
             else:
                 ask_side = dataframes[i][1].iloc[index, 0::4]
-                depth = np.where(ask_side == order_price)[0][0]
-
+                ask_price = ask_side[0]
+                depth = (order_price - ask_price) // 100
+                if depth < 0:
+                    depth = 0
             dataframes[i][0].loc[j, "depth"] = depth
 
     # we eliminate the first row of every dataframe because we can't deduce the depth
@@ -149,7 +159,24 @@ def one_hot_encode_type(data):
     encoded_data[:, 4:] = data[:, 2:]
     return encoded_data
 
-
+def to_sparse_representation(lob, n_levels):
+    if not isinstance(lob, np.ndarray):
+        lob = np.array(lob)
+    sparse_lob = np.zeros(n_levels * 2)
+    for j in range(lob.shape[0] // 2):
+        if j % 2 == 0:
+            ask_price = lob[0]
+            current_ask_price = lob[j*2]
+            depth = (current_ask_price - ask_price) // 100
+            if depth < n_levels and int(lob[j*2]) != 0:
+                sparse_lob[2*int(depth)] = lob[j*2+1]
+        else:
+            bid_price = lob[2]
+            current_bid_price = lob[j*2]
+            depth = (bid_price - current_bid_price) // 100
+            if depth < n_levels and int(lob[j*2]) != 0:
+                sparse_lob[2*int(depth)+1] = lob[j*2+1]
+    return sparse_lob
 
 '''
 def to_original_lob(event_and_lob, seq_size):

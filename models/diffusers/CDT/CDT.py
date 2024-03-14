@@ -5,6 +5,7 @@ from timm.models.vision_transformer import Mlp, Attention
 from models.diffusers.CDT.Embedders import TimestepEmbedder, ConditionEmbedder
 from utils.utils import sinusoidal_positional_embedding
 import constants as cst
+import random
 
 """
 Some of the code is ported from https://github.com/facebookresearch/DiT and adapted to our needs
@@ -171,27 +172,15 @@ class CDT(nn.Module):
         assert cond_size == input_size
         self.cond_dropout_prob = cond_dropout_prob
         self.num_heads = num_heads
-        self.t_embedder = TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
+        self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
-        self.blocks = nn.ModuleList([
-            adaLN_Zero(input_size, num_heads, 1, is_augmented=is_augmented, mlp_ratio=mlp_ratio, dropout=dropout) for _ in range(depth)
-        ])
-        self.final_layer = FinalLayer_adaLN_Zero(input_size, 1, masked_sequence_size)
-        self.initialize_weights()
+        self.layers = nn.ModuleList([
+            #nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout, bidirectional=False)
+            nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=input_size*mlp_ratio, dropout=dropout, batch_first=True) for _ in range(depth)
+        ]) 
+        self.linear = nn.Linear(input_size, 2 * input_size, device=cst.DEVICE)
 
-    def initialize_weights(self):
-        # Initialize transformer layers:
-        def _basic_init(module):
-            if isinstance(module, nn.Linear):
-                torch.nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
-        self.apply(_basic_init)
-
-        # Initialize timestep embedding MLP:
-        nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
-        nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
 
     def forward(self, x, cond, t):
         """
@@ -203,15 +192,21 @@ class CDT(nn.Module):
         cond = self.token_drop(cond)
         full_input = torch.cat([cond, x], dim=1)
         full_input = full_input.add(self.pos_embed)
-        t = self.t_embedder(t)
-        for block in self.blocks:
-            full_input = block(full_input, t)
-        noise, var = self.final_layer(full_input, t)
+        diff_time_emb = self.t_embedder[t]
+        full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
+        for layer in self.layers:
+            full_input = layer(full_input)
+        if (x.shape[1] != 1):
+            x = x[:, -self.input_seq_len:, :]
+        out = self.linear(x)
+        out = rearrange(out, 'n l (c m) -> n l c m', c=2, m=x.shape[-1])
+        # it gives in output the noise and the variances
+        noise, var = out[:, :, 0], out[:, :, 1]
         return noise, var
 
     def token_drop(self, cond):
-        random = torch.rand(1, device=cond.device)
-        if random < self.cond_dropout_prob:
+        rand = random.random()
+        if rand < self.cond_dropout_prob:
             # create a mask of zeros for the rows to drop
             mask = torch.zeros((cond.shape), device=cond.device)
             cond = torch.einsum('bld, bld -> bld', cond, mask)

@@ -153,9 +153,9 @@ class LOBSTERDataBuilder:
         #apply z-score to size and prices of messages with the statistics of the train set
         for i in range(len(self.dataframes)):
             if (i == 0):
-                self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time = normalize_messages(self.dataframes[i][0])
+                self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time, mean_depth, std_depth = normalize_messages(self.dataframes[i][0])
             else:
-                self.dataframes[i][0], _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time)
+                self.dataframes[i][0], _, _, _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time, mean_depth, std_depth)
 
 
     def _save(self, path_where_to_save):

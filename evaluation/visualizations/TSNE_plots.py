@@ -1,7 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import visualizations_constants as cst
 import seaborn as sns
 import torch
 from sklearn.manifold import TSNE
@@ -61,9 +60,9 @@ def plot_data(tsna2d, tsna2d_):
 
 
 
-def main():
-    df = pd.read_csv(cst.REAL_PATH,header=0)
-    df_ = pd.read_csv(cst.GENERATED_PATH,header=0)
+def main(real_path, generated_path):
+    df = pd.read_csv(real_path,header=0)
+    df_ = pd.read_csv(generated_path,header=0)
 
     df = preprocess_data(df)
     df_ = preprocess_data(df_)

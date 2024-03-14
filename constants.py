@@ -13,7 +13,7 @@ class LearningHyperParameter(str, Enum):
     SEQ_SIZE = "seq_size"          #it's the sequence length
     MASKED_SEQ_SIZE = "masked_seq_size"
     AUGMENT_DIM = "augment_dim"
-    SIZE_DEPTH_EMB = "size_depth_emb"
+    SIZE_TYPE_EMB = "size_type_emb"
     SIZE_ORDER_EMB = "size_order_emb"
     LAMBDA = "lambda"
     CDT_DEPTH = "CDT_depth"
@@ -111,13 +111,14 @@ TSLA_EVENT_MEAN_PRICE = 20178.610720500274
 TSLA_EVENT_STD_PRICE = 813.8188032145645
 TSLA_EVENT_MEAN_TIME = 0.08644932804905886
 TSLA_EVENT_STD_TIME = 0.3512181506722207
+TSLA_EVENT_MEAN_DEPTH = 7.365325300819055
+TSLA_EVENT_STD_DEPTH = 8.59342838063813
 
 SEED = 0
 
 PRECISION = 32
 N_LOB_LEVELS = 10
 LEN_LEVEL = 4
-LEN_EVENT_ONE_HOT = 8
 LEN_EVENT = 6
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
@@ -128,6 +129,4 @@ DATA_DIR = "data"
 RECON_DIR = "data/reconstructions"
 PROJECT_NAME = "CDTS"
 
-REAL_PATH = r"C:\Users\marco\Documents\AFC\Diffusion-Models-for-Time-Series\data\real_orders.csv"
-GENERATED_PATH = r"C:\Users\marco\Documents\AFC\Diffusion-Models-for-Time-Series\data\generated_orders.csv"
 

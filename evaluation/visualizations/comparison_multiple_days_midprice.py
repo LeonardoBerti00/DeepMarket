@@ -1,15 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import visualizations_constants as cst
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import os
 
-def main():
+def main(days_paths):
     dfs = []
     scaler = StandardScaler()  
 
-    for path in cst.days_paths:
+    for path in days_paths:
         df = pd.read_csv(path)
         df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
 
@@ -32,7 +31,7 @@ def main():
     plt.xticks(rotation=45)
     plt.tight_layout()
     file_name = "comparison_multiple_days_midprice.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(days_paths[0], file_name)
     plt.savefig(file_path)
     plt.show()
 

@@ -22,7 +22,7 @@ class LOBDataset(data.Dataset):
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
-        self.encoded_data = one_hot_encode_type(self.data)
+        #self.encoded_data = one_hot_encode_type(self.data)
 
     def __len__(self):
         """ Denotes the total number of samples. """
@@ -31,13 +31,13 @@ class LOBDataset(data.Dataset):
     def __getitem__(self, index):
         index_cond = self.cond_seq_size + index
         index_x = self.cond_seq_size + index + self.x_seq_size
-        cond = self.encoded_data[index:index_cond, :]
-        x_0 = self.encoded_data[index_cond: index_x, :cst.LEN_EVENT_ONE_HOT]
+        cond = self.data[index:index_cond, :]
+        x_0 = self.data[index_cond:index_x, :cst.LEN_EVENT]
         return cond, x_0
 
     def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path))
+        self.data = torch.from_numpy(np.load(self.path)).float()
 
 
 

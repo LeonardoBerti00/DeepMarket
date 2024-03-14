@@ -1,7 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import visualizations_constants as cst
 import seaborn as sns
 import scipy.stats as st
 import matplotlib.dates as mdates
@@ -16,11 +15,11 @@ def ci(row, n, alpha):
 
     return pd.Series(margin, index=['LOWER', 'UPPER'])
 
-def main():
-    if cst.comparison_distribution_market_spread == "real":
-        df = pd.read_csv(cst.REAL_PATH, header=0)
-    elif cst.comparison_distribution_market_spread == "generated":
-        df = pd.read_csv(cst.GENERATED_PATH, header=0)
+def main(real_path, generated_path, IS_REAL):
+    if IS_REAL:
+        df = pd.read_csv(real_path, header=0)
+    else:
+        df = pd.read_csv(generated_path, header=0)
 
 
     # rename 'Unnamed: 0' con TIME
@@ -61,16 +60,16 @@ def main():
 
     plt.xlabel('Time')
     plt.ylabel('Spread')
-    if cst.comparison_distribution_market_spread == "real":
+    if IS_REAL:
         plt.title('Real Data')
-    if cst.comparison_distribution_market_spread == "generated":
+    else:
         plt.title('Generated Data')
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
     file_name = "comparison_distribution_market_spread.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(real_path, file_name)
     plt.savefig(file_path)
     plt.show()
 

@@ -11,11 +11,10 @@ from constants import LearningHyperParameter
 import time
 
 import wandb
-from evaluation.quantitative.evaluation_utils import JSDCalculator
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.CSDI.CSDI import CSDIDiffuser
 from utils.utils_data import unnormalize
-from utils.utils_models import pick_diffuser
+from utils.utils_models import pick_diffuser, pick_augmenter
 from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
@@ -48,7 +47,7 @@ class NNEngine(L.LightningModule):
             self.filename_ckpt = config.FILENAME_CKPT
             self.save_hyperparameters()
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-        self.size_depth_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB]
+        self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
         self.betas = config.BETAS
         self.num_violations_price = 0
@@ -58,28 +57,27 @@ class NNEngine(L.LightningModule):
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = LSTMAugmenter(config, self.size_order_emb).to(cst.DEVICE, non_blocking=True)
+            self.feature_augmenter = pick_augmenter(config, config.CHOSEN_AUGMENTER, self.size_order_emb)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
-        if self.IS_AUGMENTATION and self.cond_type == 'full':
-            self.conditioning_augmenter = LSTMAugmenter(config, config.COND_SIZE).to(cst.DEVICE, non_blocking=True)
-        elif self.IS_AUGMENTATION and self.cond_type in ['only_event', 'only_lob']:
-            self.conditioning_augmenter = self.feature_augmenter
+            
+        if self.IS_AUGMENTATION and self.cond_type in ['full', 'only_lob']:
+            self.conditioning_augmenter = pick_augmenter(config, config.CHOSEN_AUGMENTER, config.COND_SIZE)
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
-        self.depth_embedder = nn.Embedding(cst.N_LOB_LEVELS, self.size_depth_emb)
+        self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
 
 
     def forward(self, cond, x_0, is_train):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
-        x_0, cond = self.depth_embedding(x_0, cond)
+        x_0, cond = self.type_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
         if is_train:
             if isinstance(self.diffuser, CSDIDiffuser) and is_train:
-                self.t = torch.randint(low=0, high=self.num_diffusionsteps - 1, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
+                self.t = torch.randint(low=1, high=self.num_diffusionsteps, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
             elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
                 self.t, _ = self.sampler.sample(x_0.shape[0])
             recon, context = self.single_step(cond, x_0, is_train, real_cond)
@@ -93,9 +91,29 @@ class NNEngine(L.LightningModule):
 
         return recon, context
 
-    def sampling(self, cond, x_T):
-        # TODO: implement sampling
-        return 
+    def sampling(self, cond, x_0):
+        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
+        x_0, cond = self.type_embedding(x_0, cond)
+        real_cond = cond.detach().clone()
+        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
+        context.update({'x_t': x_t.detach().clone()})
+        for i in range(self.num_diffusionsteps-1, -1, -1):
+            # augment
+            x_t, cond = self.augment(x_t, real_cond, False)
+
+            context.update({
+                'is_train': False,
+                't': self.t,
+                'x_0': x_0,
+                'conditioning_aug': cond,
+            })
+
+            x_t, reverse_context = self.diffuser(x_t, context)
+
+            reverse_context.update({'conditioning': real_cond})
+            # return the deaugmented denoised input and the reverse context
+            self.t -= 1
+        return x_t
 
     def single_step(self, cond, x_0, is_train, real_cond):
         # forward process
@@ -110,7 +128,6 @@ class NNEngine(L.LightningModule):
             't': self.t,
             'x_0': x_0,
             'conditioning_aug': cond,
-            'cond_augmenter': self.conditioning_augmenter
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
@@ -126,26 +143,21 @@ class NNEngine(L.LightningModule):
             full_input_aug = self.feature_augmenter.augment(full_input)
             cond = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-        elif self.IS_AUGMENTATION and self.cond_type == 'full' and is_train:
+        elif self.IS_AUGMENTATION and (self.cond_type == 'only_lob' or self.cond_type == 'full'):
+            x_t = self.feature_augmenter.augment(x_t)
             cond = self.conditioning_augmenter.augment(cond)
-            x_t = self.feature_augmenter.augment(x_t)
-        elif self.IS_AUGMENTATION and self.cond_type == 'full' and not is_train:
-            # if we are in test mode and cond type is full, we augment the conditioning only for the first step directly in forward
-            x_t = self.feature_augmenter.augment(x_t)
-        elif self.IS_AUGMENTATION and self.cond_type == 'only_lob':
-            x_t = self.feature_augmenter.augment(x_t)
             assert self.augment_dim == self.cond_size
         return x_t, cond
 
-    def depth_embedding(self, x_0, cond):
-        depth = x_0[:, :, -1]
-        depth_emb = self.depth_embedder(depth.long()).float()
-        x_0 = torch.cat((x_0[:, :, :-1], depth_emb), dim=2)
+    def type_embedding(self, x_0, cond):
+        order_type = x_0[:, :, 1]
+        type_emb = self.type_embedder(order_type.long())
+        x_0 = torch.cat((x_0[:, :, :1], type_emb, x_0[:, :, 2:]), dim=2)
 
         if self.cond_type == 'only_event':
-            cond_depth = cond[:, :, -1]
-            cond_depth_emb = self.depth_embedder(cond_depth.long()).float()
-            cond = torch.cat((cond[:, :, :-1], cond_depth_emb), dim=2)
+            cond_type = cond[:, :, 1]
+            cond_depth_emb = self.type_embedder(cond_type.long())
+            cond = torch.cat((cond[:, :, :1], cond_depth_emb, cond[:, :, 2:]), dim=2)
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
@@ -174,6 +186,10 @@ class NNEngine(L.LightningModule):
         return batch_loss_mean
 
 
+    def on_train_epoch_start(self) -> None:
+        print(f'learning rate: {self.optimizer.param_groups[0]["lr"]}')
+
+
     def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -183,9 +199,9 @@ class NNEngine(L.LightningModule):
                 wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
                 wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)
                 wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
-            print(f'\ntrain loss simple on epoch {self.current_epoch} is {L_simple}\n')
-            print(f'\ntrain loss vlb on epoch {self.current_epoch} is {L_vlb}\n')
-            print(f'\ntrain loss on epoch {self.current_epoch} is {loss}\n')
+            print(f'\ntrain loss simple on epoch {self.current_epoch} is {round(L_simple, 3)}')
+            print(f'\ntrain loss vlb on epoch {self.current_epoch} is {round(L_vlb, 3)}')
+            print(f'\ntrain loss on epoch {self.current_epoch} is {round(loss, 3)}')
         self.train_losses = []
         self.simple_train_losses = []
         self.vlb_train_losses = []
@@ -220,6 +236,9 @@ class NNEngine(L.LightningModule):
 
         # model checkpointing
         if loss_ema < self.min_loss_ema:
+            # if the improvement is less than 0.01, we halve the learning rate
+            if loss_ema - self.min_loss_ema > -0.005:
+                self.optimizer.param_groups[0]["lr"] /= 2  
             self.min_loss_ema = loss_ema
             self._model_checkpointing(loss_ema)
 
@@ -229,11 +248,12 @@ class NNEngine(L.LightningModule):
             if self.IS_WANDB:
                 wandb.log({'val_loss_simple': L_simple}, step=self.current_epoch + 1)
                 wandb.log({'val_loss_vlb': L_vlb}, step=self.current_epoch + 1)
-            print(f'\nval loss simple on epoch {self.current_epoch} is {L_simple}\n')
-            print(f'\nval loss vlb on epoch {self.current_epoch} is {L_vlb}\n')
+            print(f'\nval loss simple on epoch {self.current_epoch} is {round(L_simple, 3)}')
+            print(f'\nval loss vlb on epoch {self.current_epoch} is {round(L_vlb, 3)}')
 
         self.log('val_ema_loss', loss_ema)
-        print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}\n")
+        print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
+        
 
 
     def configure_optimizers(self):
@@ -257,9 +277,9 @@ class NNEngine(L.LightningModule):
 
     def _select_cond(self, cond, cond_type):
         if cond_type == 'only_event':
-            cond = cond[:, :, :cst.LEN_EVENT_ONE_HOT]
+            cond = cond[:, :, :cst.LEN_EVENT]
         elif cond_type == 'only_lob':
-            cond = cond[:, :, cst.LEN_EVENT_ONE_HOT:]
+            cond = cond[:, :, cst.LEN_EVENT:]
         return cond
 
     def _model_checkpointing(self, loss):
@@ -270,7 +290,7 @@ class NNEngine(L.LightningModule):
                              "_" + self.filename_ckpt +
                              "_ema.ckpt"
                              )
-        path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/ema/" + filename_ckpt_ema
+        path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/" + filename_ckpt_ema
         with self.ema.average_parameters():
             self.trainer.save_checkpoint(path_ckpt_ema)
         self.last_path_ckpt_ema = path_ckpt_ema

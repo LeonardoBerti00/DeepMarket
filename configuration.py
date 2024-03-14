@@ -7,25 +7,15 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
-        self.IS_TRAINING = True
+        self.IS_TRAINING = False
         self.IS_DEBUG = False
 
         # evaluation
-        self.PRED_DISC = False # to activate the predictive and discriminative evaluation
-        self.IS_DISCRIMINATIVE = True 
-        self.IS_PREDICTIVE = True
+        self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
         self.PLOT_GRAPHS = False #to activate the plot of the graphs
-        self.IS_PCA = True
-        self.IS_TSNE = True
-        self.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE = True
-        self.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE = True
-        self.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD = True
-        self.IS_COMPARISON_MIDPRICE = True
-        self.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE = True
-        self.IS_COMPARISON_VOLUME_DISTRIBUTION = True
 
         assert (self.IS_WANDB + self.IS_TRAINING) == 1
 
@@ -38,6 +28,8 @@ class Configuration:
         self.SPLIT_RATES = (.75, .05, .2)
 
         self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_AUGMENTER = "MLP"
+        
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
@@ -51,6 +43,10 @@ class Configuration:
 
         self.IS_SHUFFLE_TRAIN_SET = True
 
+        # insert the path of the generated and real orders with a relative path
+        self.REAL_DATA_PATH = ""
+        self.GEN_DATA_PATH = ""
+
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
@@ -59,20 +55,20 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 20
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 50        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 128        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
         self.COND_SEQ_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] = 2     # try higher values
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT_ONE_HOT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_DEPTH_EMB] - 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.1       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3     # try higher values
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 1       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 12
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 2
         self.COND_METHOD = "concatenation"
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
@@ -86,11 +82,11 @@ class Configuration:
 
         self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
-            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT_ONE_HOT
+            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 44
         elif self.COND_TYPE == "only_event":
-            self.COND_SIZE = cst.LEN_EVENT_ONE_HOT
-            self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 16
+            self.COND_SIZE = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+            self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 32
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
             self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 40

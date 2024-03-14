@@ -16,7 +16,7 @@ import pandas as pd
 import datetime
 
 from ABIDES.util.order.MarketOrder import MarketOrder
-from utils.utils_data import reset_indexes, normalize_messages, one_hot_encode_type
+from utils.utils_data import reset_indexes, normalize_messages, one_hot_encode_type, to_sparse_representation
 import constants as cst
 
 class WorldAgent(Agent):
@@ -30,9 +30,10 @@ class WorldAgent(Agent):
                  cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
-        self.count_neg_price_size = 0
+        self.count_neg_size = 0
         self.next_historical_orders_index = 0
         self.lob_snapshots = []
+        self.sparse_lob_snapshots = []
         self.symbol = symbol
         self.date = date
         self.log_orders = log_orders
@@ -48,6 +49,7 @@ class WorldAgent(Agent):
         self.first_wakeup = True
         self.active_limit_orders = {}
         self.placed_orders = []
+        self.count_diff_placed_orders = 0
         self.count_modify = 0
         self.cond_type = cond_type
         self.cond_seq_size = cond_seq_size
@@ -57,6 +59,8 @@ class WorldAgent(Agent):
         self.generated_orders_out_of_depth = 0
         self.generated_cancel_orders_empty_depth = 0
         self.depth_rounding = 0
+        self.last_bid_price = 0
+        self.last_ask_price = 0
         if using_diffusion:
             self.starting_time_diffusion = '15min'
         else:
@@ -87,12 +91,12 @@ class WorldAgent(Agent):
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
         #make a print every 10 minutes
-        if currentTime.minute % 5 == 0 and currentTime.second % 30 == 0:
+        if currentTime.minute % 2 == 0 and currentTime.second % 30 == 0:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
-            print("Number of generated cancel orders empty depth: {}".format(self.generated_cancel_orders_empty_depth))
-            print("Number of negative price or size: {}".format(self.count_neg_price_size))
-            print("Number of depth rounding: {}".format(self.depth_rounding))
+            print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
+            print("Number of negative size: {}".format(self.count_neg_size))
+            print("Number of generated placed orders: {}".format(self.count_diff_placed_orders))
             now = datetime.datetime.now()
             current_time = now.strftime("%H:%M:%S")
             print("Current Time =", current_time)
@@ -220,14 +224,14 @@ class WorldAgent(Agent):
                 cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders,
+                cond = self._preprocess_orders_for_diff_cond(orders,
                                                                             np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
-                cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
+                #cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
             cond = cond.unsqueeze(0)
             x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT, device=cst.DEVICE, dtype=torch.float32)
-            generated, context = self.diffusion_model(cond, x, False)
+            generated = self.diffusion_model.sampling(cond, x)
             generated = generated[0, 0, :]
             generated = self._postprocess_generated(generated)
         return generated
@@ -270,47 +274,45 @@ class WorldAgent(Agent):
 
     def _postprocess_generated(self, generated):
         ''' we need to go from the output of the diffusion model to an actual order '''
-
-        # we select the depth with the minimum distance from the nn.Embedding layer
-        # the depth will be used only in the case of a cancel order
-        depth_emb = generated[-2:]
-        depth = torch.argmin(torch.sum(torch.abs(self.diffusion_model.depth_embedder.weight.data - depth_emb), dim=1)).item()
-
-        # we need to convert the order type from one hot encoding to the original encoding, so we select the nearest of the tuple to 1
-        # for example if we have (0.1, 0.9, 0.1) the order type is 2
-        order_type = torch.argmin(torch.abs(generated[1:4] - 1.0)).item() + 1
+        direction = generated[6]
+        if direction < 0:
+            direction = -1
+        else:
+            direction = 1
+        
+        order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:4]), dim=1)).item()
         if order_type == 3 or order_type == 2:
             order_type += 1
         # order type == 1 -> limit order
         # order type == 3 -> cancel order
         # order type == 4 -> market order
 
-        # we return the price, the size and the time to the original scale
-        price = round(generated[5].item() * self.normalization_terms["event"][0] + self.normalization_terms["event"][1], ndigits=0)*100
-        size = round(generated[4].item() * self.normalization_terms["event"][2] + self.normalization_terms["event"][3], ndigits=0)
+        # we return the size and the time to the original scale
+        size = round(generated[5].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
+        depth = round(generated[-1].item() * self.normalization_terms["event"][7] + self.normalization_terms["event"][6], ndigits=0)
+        time = generated[0].item() * self.normalization_terms["event"][5] + self.normalization_terms["event"][4]
 
         # if the price or the size are negative we return None and we generate another order
-        if price < 0 or size < 0:
-            self.count_neg_price_size += 1
+        if size < 0:
+            self.count_neg_size += 1
             return None
-        time = generated[0].item() * self.normalization_terms["event"][4] + self.normalization_terms["event"][5]
-
+        
         # if the time is negative we approximate to 1 microsecond
         if time <= 0:
             time = 0.0000001
-
-        direction = generated[-3]
-        if direction < 0:
-            direction = -1
-        else:
-            direction = 1
 
         if order_type == 1:
             order_id = self.unused_order_ids[0]
             self.unused_order_ids = self.unused_order_ids[1:]
             if direction == 1:
                 bid_side = self.lob_snapshots[-1][2::4]
-                last_price = bid_side[-1]
+                bid_price = bid_side[0]
+                if bid_price == 0:
+                    bid_price = self.last_bid_price
+                else:
+                    self.last_bid_price = bid_price
+                last_price = bid_side[-1] 
+                price = bid_price - depth*100
                 # if the first 10 levels are full and the price is less than the last price we generate another order
                 # because we consider only the first 10 levels
                 if price < last_price and last_price > 0:
@@ -318,7 +320,13 @@ class WorldAgent(Agent):
                     return None
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
+                ask_price = ask_side[0]
+                if ask_price == 0:
+                    ask_price = self.last_ask_price
+                else:
+                    self.last_ask_price = ask_price
                 last_price = ask_side[-1]
+                price = ask_price + depth*100
                 if price > last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
@@ -326,7 +334,12 @@ class WorldAgent(Agent):
         elif order_type == 3:
             if direction == 1:
                 bid_side = self.lob_snapshots[-1][2::4]
-                price = bid_side[depth]
+                bid_price = bid_side[0]
+                if bid_price == 0:
+                    bid_price = self.last_bid_price
+                else:
+                    self.last_bid_price = bid_price
+                price = bid_price - depth*100
                 # search all the active limit orders with the same price
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we generate another order
@@ -338,7 +351,13 @@ class WorldAgent(Agent):
 
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
-                price = ask_side[depth]
+                ask_price = ask_side[0]
+                if ask_price == 0:
+                    ask_price = self.last_ask_price
+                else:
+                    self.last_ask_price = ask_price
+                last_price = ask_side[-1]
+                price = ask_price + depth*100
                 # search all the active limit orders in the same level
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we generate another order
@@ -349,11 +368,15 @@ class WorldAgent(Agent):
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
         elif order_type == 4:
+            if direction == 1:
+                price = self.lob_snapshots[-1][0]
+            else:
+                price = self.lob_snapshots[-1][2]
             order_id = 0
             # the diffusion gives in output market order and not execution of limit order,
             # so we transform market orders in execution orders of the opposite side as the original message files
             direction = -direction
-
+        self.count_diff_placed_orders += 1
         return np.array([time, order_type, order_id, size, price, direction])
 
 
@@ -408,19 +431,16 @@ class WorldAgent(Agent):
                     index = j
                 if direction == 1:
                     bid_side = dataframes[i][1].iloc[index, 2::4]
-                    if len(np.where(bid_side == order_price)[0]) == 0:
-                        self.depth_rounding += 1
-                        depth = 9
-                    else:
-                        depth = np.where(bid_side == order_price)[0][0]
+                    bid_price = bid_side[0]
+                    depth = (bid_price - order_price) // 100
+                    if depth < 0:
+                        depth = 0
                 else:
                     ask_side = dataframes[i][1].iloc[index, 0::4]
-                    if len(np.where(ask_side == order_price)[0]) == 0:
-                        depth = 9
-                        self.depth_rounding += 1
-                    else:
-                        depth = np.where(ask_side == order_price)[0][0]
-
+                    ask_price = ask_side[0]
+                    depth = (order_price - ask_price) // 100
+                    if depth < 0:
+                        depth = 0
                 dataframes[i][0].loc[j, "depth"] = depth
 
         # if order type is 4, then we transform the execution of a sell limit order in a buy market order
@@ -438,14 +458,17 @@ class WorldAgent(Agent):
 
         # apply z score to orders
         for i in range(len(dataframes)):
-            dataframes[i][0], _, _, _, _, _, _ = normalize_messages(dataframes[i][0],
+            dataframes[i][0], _, _, _, _, _, _, _, _ = normalize_messages(dataframes[i][0],
                                                                     mean_size=self.normalization_terms["event"][0],
-                                                                    mean_prices=self.normalization_terms["event"][1],
-                                                                    std_size=self.normalization_terms["event"][2],
+                                                                    mean_prices=self.normalization_terms["event"][2],
+                                                                    std_size=self.normalization_terms["event"][1],
                                                                     std_prices=self.normalization_terms["event"][3],
                                                                     mean_time=self.normalization_terms["event"][4],
-                                                                    std_time=self.normalization_terms["event"][5]
+                                                                    std_time=self.normalization_terms["event"][5],
+                                                                    mean_depth=self.normalization_terms["event"][6],
+                                                                    std_depth=self.normalization_terms["event"][7]
                                                                     )
+                                                                    
 
 
         return torch.from_numpy(dataframes[0][0].to_numpy()).to(cst.DEVICE, torch.float32)
@@ -546,6 +569,7 @@ class WorldAgent(Agent):
                     for _ in range(4): last_lob_snapshot.append(0)
         self.last_lob_snapshot = last_lob_snapshot
         self.lob_snapshots.append(last_lob_snapshot)
+        self.sparse_lob_snapshots.append(to_sparse_representation(last_lob_snapshot, 100))
 
 
 

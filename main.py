@@ -8,8 +8,8 @@ import constants as cst
 import configuration
 from preprocessing.LOBSTERDataBuilder import LOBSTERDataBuilder
 from models.NNEngine import NNEngine
-import evaluation.predictive_discriminative.predictive_lstm as predictive_lstm
-import evaluation.predictive_discriminative.discriminative_lstm as discriminative_lstm
+import evaluation.quantitative_eval.predictive_lstm as predictive_lstm
+import evaluation.quantitative_eval.discriminative_lstm as discriminative_lstm
 import evaluation.visualizations.comparison_distribution_order_type as comparison_distribution_order_type
 import evaluation.visualizations.comparison_distribution_volume_price as comparison_distribution_volume_price
 import evaluation.visualizations.comparison_distribution_market_spread as comparison_distribution_market_spread
@@ -27,36 +27,19 @@ def set_torch():
     torch.autograd.set_detect_anomaly(True)
     torch.set_float32_matmul_precision('high')
 
-def plot_graphs():
-    if config.IS_COMPARISON_DISTRIBUTION_ORDER_TYPE:
-        comparison_distribution_order_type.main()
+def plot_graphs(real_data_path, gen_data_path):
+    comparison_distribution_order_type.main(real_data_path, gen_data_path)
+    comparison_distribution_volume_price.main(real_data_path, gen_data_path)
+    comparison_distribution_market_spread.main(real_data_path, gen_data_path, IS_REAL=True)
+    PCA_plots.main(real_data_path, gen_data_path)
+    TSNE_plots.main(real_data_path, gen_data_path)
+    comparison_midprice.main(real_data_path, gen_data_path)
+    comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
+    comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
 
-    elif config.IS_COMPARISON_DISTRIBUTION_VOLUME_PRICE:
-        comparison_distribution_volume_price.main()
-
-    elif config.IS_COMPARISON_DISTRIBUTION_MARKET_SPREAD:
-        comparison_distribution_market_spread.main()
-
-    elif config.IS_PCA:
-        PCA_plots.main()
-
-    elif config.IS_TSNE:
-        TSNE_plots.main()
-
-    elif config.IS_COMPARISON_MIDPRICE:
-        comparison_midprice.main()
-
-    elif config.IS_COMPARISON_MULTIPLE_DAYS_MIDPRICE:
-        comparison_multiple_days_midprice.main()
-
-    elif config.IS_COMPARISON_VOLUME_DISTRIBUTION:
-        comparison_volume_distribution.main()
-
-def pred_discrim():
-    if config.IS_PREDICTIVE:
-        predictive_lstm.main()
-    elif config.IS_DISCRIMINATIVE:
-        discriminative_lstm.main()
+def predictive_discriminative_scores(real_data_path, gen_data_path):
+    predictive_lstm.main(real_data_path, gen_data_path)
+    discriminative_lstm.main(real_data_path, gen_data_path)
 
 
 if __name__ == "__main__":
@@ -89,11 +72,11 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
-    elif config.PRED_DISC:
-        pred_discrim()
+    elif config.QUANT_METRICS:
+        predictive_discriminative_scores(config.REAL_DATA_PATH, config.GEN_DATA_PATH)
 
     elif config.PLOT_GRAPHS:
-        plot_graphs()
+        plot_graphs(config.REAL_DATA_PATH, config.GEN_DATA_PATH)
 
 
 

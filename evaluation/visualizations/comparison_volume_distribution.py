@@ -1,6 +1,5 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import visualizations_constants as cst
 import numpy as np
 import scipy.stats as st
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -23,11 +22,11 @@ def ci_(row, n, alpha):
 
     return pd.Series(margin, index=['LOWER_', 'UPPER_'])
 
-def main():
-    if cst.comparison_volume_distribution == "real":
-        df = pd.read_csv(cst.REAL_PATH, header=0)
-    elif cst.comparison_volume_distribution == "generated":
-        df = pd.read_csv(cst.GENERATED_PATH, header=0)
+def main(real_path, generated_path, IS_REAL):
+    if IS_REAL:
+        df = pd.read_csv(real_path, header=0)
+    else:
+        df = pd.read_csv(generated_path, header=0)
 
     # rename 'Unnamed: 0' con TIME
     df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
@@ -70,16 +69,16 @@ def main():
 
     plt.xlabel('Time')
     plt.ylabel('Volume')
-    if cst.comparison_volume_distribution == "real":
+    if IS_REAL:
         plt.title('Real Data')
-    if cst.comparison_volume_distribution == "generated":
+    else:
         plt.title('Generated Data')
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
     file_name = "comparison_volume_distribution.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
     plt.show()
 

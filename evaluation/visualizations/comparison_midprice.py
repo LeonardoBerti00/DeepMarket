@@ -1,14 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import visualizations_constants as cst
 import seaborn as sns
-import visualizations_constants as cst
 import os
 
-def main():
-    df1 = pd.read_csv(cst.REAL_PATH)
-    df2 = pd.read_csv(cst.GENERATED_PATH)
+def main(real_path, generated_path):
+    df1 = pd.read_csv(real_path)
+    df2 = pd.read_csv(generated_path)
 
     df1.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
     df2.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
@@ -30,7 +28,7 @@ def main():
     plt.xticks(rotation=45)
     plt.tight_layout()
     file_name = "comparison_midprice.png"
-    file_path = os.path.join(cst.folder_save_path, file_name)
+    file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
     plt.show()
 

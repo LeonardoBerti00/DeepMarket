@@ -42,13 +42,15 @@ parser.add_argument('-date',
                     required=True,
                     type=parse,
                     help='historical date being simulated in format YYYYMMDD.')
-parser.add_argument('--start-time',
+parser.add_argument('-st',
+                    '--start-time',
                     default='09:30:00',
                     type=parse,
                     help='Starting time of simulation.'
                     )
-parser.add_argument('--end-time',
-                    default='12:00:00',
+parser.add_argument('-et',
+                    '--end-time',
+                    default='11:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -70,9 +72,6 @@ parser.add_argument('-m',
                     '--chosen-model',
                     type=str,
                     default='CDT')
-parser.add_argument('-pt',
-                    '--param-type',
-                    default='normal')
 parser.add_argument('-p',
                     '--execution-pov',
                     type=float,
@@ -117,23 +116,25 @@ if symbol == "TSLA":
             cst.TSLA_LOB_MEAN_SIZE_10,
             cst.TSLA_LOB_STD_SIZE_10,
             cst.TSLA_LOB_MEAN_PRICE_10,
-            cst.TSLA_LOB_STD_PRICE_10
+            cst.TSLA_LOB_STD_PRICE_10,
         ],
         "event": [
             cst.TSLA_EVENT_MEAN_SIZE,
-            cst.TSLA_EVENT_MEAN_PRICE,
             cst.TSLA_EVENT_STD_SIZE,
+            cst.TSLA_EVENT_MEAN_PRICE,
             cst.TSLA_EVENT_STD_PRICE,
             cst.TSLA_EVENT_MEAN_TIME,
-            cst.TSLA_EVENT_STD_TIME
+            cst.TSLA_EVENT_STD_TIME,
+            cst.TSLA_EVENT_MEAN_DEPTH,
+            cst.TSLA_EVENT_STD_DEPTH,
         ]
     }
 
 elif symbol == "INTC":
     normalization_terms = {"lob": [cst.INTC_LOB_MEAN_SIZE_10, cst.INTC_LOB_STD_SIZE_10, cst.INTC_LOB_MEAN_PRICE_10,
                                    cst.INTC_LOB_STD_PRICE_10],
-                           "event": [cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_PRICE, cst.INTC_EVENT_STD_SIZE,
-                                     cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_TIME, cst.INTC_EVENT_MEAN_TIME]}
+                           "event": [cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_SIZE, cst.INTC_EVENT_MEAN_PRICE, 
+                                     cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_TIME, cst.INTC_EVENT_STD_TIME]}
 
 starting_cash = 1000000000  # Cash in this simulator is always in CENTS.
 
@@ -164,13 +165,13 @@ agent_count += 1
 # 2) World Agent
 
 chosen_model = args.chosen_model
-param_type = args.param_type
-dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model) + "/" + param_type)
+dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
 best_val_loss = 1000000
 for file in dir_path.iterdir():
     try:
         val_loss = float(file.name.split("=")[1].split("_")[0])
-        if val_loss < best_val_loss:
+        #if val_loss < best_val_loss:
+        if val_loss == 1.808:
             best_val_loss = val_loss
             checkpoint_reference = file
     except:
@@ -259,12 +260,12 @@ time_mkt_close = str(tmp.time()).replace(':', '-')
 
 if trade_pov:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_pov_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume) + checkpoint_reference.name
+        log_dir = "world_agent_{}_{}_{}_pov_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume) + checkpoint_reference.name[:-5]
     else:
         log_dir = "market_replay_{}_{}_{}_pov_{}".format(symbol, date, time_mkt_close, args.pov_proportion_of_volume)
 else:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_".format(symbol, date, time_mkt_close) + checkpoint_reference.name
+        log_dir = "world_agent_{}_{}_{}_".format(symbol, date, time_mkt_close) + checkpoint_reference.name[:-5]
     else:
         log_dir = "market_replay_{}_{}_{}".format(symbol, date, time_mkt_close)
 

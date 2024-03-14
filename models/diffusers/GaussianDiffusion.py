@@ -67,8 +67,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 self.IS_AUGMENTATION,
                 self.dropout
             )
-        elif (self.type == 'crossattention'):
-            pass
         else:
             raise ValueError("Invalid conditioning type")
 
@@ -138,6 +136,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         std_t = torch.sqrt(var_t)
         # Sample a standard normal random variable z
         z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE, non_blocking=True)
+
+        #take the indexes for which t = 1
+        indexes = torch.where(t == 0)
+        z[indexes] = 0.0
+
         # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
         x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
 

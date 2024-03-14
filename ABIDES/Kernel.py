@@ -492,7 +492,7 @@ class Kernel:
 
     if self.skip_log: return
 
-    path = os.path.join(".", "ABIDES", "log", self.log_dir)
+    path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir)
 
     if filename:
       file = "{}.bz2".format(filename)
@@ -514,7 +514,7 @@ class Kernel:
 
 
   def writeSummaryLog (self):
-    path = os.path.join(".", "log", self.log_dir)
+    path = os.path.join("abides", "log", self.log_dir)
     file = "summary_log.bz2"
 
     if not os.path.exists(path):
