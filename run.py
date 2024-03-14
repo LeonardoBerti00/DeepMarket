@@ -68,6 +68,21 @@ def train(config, trainer):
 
 
 def run(config, accelerator, model=None):
+    wandb_instance_name = ""
+    model_params = HP_DICT_MODEL[config.CHOSEN_MODEL].fixed
+    for param in cst.LearningHyperParameter:
+        if param.value in model_params:
+            config.HYPER_PARAMETERS[param] = model_params[param.value]
+            wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
+
+    cond_type = config.COND_TYPE
+    is_augmentation = config.IS_AUGMENTATION
+    stock_name = config.CHOSEN_STOCK.name
+    diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+    augmenter = config.CHOSEN_AUGMENTER
+    aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
+    config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_" + str(aug_dim) + "_diffsteps_" + str(diffsteps)
+            
     trainer = L.Trainer(
         accelerator=accelerator,
         precision=cst.PRECISION,

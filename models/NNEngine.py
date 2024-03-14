@@ -162,8 +162,9 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, 5], p=1) // recon.shape[0]
-        return self.diffuser.loss(real, recon, **kwargs) + self.reg_term_weight * regularization_term
+        regularization_term = torch.norm(recon[:, 0, 5], p=1) / recon.shape[0]
+        L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
+        return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
