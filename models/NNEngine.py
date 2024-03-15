@@ -45,8 +45,7 @@ class NNEngine(L.LightningModule):
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = 10000000
         self.filename_ckpt = config.FILENAME_CKPT
-        if self.IS_WANDB:
-            self.save_hyperparameters()
+        self.save_hyperparameters()
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]

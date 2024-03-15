@@ -91,7 +91,7 @@ def run(config, accelerator, model=None):
         num_sanity_val_steps=0,
         detect_anomaly=False,
         profiler="simple",
-        check_val_every_n_epoch=2
+        check_val_every_n_epoch=1
     )
     train(config, trainer)
 
@@ -134,7 +134,7 @@ def run_wandb(config, accelerator):
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
                 detect_anomaly=False,
-                check_val_every_n_epoch=2,
+                check_val_every_n_epoch=1,
             )
 
             # log simulation details in WANDB console

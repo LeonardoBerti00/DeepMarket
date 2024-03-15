@@ -230,7 +230,7 @@ class WorldAgent(Agent):
             else:
                 raise ValueError("cond_type not recognized")
             cond = cond.unsqueeze(0)
-            x = torch.zeros(1, 1, cst.LEN_EVENT_ONE_HOT, device=cst.DEVICE, dtype=torch.float32)
+            x = torch.zeros(1, 1, cst.LEN_EVENT, device=cst.DEVICE, dtype=torch.float32)
             generated = self.diffusion_model.sampling(cond, x)
             generated = generated[0, 0, :]
             generated = self._postprocess_generated(generated)
@@ -274,13 +274,16 @@ class WorldAgent(Agent):
 
     def _postprocess_generated(self, generated):
         ''' we need to go from the output of the diffusion model to an actual order '''
-        direction = generated[6]
+        direction = generated[8]
         if direction < 0:
             direction = -1
         else:
             direction = 1
         
-        order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:4]), dim=1)).item()
+        order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:6]), dim=1)).item()+1
+        #print(order_type)
+        #print(self.diffusion_model.type_embedder.weight.data)
+        #print(generated[1:4])
         if order_type == 3 or order_type == 2:
             order_type += 1
         # order type == 1 -> limit order
@@ -288,7 +291,7 @@ class WorldAgent(Agent):
         # order type == 4 -> market order
 
         # we return the size and the time to the original scale
-        size = round(generated[5].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
+        size = round(generated[7].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
         depth = round(generated[-1].item() * self.normalization_terms["event"][7] + self.normalization_terms["event"][6], ndigits=0)
         time = generated[0].item() * self.normalization_terms["event"][5] + self.normalization_terms["event"][4]
 
