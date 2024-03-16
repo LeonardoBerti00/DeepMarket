@@ -58,6 +58,8 @@ class WorldAgent(Agent):
         self.ignored_cancel = 0
         self.generated_orders_out_of_depth = 0
         self.generated_cancel_orders_empty_depth = 0
+        self.diff_limit_order_placed = 0
+        self.diff_market_order_placed = 0
         self.depth_rounding = 0
         self.last_bid_price = 0
         self.last_ask_price = 0
@@ -97,6 +99,7 @@ class WorldAgent(Agent):
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
             print("Number of negative size: {}".format(self.count_neg_size))
             print("Number of generated placed orders: {}".format(self.count_diff_placed_orders))
+            print("Of which {} market order and {} limit order".format(self.diff_market_order_placed, self.diff_limit_order_placed))
             now = datetime.datetime.now()
             current_time = now.strftime("%H:%M:%S")
             print("Current Time =", current_time)
@@ -321,6 +324,7 @@ class WorldAgent(Agent):
                 if price < last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
+                self.diff_limit_order_placed += 1
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
                 ask_price = ask_side[0]
@@ -333,6 +337,7 @@ class WorldAgent(Agent):
                 if price > last_price and last_price > 0:
                     self.generated_orders_out_of_depth += 1
                     return None
+                self.diff_limit_order_placed += 1
 
         elif order_type == 3:
             if direction == 1:
@@ -371,6 +376,7 @@ class WorldAgent(Agent):
                 order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
         elif order_type == 4:
+            self.diff_market_order_placed += 1
             if direction == 1:
                 price = self.lob_snapshots[-1][0]
             else:

@@ -267,8 +267,7 @@ class NNEngine(L.LightningModule):
             self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
         elif self.optimizer == 'LION':
             self.optimizer = Lion(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)
-        return {"optimizer": self.optimizer, "lr_scheduler": scheduler}
+        return self.optimizer
 
     def on_before_zero_grad(self, *args, **kwargs):
         self.ema.update()

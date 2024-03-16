@@ -7,6 +7,7 @@ import constants as cst
 from preprocessing.DataModule import DataModule
 from preprocessing.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.callbacks import TQDMProgressBar
 from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
@@ -87,7 +88,10 @@ def run(config, accelerator, model=None):
         accelerator=accelerator,
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
-        callbacks=[EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True)],
+        callbacks=[
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
+            TQDMProgressBar(refresh_rate=1000)
+            ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
         profiler="simple",
@@ -130,7 +134,10 @@ def run_wandb(config, accelerator):
                 accelerator=accelerator,
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
-                callbacks=EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
+                callbacks=[
+                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
+                    TQDMProgressBar(refresh_rate=1000)
+                ],
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
                 detect_anomaly=False,
