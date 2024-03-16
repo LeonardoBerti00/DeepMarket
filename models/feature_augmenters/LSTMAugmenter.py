@@ -9,22 +9,21 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 class LSTMAugmenter(AugmenterAB, nn.Module):
     
-    def __init__(self, config, input_size):
+    def __init__(self, input_size, augment_dim, chosen_model):
         super().__init__()
-        dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
-        augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
+        augment_dim = augment_dim
         self.input_size = input_size
-        self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
-        self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
-        self.chosen_model = config.CHOSEN_MODEL
-        if config.CHOSEN_MODEL == cst.Models.CDT.value:
-            self.v_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, dropout=dropout, device=cst.DEVICE)
+        self.fwd_lstm = nn.LSTM(input_size, augment_dim, num_layers=2, batch_first=True, device=cst.DEVICE)
+        self.bck_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, device=cst.DEVICE)
+        self.chosen_model = chosen_model
+        if self.chosen_model == cst.Models.CDT.value:
+            self.v_lstm = nn.LSTM(augment_dim, input_size, num_layers=2, batch_first=True, device=cst.DEVICE)
 
 
     def forward(self, input):
         out, (h_n, c_n) = self.fwd_lstm(input)
         return out
-    
+     
     def augment(self, input):
         return self.forward(input)
     

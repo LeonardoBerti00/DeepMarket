@@ -57,13 +57,13 @@ class NNEngine(L.LightningModule):
         # TODO: Why not choose this augmenter from the config?
         # TODO: make both conditioning as default to switch to nn.Identity
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = pick_augmenter(config, config.CHOSEN_AUGMENTER, self.size_order_emb)
+            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.chosen_model)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
             
         if self.IS_AUGMENTATION and self.cond_type in ['full', 'only_lob']:
-            self.conditioning_augmenter = pick_augmenter(config, config.CHOSEN_AUGMENTER, config.COND_SIZE)
+            self.conditioning_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, config.COND_SIZE, self.augment_dim, self.chosen_model)
 
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -154,16 +154,16 @@ class NNEngine(L.LightningModule):
         type_emb = self.type_embedder(order_type.long())
         x_0 = torch.cat((x_0[:, :, :1], type_emb, x_0[:, :, 2:]), dim=2)
 
-        if self.cond_type == 'only_event':
+        if self.cond_type == 'only_event' or self.cond_type == 'full':
             cond_type = cond[:, :, 1]
             cond_depth_emb = self.type_embedder(cond_type.long())
             cond = torch.cat((cond[:, :, :1], cond_depth_emb, cond[:, :, 2:]), dim=2)
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, 5], p=1) / recon.shape[0]
+        regularization_term = torch.norm(recon[:, 0, 7], p=2) / recon.shape[0]
         L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
-        return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
+        return L_hybrid + regularization_term, L_simple, L_vlb
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:

@@ -13,13 +13,11 @@ def pick_diffuser(config, model_name, augmenter):
         return CSDIDiffuser(config, augmenter).to(cst.DEVICE, non_blocking=True)
     else:
         raise ValueError("Diffuser not found")
-    return "fai un diffuser al posto di cazzeggiare"
 
-def pick_augmenter(config, augmenter_name, input_size):
+def pick_augmenter(augmenter_name, input_size, augment_dim, chosen_model):
     if augmenter_name == "LSTM":
-        return LSTMAugmenter(config, input_size).to(cst.DEVICE, non_blocking=True)
+        return LSTMAugmenter(input_size, augment_dim, chosen_model).to(cst.DEVICE, non_blocking=True)
     elif augmenter_name == 'MLP':
-        return MLPAugmenter(config, input_size).to(cst.DEVICE, non_blocking=True)
+        return MLPAugmenter(input_size, augment_dim, chosen_model).to(cst.DEVICE, non_blocking=True)
     else:
-        raise ValueError("Diffuser not found")
-    return "fai un diffuser al posto di cazzeggiare"
+        raise ValueError("Augmenter not found")
