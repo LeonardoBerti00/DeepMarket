@@ -294,7 +294,7 @@ class WorldAgent(Agent):
         # order type == 4 -> market order
 
         # we return the size and the time to the original scale
-        size = round(generated[7].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
+        size = round(generated[6].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
         depth = round(generated[-1].item() * self.normalization_terms["event"][7] + self.normalization_terms["event"][6], ndigits=0)
         time = generated[0].item() * self.normalization_terms["event"][5] + self.normalization_terms["event"][4]
 
@@ -344,7 +344,7 @@ class WorldAgent(Agent):
                 bid_side = self.lob_snapshots[-1][2::4]
                 bid_price = bid_side[0]
                 if bid_price == 0:
-                    bid_price = self.last_bid_price
+                    return None
                 else:
                     self.last_bid_price = bid_price
                 price = bid_price - depth*100
@@ -353,27 +353,29 @@ class WorldAgent(Agent):
                 # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
-                    return None
-                # we select the order with the quantity closer to the quantity generated
-                order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    # find the order with the closest price and quantity
+                    order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
+                else:
+                    # we select the order with the quantity closer to the quantity generated
+                    order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
                 ask_price = ask_side[0]
                 if ask_price == 0:
-                    ask_price = self.last_ask_price
+                    return None
                 else:
                     self.last_ask_price = ask_price
-                last_price = ask_side[-1]
                 price = ask_price + depth*100
                 # search all the active limit orders in the same level
                 orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
                 # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
-                    return None
-                # we select the order with the quantity near to the quantity generated
-                order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
+                else:
+                    # we select the order with the quantity near to the quantity generated
+                    order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
 
         elif order_type == 4:
             self.diff_market_order_placed += 1

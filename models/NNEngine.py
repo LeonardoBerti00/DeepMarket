@@ -161,9 +161,9 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, 7], p=2) / recon.shape[0]
+        regularization_term = torch.norm(recon[:, 0, 6], p=3) / recon.shape[0]
         L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
-        return L_hybrid + regularization_term, L_simple, L_vlb
+        return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
@@ -191,7 +191,7 @@ class NNEngine(L.LightningModule):
     def on_train_epoch_start(self) -> None:
         print(f'learning rate: {self.optimizer.param_groups[0]["lr"]}')
 
-
+    
     def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
         if isinstance(self.diffuser, GaussianDiffusion):
@@ -210,7 +210,7 @@ class NNEngine(L.LightningModule):
         self.val_ema_losses = []
         self.simple_val_losses = []
         self.vlb_val_losses = []
-        
+    
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
@@ -218,7 +218,14 @@ class NNEngine(L.LightningModule):
         cond = self._select_cond(full_cond, self.cond_type)
         # Validation: with EMA
         with self.ema.average_parameters():
-            recon, reverse_context = self.forward(cond, x_0, is_train=False)
+            current_time = time.time()
+            recon, reverse_context = self.forward(cond[:1], x_0[:1], is_train=False)
+            time_val_step = time.time() - current_time
+            current_time = time.time()
+            self.sampling(cond[:1], x_0[:1])
+            time_sampling = time.time() - current_time
+            self.time_val_steps.append(time_val_step)
+            self.time_sampling_steps.append(time_sampling)
             reverse_context.update({'is_train': False})
             if isinstance(self.diffuser, GaussianDiffusion):
                 batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
@@ -228,6 +235,8 @@ class NNEngine(L.LightningModule):
                 batch_loss = self.loss(x_0, recon, **reverse_context)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
+        
+        
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean

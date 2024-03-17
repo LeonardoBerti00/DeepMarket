@@ -64,7 +64,7 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     data["event_type"] = data["event_type"].replace(3, 2)
     # order_type = 0 -> limit order
     # order_type = 1 -> cancel order
-    # order_type = 2 -> ma rket order
+    # order_type = 2 -> market order
     
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth
 
