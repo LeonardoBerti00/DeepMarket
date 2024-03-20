@@ -9,6 +9,7 @@ import lightning as L
 import constants as cst
 from constants import LearningHyperParameter
 import time
+import matplotlib.pyplot as plt
 
 import wandb
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
@@ -69,9 +70,12 @@ class NNEngine(L.LightningModule):
         self.ema.to(cst.DEVICE)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
+        self.vlb_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
+        self.simple_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
+        
 
-    
-    def forward(self, cond, x_0, is_train):
+
+    def forward(self, cond, x_0, is_train, batch_idx=None):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
         #x_0, cond = self.type_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
@@ -81,6 +85,16 @@ class NNEngine(L.LightningModule):
             elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
                 self.t, _ = self.sampler.sample(x_0.shape[0])
             recon, context = self.single_step(cond, x_0, is_train, real_cond)
+            if batch_idx % 1000 == 0 and batch_idx != 0:
+                plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
+                plt.xlabel('num_diffusionsteps')
+                plt.ylabel('Simple')
+                plt.savefig(f'data/plot/simple_loss{str(batch_idx)}.png')
+                plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
+                plt.xlabel('num_diffusionsteps')
+                plt.ylabel('VLB')
+                plt.savefig(f'data/plot/vlb_loss{str(batch_idx)}.png')
+
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
             if self.IS_AUGMENTATION and self.cond_type == 'full':
@@ -161,7 +175,7 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, 4], p=3) / recon.shape[0]
+        regularization_term = torch.norm(recon[:, 0, 2], p=3) / recon.shape[0]
         L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
         return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
 
@@ -171,7 +185,7 @@ class NNEngine(L.LightningModule):
         x_0 = input[1]
         full_cond = input[0]
         cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=True)
+        recon, reverse_context = self.forward(cond, x_0, is_train=True, batch_idx=batch_idx)
         reverse_context.update({'is_train': True})
         if isinstance(self.diffuser, GaussianDiffusion):
             batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
@@ -182,6 +196,8 @@ class NNEngine(L.LightningModule):
         batch_loss_mean = torch.mean(batch_loss)
         self.train_losses.append(batch_loss_mean.item())
         self.sampler.update_losses(self.t, batch_loss[0])
+        self.vlb_sampler.update_losses(self.t, L_vlb[0])
+        self.simple_sampler.update_losses(self.t, L_simple[0])
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         self.ema.update()
