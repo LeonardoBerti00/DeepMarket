@@ -22,6 +22,7 @@ class LOBDataset(data.Dataset):
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
+        self.encoding_type()
         #self.encoded_data = one_hot_encode_type(self.data)
 
     def __len__(self):
@@ -37,9 +38,13 @@ class LOBDataset(data.Dataset):
 
     def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path)).float()
+        self.data = torch.from_numpy(np.load(self.path)).float()        
 
+    def encoding_type(self):
+        self.data[:, 1] = torch.where(self.data[:, 1] == 1.0, 2.0, torch.where(self.data[:, 1] == 2.0, 1.0, self.data[:, 1]))
+        self.data[:, 1] = self.data[:, 1] - 1
 
+        
 
 
 
