@@ -70,10 +70,10 @@ class NNEngine(L.LightningModule):
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
 
-
+    
     def forward(self, cond, x_0, is_train):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
-        x_0, cond = self.type_embedding(x_0, cond)
+        #x_0, cond = self.type_embedding(x_0, cond)
         real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
         if is_train:
             if isinstance(self.diffuser, CSDIDiffuser) and is_train:
@@ -93,7 +93,7 @@ class NNEngine(L.LightningModule):
 
     def sampling(self, cond, x_0):
         self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
-        x_0, cond = self.type_embedding(x_0, cond)
+        #x_0, cond = self.type_embedding(x_0, cond)
         real_cond = cond.detach().clone()
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
         context.update({'x_t': x_t.detach().clone()})
@@ -161,7 +161,7 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, 6], p=3) / recon.shape[0]
+        regularization_term = torch.norm(recon[:, 0, 4], p=3) / recon.shape[0]
         L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
         return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
 
@@ -220,12 +220,6 @@ class NNEngine(L.LightningModule):
         with self.ema.average_parameters():
             current_time = time.time()
             recon, reverse_context = self.forward(cond[:1], x_0[:1], is_train=False)
-            time_val_step = time.time() - current_time
-            current_time = time.time()
-            self.sampling(cond[:1], x_0[:1])
-            time_sampling = time.time() - current_time
-            self.time_val_steps.append(time_val_step)
-            self.time_sampling_steps.append(time_sampling)
             reverse_context.update({'is_train': False})
             if isinstance(self.diffuser, GaussianDiffusion):
                 batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)

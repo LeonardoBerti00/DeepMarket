@@ -22,7 +22,7 @@ class LOBDataset(data.Dataset):
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
-        #self.encoded_data = one_hot_encode_type(self.data)
+        self.data = one_hot_encode_type(self.data)
 
     def __len__(self):
         """ Denotes the total number of samples. """
@@ -38,7 +38,6 @@ class LOBDataset(data.Dataset):
     def _get_data(self):
         """ Loads the data. """
         self.data = torch.from_numpy(np.load(self.path)).float()
-
 
 
 

@@ -143,13 +143,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
         # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
         x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
-
+        
         # Compute the mean squared error loss between the noise and the true noise
         L_mse = self._mse_loss(noise_t, noise_true)
         # Append the loss to the mse_losses list
         self.mse_losses.append(L_mse)
         # Compute the variational lower bound loss for the current time step
-
         L_vlb = self._vlb_loss(
             noise_t=noise_t.detach(),
             pred_log_var=log_var_t,
@@ -163,7 +162,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
-        # Return the reverse diffusion output and an empty dictionary
         return x_recon, {}
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
