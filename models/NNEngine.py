@@ -74,7 +74,6 @@ class NNEngine(L.LightningModule):
         self.simple_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         
 
-
     def forward(self, cond, x_0, is_train, batch_idx=None):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
         #x_0, cond = self.type_embedding(x_0, cond)
@@ -85,16 +84,6 @@ class NNEngine(L.LightningModule):
             elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
                 self.t, _ = self.sampler.sample(x_0.shape[0])
             recon, context = self.single_step(cond, x_0, is_train, real_cond)
-            if batch_idx % 1000 == 0 and batch_idx != 0:
-                plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
-                plt.xlabel('num_diffusionsteps')
-                plt.ylabel('Simple')
-                plt.savefig(f'data/plot/simple_loss{str(batch_idx)}.png')
-                plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
-                plt.xlabel('num_diffusionsteps')
-                plt.ylabel('VLB')
-                plt.savefig(f'data/plot/vlb_loss{str(batch_idx)}.png')
-
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
             if self.IS_AUGMENTATION and self.cond_type == 'full':
@@ -102,7 +91,6 @@ class NNEngine(L.LightningModule):
             for i in range(self.num_diffusionsteps-1, -1, -1):
                 recon, context = self.single_step(cond, x_0, is_train, real_cond)
                 self.t -= 1
-
         return recon, context
 
     def sampling(self, cond, x_0):
@@ -120,6 +108,7 @@ class NNEngine(L.LightningModule):
                 't': self.t,
                 'x_0': x_0,
                 'conditioning_aug': cond,
+                'weights': self.sampler.weights()
             })
 
             x_t, reverse_context = self.diffuser(x_t, context)
@@ -133,15 +122,14 @@ class NNEngine(L.LightningModule):
         # forward process
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
         context.update({'x_t': x_t.detach().clone()})
-
         # augment
         x_t, cond = self.augment(x_t, context['conditioning'], is_train)
-
         context.update({
             'is_train': is_train,
             't': self.t,
             'x_0': x_0,
             'conditioning_aug': cond,
+            'weights': self.sampler.weights()
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
@@ -203,16 +191,24 @@ class NNEngine(L.LightningModule):
         self.ema.update()
         return batch_loss_mean
 
-
     def on_train_epoch_start(self) -> None:
         print(f'learning rate: {self.optimizer.param_groups[0]["lr"]}')
 
-    
     def on_validation_start(self) -> None:
         loss = sum(self.train_losses) / len(self.train_losses)
         if isinstance(self.diffuser, GaussianDiffusion):
             L_simple = sum(self.simple_train_losses) / len(self.simple_train_losses)
             L_vlb = sum(self.vlb_train_losses) / len(self.vlb_train_losses)
+            plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
+            plt.xlabel('num_diffusionsteps')
+            plt.ylabel('Simple')
+            plt.savefig(f'data/plot/simple_loss{self.current_epoch}.png')
+            plt.close()  
+            plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
+            plt.xlabel('num_diffusionsteps')
+            plt.ylabel('VLB')
+            plt.savefig(f'data/plot/vlb_loss{self.current_epoch}.png')
+            plt.close() 
             if self.IS_WANDB:
                 wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
                 wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)

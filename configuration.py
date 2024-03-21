@@ -64,7 +64,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 1     # try higher values
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 1       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
+        self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 1
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8

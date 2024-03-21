@@ -179,7 +179,8 @@ class CDT(nn.Module):
             #nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout, bidirectional=False)
             nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=input_size*mlp_ratio, dropout=dropout, batch_first=True) for _ in range(depth)
         ]) 
-        self.linear = nn.Linear(input_size, 2 * input_size, device=cst.DEVICE)
+        self.fc_noise = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
+        self.fc_var = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
 
 
     def forward(self, x, cond, t):
@@ -196,12 +197,11 @@ class CDT(nn.Module):
         full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
         for layer in self.layers:
             full_input = layer(full_input)
-        if (x.shape[1] != 1):
-            x = x[:, -self.input_seq_len:, :]
-        out = self.linear(x)
-        out = rearrange(out, 'n l (c m) -> n l c m', c=2, m=x.shape[-1])
-        # it gives in output the noise and the variances
-        noise, var = out[:, :, 0], out[:, :, 1]
+        full_input = rearrange(full_input, 'n l f -> n (l f)')
+        noise = self.fc_noise(full_input)
+        var = self.fc_var(full_input)
+        noise = rearrange(noise, 'n l -> n 1 l')
+        var = rearrange(var, 'n l -> n 1 l')
         return noise, var
 
     def token_drop(self, cond):

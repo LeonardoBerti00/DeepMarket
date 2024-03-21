@@ -77,9 +77,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
         # calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
-        self.posterior_log_var_clipped = torch.log(
-            torch.cat([self.posterior_var[:1], self.posterior_var[1:]])
-        )
+        self.posterior_log_var_clipped = torch.log(self.posterior_var)
         self.posterior_mean_coef1 = (
             self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
         )
@@ -102,7 +100,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         t = context['t']
         assert 'x_0' in context
         x_0 = context['x_0']
-        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond, noise_true)
+        assert 'weights' in context
+        weights = context['weights']
+        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond, noise_true, weights)
 
 
     def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
@@ -111,7 +111,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         x_t, noise = super().forward_reparametrized(x_0, t)
         return x_t, {'noise_true': noise, 'conditioning': cond}
 
-    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond, noise_true):
+    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond, noise_true, weights):
         '''
         Compute the reverse diffusion process for the current time step
         '''
@@ -143,13 +143,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
         # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
         x_recon = 1 / torch.sqrt(alpha_t) * (x_t - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
-
         # Compute the mean squared error loss between the noise and the true noise
         L_mse = self._mse_loss(noise_t, noise_true)
         # Append the loss to the mse_losses list
         self.mse_losses.append(L_mse)
         # Compute the variational lower bound loss for the current time step
-
         L_vlb = self._vlb_loss(
             noise_t=noise_t.detach(),
             pred_log_var=log_var_t,
@@ -160,7 +158,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             alpha_t=alpha_t,
             alpha_cumprod_t=alpha_cumprod_t,
             clip_denoised=False,
+            weights=weights
         )
+
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
         # Return the reverse diffusion output and an empty dictionary
@@ -184,7 +184,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
     #ported from https://github.com/openai/improved-diffusion/blob/main/improved_diffusion/gaussian_diffusion.py
     def _vlb_loss(
-        self, noise_t, pred_log_var, x_0, x_t, t, beta_t, alpha_t, alpha_cumprod_t, clip_denoised=False, model_kwargs=None
+        self, noise_t, pred_log_var, x_0, x_t, t, beta_t, alpha_t, alpha_cumprod_t, clip_denoised=False, model_kwargs=None, weights=None
     ):
         """
         Get a term for the variational lower-bound.
@@ -195,7 +195,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         pred_mean = self._p_mean(
             noise_t, x_t, t, beta_t, alpha_t, alpha_cumprod_t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
-
         kl = self._normal_kl(
             true_mean, true_log_variance_clipped, pred_mean, pred_log_var
         )
@@ -209,7 +208,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         # At the first timestep return the decoder NLL,
         # otherwise return KL(q(x_{t-1}|x_t,x_0) || p(x_{t-1}|x_t))
         output = torch.where((t == 0), decoder_nll, kl)
-        return output
+        return output / torch.from_numpy(weights).to(cst.DEVICE)[t]
 
     def _p_mean(self, noise_t, x_t, t,  beta_t, alpha_t, alpha_cumprod_t, clip_denoised=True, model_kwargs=None):
         '''
@@ -268,53 +267,21 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         :param log_scales: the Gaussian log var Tensor.
         :return: a tensor like x of log probabilities (in nats).
         """
-        '''
         assert x.shape == means.shape == log_scales.shape
         centered_x = x - means
-        var = torch.exp(log_scales)
-        first_term = - ((centered_x ** 2) / (2*var))
-        second_term = - log_scales*0.5
-        third_term = - (math.log(2*math.pi)/2)
-        log_probs = -((centered_x ** 2) / (2*var)) - (0.5 * log_scales) - (math.log(2 * math.pi)/2)
-        assert log_probs.shape == x.shape
-        '''
-        assert x.shape == means.shape == log_scales.shape
-        if torch.isnan(x).any():  # check for nan values in x
-            print("x contains nan:", torch.isnan(x).any())
-        centered_x = x - means
-        if torch.isnan(centered_x).any():  # check for nan values in centered_x
-            print("centered_x contains nan:", torch.isnan(centered_x).any())
         inv_stdv = torch.exp(log_scales)
-        if torch.isnan(inv_stdv).any():  # check for nan values in inv_stdv
-            print("inv_stdv contains nan:", torch.isnan(inv_stdv).any())
         plus_in = inv_stdv * (centered_x + 1.0)
-        if torch.isnan(plus_in).any():  # check for nan values in plus_in
-            print("plus_in contains nan:", torch.isnan(plus_in).any())
         cdf_plus = self._approx_standard_normal_cdf(plus_in)
-        if torch.isnan(cdf_plus).any():  # check for nan values in cdf_plus
-            print("cdf_plus contains nan:", torch.isnan(cdf_plus).any())
         min_in = inv_stdv * (centered_x - 1.0)
-        if torch.isnan(min_in).any():  # check for nan values in min_in
-            print("min_in contains nan:", torch.isnan(min_in).any())
         cdf_min = self._approx_standard_normal_cdf(min_in)
-        if torch.isnan(cdf_min).any():  # check for nan values in cdf_min
-            print("cdf_min contains nan:", torch.isnan(cdf_min).any())
         log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-6))
-        if torch.isnan(log_cdf_plus).any():  # check for nan values in log_cdf_plus
-            print("log_cdf_plus contains nan:", torch.isnan(log_cdf_plus).any())
         log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-6))
-        if torch.isnan(log_one_minus_cdf_min).any():  # check for nan values in log_one_minus_cdf_min
-            print("log_one_minus_cdf_min contains nan:", torch.isnan(log_one_minus_cdf_min).any())
         cdf_delta = cdf_plus - cdf_min
-        if torch.isnan(cdf_delta).any():  # check for nan values in cdf_delta
-            print("cdf_delta contains nan:", torch.isnan(cdf_delta).any())
         log_probs = torch.where(
             x < -0.999,
             log_cdf_plus,
             torch.where(x > 0.999, log_one_minus_cdf_min, torch.log(cdf_delta.clamp(min=1e-6))),
         )
-        if torch.isnan(log_probs).any():  # check for nan values in log_probs
-            print("log_probs contains nan:", torch.isnan(log_probs).any())
         return log_probs
 
 
