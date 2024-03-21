@@ -61,6 +61,7 @@ class WorldAgent(Agent):
         self.generated_cancel_orders_empty_depth = 0
         self.diff_limit_order_placed = 0
         self.diff_market_order_placed = 0
+        self.diff_cancel_order_placed = 0
         self.depth_rounding = 0
         self.last_bid_price = 0
         self.last_ask_price = 0
@@ -98,6 +99,7 @@ class WorldAgent(Agent):
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
+            print("Number of generated cancel orders matched: {}".format(self.diff_cancel_order_placed))
             print("Number of negative size: {}".format(self.count_neg_size))
             print("Number of generated placed orders: {}".format(self.count_diff_placed_orders))
             print("Of which {} market order and {} limit order".format(self.diff_market_order_placed, self.diff_limit_order_placed))
@@ -228,9 +230,8 @@ class WorldAgent(Agent):
                 cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                cond = self._preprocess_orders_for_diff_cond(orders,
-                                                                            np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
-                #cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
+                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
+                cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
             cond = cond.unsqueeze(0)
@@ -361,11 +362,15 @@ class WorldAgent(Agent):
                 # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
+                    #chech if there are buy limit orders active
+                    if len([order for order in self.active_limit_orders.values() if order.is_buy_order]) == 0:
+                        return None
                     # find the order with the closest price and quantity
                     order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
                 else:
                     # we select the order with the quantity closer to the quantity generated
                     order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    self.diff_cancel_order_placed += 1
 
             else:
                 ask_side = self.lob_snapshots[-1][0::4]
@@ -380,10 +385,14 @@ class WorldAgent(Agent):
                 # if there are no orders with the same price then we generate another order
                 if len(orders_with_same_price) == 0:
                     self.generated_cancel_orders_empty_depth += 1
+                    #chech if there are sell limit orders active
+                    if len([order for order in self.active_limit_orders.values() if not order.is_buy_order]) == 0:
+                        return None
                     order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
                 else:
                     # we select the order with the quantity near to the quantity generated
                     order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    self.diff_cancel_order_placed += 1
 
         elif order_type == 4:
             self.diff_market_order_placed += 1

@@ -232,12 +232,6 @@ class NNEngine(L.LightningModule):
         with self.ema.average_parameters():
             current_time = time.time()
             recon, reverse_context = self.forward(cond[:1], x_0[:1], is_train=False)
-            time_val_step = time.time() - current_time
-            current_time = time.time()
-            self.sampling(cond[:1], x_0[:1])
-            time_sampling = time.time() - current_time
-            self.time_val_steps.append(time_val_step)
-            self.time_sampling_steps.append(time_sampling)
             reverse_context.update({'is_train': False})
             if isinstance(self.diffuser, GaussianDiffusion):
                 batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)

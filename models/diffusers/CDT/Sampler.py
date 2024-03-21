@@ -40,6 +40,7 @@ class ScheduleSampler(ABC):
         weights = torch.from_numpy(weights_np).float().to(cst.DEVICE, non_blocking=True)
         return indices, weights
 
+    
 
 class LossSecondMomentResampler(ScheduleSampler):
     def __init__(self, num_diffusionsteps, history_per_term=10, uniform_prob=0.001):

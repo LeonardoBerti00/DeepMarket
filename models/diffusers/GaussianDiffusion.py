@@ -163,7 +163,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
-        # Return the reverse diffusion output and an empty dictionary
         return x_recon, {}
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
