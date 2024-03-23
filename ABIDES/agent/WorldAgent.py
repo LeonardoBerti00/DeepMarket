@@ -17,7 +17,7 @@ import pandas as pd
 import datetime
 
 from ABIDES.util.order.MarketOrder import MarketOrder
-from utils.utils_data import reset_indexes, normalize_messages, one_hot_encode_type, to_sparse_representation
+from utils.utils_data import reset_indexes, normalize_messages, one_hot_encoding_type, to_sparse_representation, tanh_encoding_type
 import constants as cst
 
 class WorldAgent(Agent):
@@ -230,8 +230,9 @@ class WorldAgent(Agent):
                 cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size - 1:]))
-                cond = one_hot_encode_type(orders_preprocessed).to(cst.DEVICE)
+                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                #cond = one_hot_encoding_type(orders_preprocessed).to(cst.DEVICE)
+                cond = tanh_encoding_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
             cond = cond.unsqueeze(0)
@@ -441,52 +442,43 @@ class WorldAgent(Agent):
                          "message": ["time", "event_type", "order_id", "size", "price", "direction"]}
         orders_dataframe = pd.DataFrame(orders, columns=COLUMNS_NAMES["message"])
         lob_dataframe = pd.DataFrame(lob_snapshots, columns=COLUMNS_NAMES["orderbook"])
-        dataframes = [[orders_dataframe, lob_dataframe]]
-
-        # add depth column to messages
-        for i in range(len(dataframes)):
-            dataframes[i][0]["depth"] = 0
 
         # we compute the depth of the orders with respect to the orderbook
-        for i in range(0, len(dataframes)):
-            for j in range(0, dataframes[i][0].shape[0]):
-                order_price = dataframes[i][0]["price"].iloc[j]
-                direction = dataframes[i][0]["direction"].iloc[j]
-                type = dataframes[i][0]["event_type"].iloc[j]
-                if type == 1:
-                    index = j + 1
-                else:
-                    index = j
-                if direction == 1:
-                    bid_side = dataframes[i][1].iloc[index, 2::4]
-                    bid_price = bid_side[0]
-                    depth = (bid_price - order_price) // 100
-                    if depth < 0:
-                        depth = 0
-                else:
-                    ask_side = dataframes[i][1].iloc[index, 0::4]
-                    ask_price = ask_side[0]
-                    depth = (order_price - ask_price) // 100
-                    if depth < 0:
-                        depth = 0
-                dataframes[i][0].loc[j, "depth"] = depth
+        orders_dataframe["depth"] = 0
+        for j in range(0, orders_dataframe.shape[0]):
+            order_price = orders_dataframe["price"].iloc[j]
+            direction = orders_dataframe["direction"].iloc[j]
+            type = orders_dataframe["event_type"].iloc[j]
+            if type == 1:
+                index = j + 1
+            else:
+                index = j
+            if direction == 1:
+                bid_side = lob_dataframe.iloc[index, 2::4]
+                bid_price = bid_side[0]
+                depth = (bid_price - order_price) // 100
+                if depth < 0:
+                    depth = 0
+            else:
+                ask_side = lob_dataframe.iloc[index, 0::4]
+                ask_price = ask_side[0]
+                depth = (order_price - ask_price) // 100
+                if depth < 0:
+                    depth = 0
+            orders_dataframe.loc[j, "depth"] = depth
 
         # if order type is 4, then we transform the execution of a sell limit order in a buy market order
-        for i in range(len(dataframes)):
-            dataframes[i][0]["direction"] = dataframes[i][0]["direction"] * dataframes[i][0]["event_type"].apply(
-                lambda x: -1 if x == 4 else 1)
+        orders_dataframe["direction"] = orders_dataframe["direction"] * orders_dataframe["event_type"].apply(
+            lambda x: -1 if x == 4 else 1)
 
         # drop the order_id column
-        for i in range(len(dataframes)):
-            dataframes[i][0] = dataframes[i][0].drop(columns=["order_id"])
+        orders_dataframe = orders_dataframe.drop(columns=["order_id"])
 
         # divide all the price, both of lob and messages, by 100
-        for i in range(len(dataframes)):
-            dataframes[i][0]["price"] = dataframes[i][0]["price"] / 100
+        orders_dataframe["price"] = orders_dataframe["price"] / 100
 
         # apply z score to orders
-        for i in range(len(dataframes)):
-            dataframes[i][0], _, _, _, _, _, _, _, _ = normalize_messages(dataframes[i][0],
+        orders_dataframe, _, _, _, _, _, _, _, _ = normalize_messages(orders_dataframe,
                                                                     mean_size=self.normalization_terms["event"][0],
                                                                     mean_prices=self.normalization_terms["event"][2],
                                                                     std_size=self.normalization_terms["event"][1],
@@ -496,10 +488,9 @@ class WorldAgent(Agent):
                                                                     mean_depth=self.normalization_terms["event"][6],
                                                                     std_depth=self.normalization_terms["event"][7]
                                                                     )
-                                                                    
+        
 
-
-        return torch.from_numpy(dataframes[0][0].to_numpy()).to(cst.DEVICE, torch.float32)
+        return torch.from_numpy(orders_dataframe.to_numpy()).to(cst.DEVICE, torch.float32)
 
 
     def _load_orders_lob(self, symbol, data_dir, date, date_trading_days):
@@ -533,29 +524,26 @@ class WorldAgent(Agent):
                 else:
                     raise ValueError("File name not recognized")
 
-        dataframes = [[events, lob]]
-        dataframes = self._preprocess_events_for_market_replay(dataframes)
-        events = dataframes[0][0]
-        lob = dataframes[0][1]
+        events, lob = self._preprocess_events_for_market_replay(events, lob)
         # transform to numpy
         lob = lob.to_numpy()
         events = events.to_numpy()
         return events, lob
 
 
-    def _preprocess_events_for_market_replay(self, dataframes):
+    def _preprocess_events_for_market_replay(self, events, lob):
 
-        for i in range(len(dataframes)):
-            indexes = dataframes[i][0][dataframes[i][0]["event_type"].isin([5, 6, 7])].index
-            dataframes[i][0] = dataframes[i][0].drop(indexes)
-            dataframes[i][1] = dataframes[i][1].drop(indexes)
+        # drop the rows with event_type = 5, 6, 7
+        indexes = events[events["event_type"].isin([5, 6, 7])].index
+        events = events.drop(indexes)
+        lob = lob.drop(indexes)
 
         # do the difference of time row per row in messages and subsitute the values with the differences
-        for i in range(len(dataframes)):
-            first = dataframes[i][0]["time"].iloc[0]
-            dataframes[i][0]["time"] = dataframes[i][0]["time"].diff()
-            dataframes[i][0]["time"].iloc[0] = first - 34200
-        dataframes = reset_indexes(dataframes)
+        first = events["time"].iloc[0]
+        events["time"] = events["time"].diff()
+        events["time"].iloc[0] = first - 34200
+
+        dataframes = reset_indexes([[events, lob]])
         events = dataframes[0][0]
         lob = dataframes[0][1]
         # get the order ids of the rows with order_type=1
@@ -564,10 +552,10 @@ class WorldAgent(Agent):
         # filter out the rows that have order_type != 1 and have an order id that is not in order_ids
         filtered_df = events.loc[((events['event_type'] != 1) & ~(events['order_id'].isin(order_ids)))].index
 
-        dataframes[0][0] = events.drop(filtered_df)
-        dataframes[0][1] = lob.drop(filtered_df)
-        dataframes = reset_indexes(dataframes)
-        return dataframes
+        events = events.drop(filtered_df)
+        lob = lob.drop(filtered_df)
+        dataframes = reset_indexes([[events, lob]])
+        return dataframes[0][0], dataframes[0][1]
 
 
     def _update_lob_snapshot(self, msg):

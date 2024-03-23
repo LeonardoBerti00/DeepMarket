@@ -231,7 +231,7 @@ class NNEngine(L.LightningModule):
         # Validation: with EMA
         with self.ema.average_parameters():
             current_time = time.time()
-            recon, reverse_context = self.forward(cond[:1], x_0[:1], is_train=False)
+            recon, reverse_context = self.forward(cond, x_0, is_train=False)
             reverse_context.update({'is_train': False})
             if isinstance(self.diffuser, GaussianDiffusion):
                 batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
@@ -241,8 +241,6 @@ class NNEngine(L.LightningModule):
                 batch_loss = self.loss(x_0, recon, **reverse_context)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
-        
-        
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         return batch_loss_mean
@@ -271,7 +269,6 @@ class NNEngine(L.LightningModule):
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
         
-
 
     def configure_optimizers(self):
         if self.optimizer == 'Adam':

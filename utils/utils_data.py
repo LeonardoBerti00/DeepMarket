@@ -149,7 +149,7 @@ def unnormalize(x, mean, std):
     return x * std + mean
 
 
-def one_hot_encode_type(data):
+def one_hot_encoding_type(data):
     encoded_data = torch.zeros(data.shape[0], data.shape[1] + 2, dtype=torch.float32)
     encoded_data[:, 0] = data[:, 0]
     # encoding order type
@@ -158,6 +158,13 @@ def one_hot_encode_type(data):
     encoded_data[:, 1:4] = one_hot_order_type
     encoded_data[:, 4:] = data[:, 2:]
     return encoded_data
+
+
+def tanh_encoding_type(data):
+    data[:, 1] = torch.where(data[:, 1] == 1.0, 2.0, torch.where(data[:, 1] == 2.0, 1.0, data[:, 1]))
+    data[:, 1] = data[:, 1] - 1
+    return data
+
 
 def to_sparse_representation(lob, n_levels):
     if not isinstance(lob, np.ndarray):

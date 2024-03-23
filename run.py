@@ -101,7 +101,7 @@ def run(config, accelerator, model=None):
 
 def run_wandb(config, accelerator):
     def wandb_sweep_callback():
-        wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model="all", save_dir=cst.DIR_SAVED_MODEL)
+        wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model=False, save_dir=cst.DIR_SAVED_MODEL)
         run_name = None
         if not config.IS_SWEEP:
             run_name = ""
@@ -110,7 +110,7 @@ def run_wandb(config, accelerator):
                 if param.value in model_params:
                     run_name += str(param.value[:3]) + "_" + str(model_params[param.value]) + "_"
 
-        with wandb.init(project=cst.PROJECT_NAME, name=run_name) as wandb_instance:
+        with wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="leonardo-berti07") as wandb_instance:
             config.WANDB_INSTANCE = wandb_instance
 
             if config.IS_SWEEP:

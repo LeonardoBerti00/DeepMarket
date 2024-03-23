@@ -175,10 +175,14 @@ class CDT(nn.Module):
         self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
-        self.layers = nn.ModuleList([
-            #nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout, bidirectional=False)
-            nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=input_size*mlp_ratio, dropout=dropout, batch_first=True) for _ in range(depth)
-        ]) 
+        if is_augmented:
+            self.layers = nn.ModuleList([
+                nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=input_size*mlp_ratio, dropout=dropout, batch_first=True) for _ in range(depth)
+            ]) 
+        else:
+            self.layers = nn.ModuleList([
+                nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout, bidirectional=False)
+            ])  
         self.fc_noise = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
         self.fc_var = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
 

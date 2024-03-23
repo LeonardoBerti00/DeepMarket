@@ -4,7 +4,7 @@ from torch.utils import data
 import numpy as np
 import torch
 import constants as cst
-from utils.utils_data import one_hot_encode_type
+from utils.utils_data import one_hot_encoding_type, tanh_encoding_type
 
 
 class LOBDataset(data.Dataset):
@@ -22,8 +22,8 @@ class LOBDataset(data.Dataset):
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
-        self.encoding_type()
-        #self.encoded_data = one_hot_encode_type(self.data)
+        self.data = tanh_encoding_type(self.data)
+        #self.data = one_hot_encoding_type(self.data)
 
     def __len__(self):
         """ Denotes the total number of samples. """
@@ -40,9 +40,7 @@ class LOBDataset(data.Dataset):
         """ Loads the data. """
         self.data = torch.from_numpy(np.load(self.path)).float()        
 
-    def encoding_type(self):
-        self.data[:, 1] = torch.where(self.data[:, 1] == 1.0, 2.0, torch.where(self.data[:, 1] == 2.0, 1.0, self.data[:, 1]))
-        self.data[:, 1] = self.data[:, 1] - 1
+
 
         
 
