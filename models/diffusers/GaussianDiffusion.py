@@ -243,18 +243,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         scalars, among other use cases.
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
-        '''
-        k = torch.full((mean1.shape), cst.LEN_EVENT_ONE_HOT, dtype=torch.float32).to(cst.DEVICE, non_blocking=True)
-        #create a tensor matrices with the value of logvar1 as the diagonal
-        diag_ar1 = torch.diag_embed(torch.exp(logvar1))
-        diag_ar2 = torch.diag_embed(torch.exp(logvar2))
-        tmp = (torch.einsum('blmn, blgh -> blmh', torch.inverse(diag_ar1), diag_ar2))
-        mask = torch.zeros(diag_ar1.shape).to(cst.DEVICE, non_blocking=True)
-        mask[:, :, torch.arange(0, diag_ar1.shape[2]), torch.arange(0, diag_ar1.shape[3])] = 1.0  # This will mask all non-diagonal values.
-        tmp_masked = tmp * mask
-        trace_term = reduce(tmp_masked, 'b l m n -> b l m', 'sum')  # output will will contain the trace of each batch matrices.
-        output3 = 0.5 * ((logvar2 - logvar1) - k + (mean1 - mean2) * torch.exp(logvar2) * (mean1 - mean2) + trace_term)
-        '''
         return output
 
     def _gaussian_log_likelihood(self, x, means, log_scales):

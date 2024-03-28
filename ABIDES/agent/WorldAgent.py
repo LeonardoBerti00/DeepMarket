@@ -28,7 +28,7 @@ class WorldAgent(Agent):
 
 
     def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
+                 cond_seq_size, size_type_emb, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
         self.count_neg_size = 0
@@ -37,6 +37,7 @@ class WorldAgent(Agent):
         self.sparse_lob_snapshots = []
         self.symbol = symbol
         self.date = date
+        self.size_type_emb = size_type_emb
         self.log_orders = log_orders
         self.executed_trades = dict()
         self.state = 'AWAITING_WAKEUP'
@@ -230,9 +231,9 @@ class WorldAgent(Agent):
                 cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                orders_preprocessed = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                cond = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
                 #cond = one_hot_encoding_type(orders_preprocessed).to(cst.DEVICE)
-                cond = tanh_encoding_type(orders_preprocessed).to(cst.DEVICE)
+                #cond = tanh_encoding_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
             cond = cond.unsqueeze(0)
@@ -280,31 +281,25 @@ class WorldAgent(Agent):
 
     def _postprocess_generated(self, generated):
         ''' we need to go from the output of the diffusion model to an actual order '''
-        direction = generated[4]
+        direction = generated[self.size_type_emb+3]
         if direction < 0:
             direction = -1
         else:
             direction = 1
         
-        order_type = F.tanh(generated[1])
-        if order_type < -0.5:
-            order_type = 1
-        elif order_type < 0.5:
-            order_type = 4
-        else:
-            order_type = 3
-        #order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:6]), dim=1)).item()+1
+        #order_type = torch.argmax(generated[1:self.size_type_emb+1]).item() + 1
+        order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:self.size_type_emb+1]), dim=1)).item()+1
         #print(order_type)
         #print(self.diffusion_model.type_embedder.weight.data)
         #print(generated[1:4])
-        #if order_type == 3 or order_type == 2:
-        #    order_type += 1
+        if order_type == 3 or order_type == 2:
+            order_type += 1
         # order type == 1 -> limit order
         # order type == 3 -> cancel order
         # order type == 4 -> market order
 
         # we return the size and the time to the original scale
-        size = round(generated[2].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
+        size = round(generated[self.size_type_emb+1].item() * self.normalization_terms["event"][1] + self.normalization_terms["event"][0], ndigits=0)
         depth = round(generated[-1].item() * self.normalization_terms["event"][7] + self.normalization_terms["event"][6], ndigits=0)
         time = generated[0].item() * self.normalization_terms["event"][5] + self.normalization_terms["event"][4]
 

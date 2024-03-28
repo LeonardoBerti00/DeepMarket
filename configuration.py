@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
-        self.IS_TRAINING = True
+        self.IS_TRAINING = False
         self.IS_DEBUG = False
 
         # evaluation
@@ -62,8 +62,13 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 1    # try higher values
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 11    # try higher values
+        self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
+        if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
+            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+        else:
+            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT
+        
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 1
 
@@ -83,9 +88,9 @@ class Configuration:
 
         self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
-            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
         elif self.COND_TYPE == "only_event":
-            self.COND_SIZE = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+            self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
 

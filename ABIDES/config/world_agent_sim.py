@@ -199,6 +199,7 @@ agents.extend([WorldAgent(id=1,
                           data_dir=cst.DATA_DIR,
                           cond_type=config.COND_TYPE,
                           cond_seq_size=config.COND_SEQ_SIZE,
+                          size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB],
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
                               seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),

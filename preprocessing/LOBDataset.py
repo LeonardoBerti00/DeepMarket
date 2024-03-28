@@ -13,17 +13,16 @@ class LOBDataset(data.Dataset):
             self,
             path,
             seq_size,
-            cond_type,
+            one_hot_encoding_type,
             x_seq_size
     ):
         self.path = path
-        self.cond_type = cond_type
         self.seq_size = seq_size          #sequence length
         self.x_seq_size = x_seq_size      #sequence length of the input
         self.cond_seq_size = self.seq_size - self.x_seq_size
         self._get_data()
-        self.data = tanh_encoding_type(self.data)
-        #self.data = one_hot_encoding_type(self.data)
+        if one_hot_encoding_type:        
+            self.data = one_hot_encoding_type(self.data)
 
     def __len__(self):
         """ Denotes the total number of samples. """

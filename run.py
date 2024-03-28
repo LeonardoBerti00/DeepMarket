@@ -25,23 +25,17 @@ def train(config, trainer):
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.COND_TYPE,
+        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
     val_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.COND_TYPE,
+        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
 
-    test_set = LOBDataset(
-        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
-        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        cond_type=config.COND_TYPE,
-        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
-    )
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
     #print("size of test set: ", test_set.data.size())
@@ -49,23 +43,20 @@ def train(config, trainer):
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
-        test_set.data = test_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 5
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
 
     data_module = DataModule(
         train_set=train_set,
         val_set=val_set,
-        test_set=test_set,
         batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE],
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
         num_workers=4
     )
 
-    train_dataloader, val_dataloader, test_dataloader = data_module.train_dataloader(), data_module.val_dataloader(), data_module.test_dataloader()
+    train_dataloader, val_dataloader = data_module.train_dataloader(), data_module.val_dataloader()
     model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
     trainer.fit(model, train_dataloader, val_dataloader)
-
 
 
 def run(config, accelerator, model=None):
@@ -83,19 +74,20 @@ def run(config, accelerator, model=None):
     augmenter = config.CHOSEN_AUGMENTER
     aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
     config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_" + str(aug_dim) + "_diffsteps_" + str(diffsteps)
-            
+    wandb_instance_name = config.FILENAME_CKPT
+
     trainer = L.Trainer(
         accelerator=accelerator,
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.01),
             TQDMProgressBar(refresh_rate=1000)
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
         profiler="simple",
-        check_val_every_n_epoch=1
+        check_val_every_n_epoch=2
     )
     train(config, trainer)
 
@@ -135,13 +127,13 @@ def run_wandb(config, accelerator):
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
                 callbacks=[
-                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.01),
+                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.01),
                     TQDMProgressBar(refresh_rate=1000)
                 ],
                 num_sanity_val_steps=0,
                 logger=wandb_logger,
                 detect_anomaly=False,
-                check_val_every_n_epoch=1,
+                check_val_every_n_epoch=2,
             )
 
             # log simulation details in WANDB console

@@ -1,4 +1,6 @@
 from pathlib import Path
+import random
+import numpy as np
 import wandb
 from lightning.pytorch.loggers import WandbLogger
 from run import run_wandb, run, sweep_init
@@ -20,11 +22,13 @@ import evaluation.visualizations.TSNE_plots as TSNE_plots
 import evaluation.visualizations.comparison_volume_distribution as comparison_volume_distribution
 
 def set_torch():
-    #torch.manual_seed(cst.SEED)
+    torch.manual_seed(cst.SEED)
+    np.random.seed(cst.SEED)
+    random.seed(cst.SEED)
     torch.set_default_dtype(torch.float32)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(False)
     torch.set_float32_matmul_precision('high')
 
 def plot_graphs(real_data_path, gen_data_path):

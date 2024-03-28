@@ -28,6 +28,7 @@ class LearningHyperParameter(str, Enum):
     CSDI_LAYERS = "CSDI_layers"
     CSDI_N_HEADS = "CSDI_n_heads"
     REG_TERM_WEIGHT = "reg_term_weight"
+    ONE_HOT_ENCODING_TYPE = "one_hot_encoding_type"
 
 
 class Optimizers(Enum):
