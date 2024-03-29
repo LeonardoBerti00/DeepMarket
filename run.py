@@ -178,6 +178,18 @@ def sweep_init(config):
 def print_setup(config):
     print("Chosen model is: ", config.CHOSEN_MODEL.name)
     print("Is augmented: ", config.IS_AUGMENTATION)
+    if config.IS_AUGMENTATION:
+        print("Augmentation dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM])
+        print("Augmenter: ", config.CHOSEN_AUGMENTER)
+        print("CDT depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH])
+        print("CDT num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS])
     print("Conditioning type: ", config.COND_TYPE)
     print("Conditioning method: ", config.COND_METHOD)
     print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
+    print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
+    print("Batch size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE])
+    print("Learning rate: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE])
+    print("Optimizer: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER])
+    print("One hot encoding type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE])
+    if not config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
+        print("Size order embedding: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB])  

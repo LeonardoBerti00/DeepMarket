@@ -48,6 +48,13 @@ def predictive_discriminative_scores(real_data_path, gen_data_path):
 
 if __name__ == "__main__":
     set_torch()
+    '''
+    print("Device:", cst.DEVICE)
+    num_gpus = torch.cuda.device_count()
+    print(f'Number of GPUs Available: {num_gpus}')
+    for i in range(num_gpus):
+        print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
+    '''
     config = configuration.Configuration()
     if (cst.DEVICE == "cpu"):
         accelerator = "cpu"

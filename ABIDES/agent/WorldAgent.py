@@ -70,6 +70,7 @@ class WorldAgent(Agent):
             self.starting_time_diffusion = '15min'
         else:
             self.starting_time_diffusion = '10000min'
+        print(self.diffusion_model.type_embedder.weight.data)
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -291,7 +292,6 @@ class WorldAgent(Agent):
         order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:self.size_type_emb+1]), dim=1)).item()+1
         #print(order_type)
         #print(self.diffusion_model.type_embedder.weight.data)
-        #print(generated[1:4])
         if order_type == 3 or order_type == 2:
             order_type += 1
         # order type == 1 -> limit order
