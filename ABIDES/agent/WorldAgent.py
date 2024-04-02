@@ -291,7 +291,7 @@ class WorldAgent(Agent):
         #order_type = torch.argmax(generated[1:self.size_type_emb+1]).item() + 1
         order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:self.size_type_emb+1]), dim=1)).item()+1
         #print(order_type)
-        #print(self.diffusion_model.type_embedder.weight.data)
+
         if order_type == 3 or order_type == 2:
             order_type += 1
         # order type == 1 -> limit order

@@ -81,7 +81,7 @@ def run(config, accelerator, model=None):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.01),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
             TQDMProgressBar(refresh_rate=1000)
             ],
         num_sanity_val_steps=0,
@@ -114,20 +114,29 @@ def run_wandb(config, accelerator):
                     config.HYPER_PARAMETERS[param] = model_params[param.value]
                     wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
 
+            aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
+            if aug_dim == 64:
+                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 1
+            elif aug_dim == 256:
+                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 4
+            elif aug_dim == 512:
+                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 8
+
             cond_type = config.COND_TYPE
             is_augmentation = config.IS_AUGMENTATION
             stock_name = config.CHOSEN_STOCK.name
             diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
             augmenter = config.CHOSEN_AUGMENTER
-            aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_" + str(aug_dim) + "_diffsteps_" + str(diffsteps)
+            seq_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
+            size_type = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]
+            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps) + "_size_type_" + str(size_type) + "_seq_size_" + str(seq_size)
             wandb_instance_name = config.FILENAME_CKPT
             trainer = L.Trainer(
                 accelerator=accelerator,
                 precision=cst.PRECISION,
                 max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
                 callbacks=[
-                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.01),
+                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
                     TQDMProgressBar(refresh_rate=1000)
                 ],
                 num_sanity_val_steps=0,

@@ -21,7 +21,7 @@ class Configuration:
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = True
+        self.IS_AUGMENTATION = False
 
         self.IS_DATA_PREPROCESSED = True
 
@@ -55,14 +55,14 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 20
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 128        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
         self.COND_SEQ_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 2    # try higher values
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3    # try higher values
         self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
         if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
@@ -74,7 +74,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
         self.COND_METHOD = "concatenation"
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
@@ -94,7 +94,7 @@ class Configuration:
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
+        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 512
 
 
 
