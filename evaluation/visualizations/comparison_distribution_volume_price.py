@@ -15,20 +15,60 @@ def main(real_path, generated_path):
 
     sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
 
-    plt.title("Volume")
-    plt.xlabel("Shares (qta)")
+    plt.title("Order Volume Imbalance")
+    plt.xlabel("Shares")
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_volume.png"
-    file_path = os.path.join(generated_path, file_name)
+    file_name = "comparison_distribution_order_volume_imbalance.png"
+    dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.show()
+    plt.close()
 
-    df1 = pd.read_csv(generated_path)
+
+    data1 = df1["SIZE"]
+    data2 = df2["SIZE"]
+
+    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+
+    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+
+    plt.title("Order Size")
+    plt.xlabel("Shares")
+    plt.ylabel("Density")
+
+    plt.legend()
+    file_name = "comparison_distribution_size.png"
+    dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
+    plt.savefig(file_path)
+    plt.show()
+    plt.close()
+
+
+    data1 = df1["VWAP"]
+    data2 = df2["VWAP"]
+
+    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+
+    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+
+    plt.title("VWAP")
+    plt.xlabel("Dollar")
+    plt.ylabel("Density")
+
+    plt.legend()
+    file_name = "comparison_distribution_vwap.png"
+    dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
+    plt.savefig(file_path)
+    plt.show()
+    plt.close()
+
+
     data1 = df1["PRICE"]
-
-    df2 = pd.read_csv(real_path)
     data2 = df2["PRICE"]
 
     sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
@@ -36,14 +76,33 @@ def main(real_path, generated_path):
     sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
 
     plt.title("Price")
-    plt.xlabel("DOLLAR ($)")
+    plt.xlabel("Dollar")
     plt.ylabel("Density")
 
     plt.legend()
     file_name = "comparison_distribution_price.png"
-    file_path = os.path.join(generated_path, file_name)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.show()
+    plt.close()
+
+    data1 = df1["MID_PRICE"]
+    data2 = df2["MID_PRICE"]
+
+    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+
+    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+
+    plt.title("Price")
+    plt.xlabel("Dollar")
+    plt.ylabel("Density")
+
+    plt.legend()
+    file_name = "comparison_distribution_midprice.png"
+    file_path = os.path.join(dir_path, file_name)
+    plt.savefig(file_path)
+    plt.show()
+    plt.close()
 
 
 if __name__ == '__main__':

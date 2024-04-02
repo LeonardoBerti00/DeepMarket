@@ -35,11 +35,14 @@ def plot_graphs(real_data_path, gen_data_path):
     comparison_distribution_order_type.main(real_data_path, gen_data_path)
     comparison_distribution_volume_price.main(real_data_path, gen_data_path)
     comparison_distribution_market_spread.main(real_data_path, gen_data_path, IS_REAL=True)
+    comparison_distribution_market_spread.main(real_data_path, gen_data_path, IS_REAL=False)
     PCA_plots.main(real_data_path, gen_data_path)
-    TSNE_plots.main(real_data_path, gen_data_path)
     comparison_midprice.main(real_data_path, gen_data_path)
     comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
+    comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
+    TSNE_plots.main(real_data_path, gen_data_path)
+    
 
 def predictive_discriminative_scores(real_data_path, gen_data_path):
     predictive_lstm.main(real_data_path, gen_data_path)

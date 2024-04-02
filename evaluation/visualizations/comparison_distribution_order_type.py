@@ -38,10 +38,12 @@ def main(real_path, generated_path):
     plt.legend()
 
     file_name = "comparison_distribution_order_type.png"
+    generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
 
     plt.show()
+    plt.close()
 
 if __name__ == '__main__':
     main()

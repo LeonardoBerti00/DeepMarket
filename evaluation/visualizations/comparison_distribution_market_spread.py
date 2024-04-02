@@ -69,9 +69,14 @@ def main(real_path, generated_path, IS_REAL):
 
     plt.legend()
     file_name = "comparison_distribution_market_spread.png"
-    file_path = os.path.join(real_path, file_name)
+    if IS_REAL:
+        dir_path = os.path.dirname(real_path)
+    else:
+        dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.show()
+    plt.close()
 
 if __name__ == '__main__':
     main()
