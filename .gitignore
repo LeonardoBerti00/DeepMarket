@@ -7,7 +7,6 @@ lightning_logs/
 data/generated_orders.csv
 data/real_orders.csv
 wandb/
-abides/log
 output
 launch.sh
 launch_sim.sh

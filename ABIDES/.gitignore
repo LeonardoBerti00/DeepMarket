@@ -3,7 +3,6 @@ __pycache__/
 batch_output/
 cache/
 local/
-log/
 .idea/
 results/
 util/crypto/datasets
