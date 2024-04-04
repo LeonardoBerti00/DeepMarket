@@ -69,6 +69,7 @@ class NNEngine(L.LightningModule):
 
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
+            self.type_embedder.requires_grad_(False)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -168,9 +169,9 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        regularization_term = torch.norm(recon[:, 0, self.size_type_emb+1], p=2) / recon.shape[0]
+        #regularization_term = torch.norm(recon[:, 0, self.size_type_emb+1], p=2) / recon.shape[0]
         L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
-        return L_hybrid + self.reg_term_weight * regularization_term, L_simple, L_vlb
+        return L_hybrid, L_simple, L_vlb
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
