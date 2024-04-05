@@ -1,0 +1,1 @@
+# take the time; compute the difference between the current time and the previous time; and plot the distribution of the interarrival times.
