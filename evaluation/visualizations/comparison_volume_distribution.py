@@ -61,14 +61,14 @@ def main(real_path, generated_path, IS_REAL):
 
     df_f['TIME'] = mdates.date2num(df_f['TIME'])
 
-    plt.plot(df_f['TIME'], df_f['asksize1_mean'], label='ask_size_1 mean', color='green', marker='o', linestyle='', markersize=3)
+    plt.plot(df_f['TIME'], df_f['asksize1_mean'], label='ask_size mean', color='green', marker='o', linestyle='', markersize=3)
     plt.fill_between(df_f['TIME'], df_f['LOWER'], df_f['UPPER'], color='green', alpha=0.3, label='ptc5-95 enveloppe ask')
 
-    plt.plot(df_f['TIME'], df_f['bidsize1_mean'], label='bid_size_1 mean', color='red', marker='o', linestyle='', markersize=3)
+    plt.plot(df_f['TIME'], df_f['bidsize1_mean'], label='bid_size mean', color='red', marker='o', linestyle='', markersize=3)
     plt.fill_between(df_f['TIME'], df_f['LOWER_'], df_f['UPPER_'], color='red', alpha=0.3, label='ptc5-95 enveloppe bid')
 
     plt.xlabel('Time')
-    plt.ylabel('Volume')
+    plt.ylabel('Volume at 1st level')
     if IS_REAL:
         plt.title('Real Data')
     else:

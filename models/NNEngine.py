@@ -41,7 +41,7 @@ class NNEngine(L.LightningModule):
         self.cond_type = config.COND_TYPE
         self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
-        self.cond_seq_size = config.COND_SEQ_SIZE
+        self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
@@ -161,7 +161,6 @@ class NNEngine(L.LightningModule):
         order_type = x_0[:, :, 1]
         type_emb = self.type_embedder(order_type.long())
         x_0 = torch.cat((x_0[:, :, :1], type_emb, x_0[:, :, 2:]), dim=2)
-
         if self.cond_type == 'only_event' or self.cond_type == 'full':
             cond_type = cond[:, :, 1]
             cond_depth_emb = self.type_embedder(cond_type.long())
@@ -205,23 +204,25 @@ class NNEngine(L.LightningModule):
         if isinstance(self.diffuser, GaussianDiffusion):
             L_simple = sum(self.simple_train_losses) / len(self.simple_train_losses)
             L_vlb = sum(self.vlb_train_losses) / len(self.vlb_train_losses)
-            #plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
-            #plt.xlabel('num_diffusionsteps')
-            #plt.ylabel('Simple')
-            #plt.savefig(f'data/plot/simple_loss{self.current_epoch}.png')
-            #plt.close()  
-            #plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
-            #plt.xlabel('num_diffusionsteps')
-            #plt.ylabel('VLB')
-            #plt.savefig(f'data/plot/vlb_loss{self.current_epoch}.png')
-            #plt.close() 
             if self.IS_WANDB:
                 wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
                 wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)
                 wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
-            print(f'\ntrain loss simple on epoch {self.current_epoch} is {round(L_simple, 3)}')
-            print(f'\ntrain loss vlb on epoch {self.current_epoch} is {round(L_vlb, 3)}')
-            print(f'\ntrain loss on epoch {self.current_epoch} is {round(loss, 3)}')
+                #Simple loss plot
+                plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
+                plt.xlabel('num_diffusionsteps')
+                plt.ylabel('Simple')
+                wandb.log({"simple_loss": wandb.Image(plt)}, step=self.current_epoch + 1)
+                plt.close()
+                # VLB loss plot
+                plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
+                plt.xlabel('num_diffusionsteps')
+                plt.ylabel('VLB')
+                wandb.log({"vlb_loss": wandb.Image(plt)}, step=self.current_epoch + 1)
+                plt.close()
+                print(f'\ntrain loss simple on epoch {self.current_epoch} is {round(L_simple, 3)}')
+                print(f'\ntrain loss vlb on epoch {self.current_epoch} is {round(L_vlb, 3)}')
+                print(f'\ntrain loss on epoch {self.current_epoch} is {round(loss, 3)}')
         self.train_losses = []
         self.simple_train_losses = []
         self.vlb_train_losses = []
