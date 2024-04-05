@@ -41,7 +41,7 @@ def plot_graphs(real_data_path, gen_data_path):
     comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
-    #TSNE_plots.main(real_data_path, gen_data_path)
+    TSNE_plots.main(real_data_path, gen_data_path)
     
 
 def predictive_discriminative_scores(real_data_path, gen_data_path):
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     if config.IS_WANDB:
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)
-            sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME)
+            sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME, entity="leonardo-berti07")
             wandb.agent(sweep_id, run_wandb(config, accelerator), count=sweep_config["run_cap"])
         else:
             start_wandb = run_wandb(config, accelerator)

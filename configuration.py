@@ -7,7 +7,7 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
@@ -15,7 +15,7 @@ class Configuration:
         # evaluation
         self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
-        self.PLOT_GRAPHS = True #to activate the plot of the graphs
+        self.PLOT_GRAPHS = False #to activate the plot of the graphs
 
         self.VALIDATE_EVERY = 1
 
@@ -26,7 +26,7 @@ class Configuration:
         self.SPLIT_RATES = (.75, .05, .2)
 
         self.CHOSEN_MODEL = cst.Models.CDT
-        self.CHOSEN_AUGMENTER = "MLP"
+        self.CHOSEN_AUGMENTER = "LSTM"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -50,14 +50,13 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
         self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 512
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
-        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 20
+        self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
-        self.COND_SEQ_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.1
+        self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3    # try higher values
@@ -92,7 +91,7 @@ class Configuration:
         elif self.COND_TYPE == "only_lob":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 512
+        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
 
 
 

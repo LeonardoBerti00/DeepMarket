@@ -63,6 +63,7 @@ def plot_data(pca2d, pca2d_, generated_path):
 
     # Show the plot
     plt.show()
+    plt.close()
 
 
 

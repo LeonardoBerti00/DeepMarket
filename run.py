@@ -43,7 +43,6 @@ def train(config, trainer):
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
-        config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 5
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
 
     data_module = DataModule(
@@ -73,7 +72,10 @@ def run(config, accelerator, model=None):
     diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
     augmenter = config.CHOSEN_AUGMENTER
     aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-    config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_" + str(aug_dim) + "_diffsteps_" + str(diffsteps)
+    if is_augmentation:
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + str(aug_dim) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+    else:
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
     wandb_instance_name = config.FILENAME_CKPT
 
     trainer = L.Trainer(
@@ -96,73 +98,66 @@ def run_wandb(config, accelerator):
         wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model=False, save_dir=cst.DIR_SAVED_MODEL)
         run_name = None
         if not config.IS_SWEEP:
-            run_name = ""
             model_params = HP_DICT_MODEL[config.CHOSEN_MODEL].fixed
+            run_name = ""
             for param in cst.LearningHyperParameter:
                 if param.value in model_params:
                     run_name += str(param.value[:3]) + "_" + str(model_params[param.value]) + "_"
 
-        with wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="leonardo-berti07") as wandb_instance:
-            config.WANDB_INSTANCE = wandb_instance
+        run = wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="leonardo-berti07")
+        if config.IS_SWEEP:
+            model_params = run.config
+                       
+        wandb_instance_name = ""
+        for param in cst.LearningHyperParameter:
+            if param.value in model_params:
+                config.HYPER_PARAMETERS[param] = model_params[param.value]
+                wandb_instance_name += str(param.value) + "_" + str(model_params[param.value]) + "_"
+        
+        run.name = wandb_instance_name
+        aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = aug_dim // 64
+        cond_type = config.COND_TYPE
+        is_augmentation = config.IS_AUGMENTATION
+        stock_name = config.CHOSEN_STOCK.name
+        diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+        augmenter = config.CHOSEN_AUGMENTER
+        size_type = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps) + "_size_type_" + str(size_type) 
+        wandb_instance_name = config.FILENAME_CKPT
+        trainer = L.Trainer(
+            accelerator=accelerator,
+            precision=cst.PRECISION,
+            max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
+            callbacks=[
+                EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
+                TQDMProgressBar(refresh_rate=10000)
+            ],
+            num_sanity_val_steps=0,
+            logger=wandb_logger,
+            detect_anomaly=False,
+            check_val_every_n_epoch=2,
+        )
 
-            if config.IS_SWEEP:
-                model_params = wandb.config
-            wandb_instance_name = ""
-
-            for param in cst.LearningHyperParameter:
-                if param.value in model_params:
-                    config.HYPER_PARAMETERS[param] = model_params[param.value]
-                    wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
-
-            aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-            if aug_dim == 64:
-                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 1
-            elif aug_dim == 256:
-                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 4
-            elif aug_dim == 512:
-                config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = 8
-
-            cond_type = config.COND_TYPE
-            is_augmentation = config.IS_AUGMENTATION
-            stock_name = config.CHOSEN_STOCK.name
-            diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-            augmenter = config.CHOSEN_AUGMENTER
-            seq_size = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]
-            size_type = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]
-            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps) + "_size_type_" + str(size_type) + "_seq_size_" + str(seq_size)
-            wandb_instance_name = config.FILENAME_CKPT
-            trainer = L.Trainer(
-                accelerator=accelerator,
-                precision=cst.PRECISION,
-                max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
-                callbacks=[
-                    EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
-                    TQDMProgressBar(refresh_rate=10000)
-                ],
-                num_sanity_val_steps=0,
-                logger=wandb_logger,
-                detect_anomaly=False,
-                check_val_every_n_epoch=2,
-            )
-
-            # log simulation details in WANDB console
-            wandb_instance.log({"model": config.CHOSEN_MODEL.name}, commit=False)
-            wandb_instance.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
-            wandb_instance.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
-            wandb_instance.log({"cond type": config.COND_TYPE}, commit=False)
-            wandb_instance.log({"cond method": config.COND_METHOD}, commit=False)
-            wandb_instance.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
-            wandb_instance.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
-            wandb_instance.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
-            wandb_instance.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
-            wandb_instance.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
-            wandb_instance.log({"cdt num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
-            wandb_instance.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
-            wandb_instance.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
-            wandb_instance.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
-            wandb_instance.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
-
-            train(config, trainer)
+        # log simulation details in WANDB console
+        run.log({"model": config.CHOSEN_MODEL.name}, commit=False)
+        run.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
+        run.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
+        run.log({"cond type": config.COND_TYPE}, commit=False)
+        run.log({"cond method": config.COND_METHOD}, commit=False)
+        run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
+        run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
+        #run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
+        #run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
+        #run.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
+        run.log({"cdt num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
+        run.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
+        run.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
+        run.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
+        run.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
+        run.log({"size type emb": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]}, commit=False)
+        train(config, trainer)
+        run.finish()
 
     return wandb_sweep_callback
 
