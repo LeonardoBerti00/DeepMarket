@@ -56,7 +56,7 @@ def main(real_path, generated_path):
     plt.grid(True)
     plt.xticks(rotation=45)
     plt.tight_layout()
-    file_name = "comparison_midprice.png"
+    file_name = "comparison_midprice.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)

@@ -307,7 +307,7 @@ class NNEngine(L.LightningModule):
         filename_ckpt_ema = ("val_ema=" + str(round(loss, 3)) +
                              "_epoch=" + str(self.current_epoch) +
                              "_" + self.filename_ckpt +
-                             "_ema.ckpt"
+                             ".ckpt"
                              )
         path_ckpt_ema = cst.DIR_SAVED_MODEL + "/" + str(self.chosen_model) + "/" + filename_ckpt_ema
         with self.ema.average_parameters():

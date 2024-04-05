@@ -33,7 +33,7 @@ def main(days_paths):
     plt.grid(True)
     plt.xticks(rotation=45)
     plt.tight_layout()
-    file_name = "comparison_multiple_days_midprice.png"
+    file_name = "comparison_multiple_days_midprice.pdf"
     dir_path = os.path.dirname(days_paths[0])
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)

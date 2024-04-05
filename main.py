@@ -41,7 +41,7 @@ def plot_graphs(real_data_path, gen_data_path):
     comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
-    TSNE_plots.main(real_data_path, gen_data_path)
+    #TSNE_plots.main(real_data_path, gen_data_path)
     
 
 def predictive_discriminative_scores(real_data_path, gen_data_path):
@@ -57,6 +57,7 @@ if __name__ == "__main__":
     print(f'Number of GPUs Available: {num_gpus}')
     for i in range(num_gpus):
         print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
+    exit()
     '''
     config = configuration.Configuration()
     if (cst.DEVICE == "cpu"):

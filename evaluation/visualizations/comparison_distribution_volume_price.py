@@ -20,7 +20,7 @@ def main(real_path, generated_path):
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_order_volume_imbalance.png"
+    file_name = "order_volume_imbalance.pdf"
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
@@ -40,7 +40,7 @@ def main(real_path, generated_path):
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_size.png"
+    file_name = "size.pdf"
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
@@ -60,7 +60,7 @@ def main(real_path, generated_path):
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_vwap.png"
+    file_name = "vwap.pdf"
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
@@ -80,7 +80,7 @@ def main(real_path, generated_path):
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_price.png"
+    file_name = "price.pdf"
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.show()
@@ -93,12 +93,12 @@ def main(real_path, generated_path):
 
     sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
 
-    plt.title("Price")
+    plt.title("Mid Price")
     plt.xlabel("Dollar")
     plt.ylabel("Density")
 
     plt.legend()
-    file_name = "comparison_distribution_midprice.png"
+    file_name = "midprice.pdf"
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.show()

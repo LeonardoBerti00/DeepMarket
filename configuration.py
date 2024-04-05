@@ -7,7 +7,7 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
+        self.IS_WANDB = False
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
@@ -15,13 +15,11 @@ class Configuration:
         # evaluation
         self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
-        self.PLOT_GRAPHS = False #to activate the plot of the graphs
-
-        assert (self.IS_WANDB + self.IS_TRAINING) == 1
+        self.PLOT_GRAPHS = True #to activate the plot of the graphs
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = False
+        self.IS_AUGMENTATION = True
 
         self.IS_DATA_PREPROCESSED = True
 
@@ -44,8 +42,8 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = ""
-        self.GEN_DATA_PATH = ""
+        self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_10-00-00_val_ema=0.836_epoch=4_TSLA_only_event_MLP_co_0.0_au_128_CD_8_CD_2_aug_True_128_diffsteps_100_ema/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 

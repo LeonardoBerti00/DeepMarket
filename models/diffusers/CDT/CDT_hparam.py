@@ -1,9 +1,9 @@
 import constants as cst
 
 HP_CDT = {
-    cst.LearningHyperParameter.CDT_DEPTH.value: {'values': [4, 16, 32]},
-    cst.LearningHyperParameter.AUGMENT_DIM.value: {'values': [64, 256, 512]},
-    cst.LearningHyperParameter.SEQ_SIZE.value: {'values': [64, 256, 512]},
+    cst.LearningHyperParameter.CDT_DEPTH.value: {'values': [4, 16]},
+    cst.LearningHyperParameter.AUGMENT_DIM.value: {'values': [64, 256]},
+    cst.LearningHyperParameter.SEQ_SIZE.value: {'values': [64, 256]},
 }
 
 

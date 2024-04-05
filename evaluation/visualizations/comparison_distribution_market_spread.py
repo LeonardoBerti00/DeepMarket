@@ -68,7 +68,7 @@ def main(real_path, generated_path, IS_REAL):
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
-    file_name = "comparison_distribution_market_spread.png"
+    file_name = "market_spread.pdf"
     if IS_REAL:
         dir_path = os.path.dirname(real_path)
     else:

@@ -171,12 +171,12 @@ for file in dir_path.iterdir():
     try:
         val_loss = float(file.name.split("=")[1].split("_")[0])
         #if val_loss < best_val_loss:
-        if val_loss == 0.82:
+        if val_loss == 0.836:
             best_val_loss = val_loss
             checkpoint_reference = file
     except:
         continue
-
+print("checkpoint used: ", checkpoint_reference)
 checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
 config = checkpoint["hyper_parameters"]["config"]
 

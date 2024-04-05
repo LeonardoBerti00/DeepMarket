@@ -37,7 +37,7 @@ def main(real_path, generated_path):
     plt.xticks(ind + bar_width / 2, df_combined['Features values'])
     plt.legend()
 
-    file_name = "comparison_distribution_order_type.png"
+    file_name = "order_type.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)

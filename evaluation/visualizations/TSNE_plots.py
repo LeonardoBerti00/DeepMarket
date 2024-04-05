@@ -54,7 +54,7 @@ def plot_data(tsna2d, tsna2d_, generated_path):
 
     # Add legend and title
     plt.legend()
-    file_name = "TSNA_plot.png"
+    file_name = "TSNA_plot.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
