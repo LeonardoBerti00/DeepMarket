@@ -20,6 +20,11 @@ import evaluation.visualizations.comparison_midprice as comparison_midprice
 import evaluation.visualizations.comparison_multiple_days_midprice as comparison_multiple_days_midprice
 import evaluation.visualizations.TSNE_plots as TSNE_plots
 import evaluation.visualizations.comparison_volume_distribution as comparison_volume_distribution
+import evaluation.visualizations.comparison_distribution_log_interarrival_times as comparison_distribution_log_interarrival_times
+import evaluation.visualizations.TSNE_density_plot as TSNE_density_plot
+import evaluation.visualizations.PCA_density_plot as PCA_density_plot
+
+
 
 def set_torch():
     torch.manual_seed(cst.SEED)
@@ -41,6 +46,9 @@ def plot_graphs(real_data_path, gen_data_path):
     comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
+    comparison_distribution_log_interarrival_times.main(real_data_path, gen_data_path)
+    TSNE_density_plot.main(real_data_path, gen_data_path)
+    PCA_density_plot.main(real_data_path, gen_data_path)
     TSNE_plots.main(real_data_path, gen_data_path)
     
 
