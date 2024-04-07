@@ -126,10 +126,18 @@ class NNEngine(L.LightningModule):
 
     def single_step(self, cond, x_0, is_train, real_cond):
         # forward process
+        #check for nan in x_0
+        if torch.isnan(x_0).any():
+            print(f'x_0 has nan values')
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
+        if torch.isnan(x_t).any():
+            print(f'x_t has nan values')
         context.update({'x_t': x_t.detach().clone()})
         # augment
         x_t, cond = self.augment(x_t, context['conditioning'], is_train)
+        if torch.isnan(x_t).any():
+            print(f'x_t has nan values after augmentation')
+        
         context.update({
             'is_train': is_train,
             't': self.t,

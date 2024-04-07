@@ -19,14 +19,13 @@ class Configuration:
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = True
+        self.IS_AUGMENTATION = False
 
         self.IS_DATA_PREPROCESSED = True
-
         self.SPLIT_RATES = (.75, .05, .2)
 
         self.CHOSEN_MODEL = cst.Models.CDT
-        self.CHOSEN_AUGMENTER = "LSTM"
+        self.CHOSEN_AUGMENTER = "MLP"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -72,7 +71,6 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
-        self.COND_METHOD = "concatenation"
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_CHANNELS] = 2

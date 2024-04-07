@@ -41,7 +41,6 @@ class ScheduleSampler(ABC):
         return indices, weights
 
     
-
 class LossSecondMomentResampler(ScheduleSampler):
     def __init__(self, num_diffusionsteps, history_per_term=10, uniform_prob=0.001):
         self.num_diffusionsteps = num_diffusionsteps

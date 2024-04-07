@@ -68,9 +68,10 @@ class WorldAgent(Agent):
         self.last_ask_price = 0
         if using_diffusion:
             self.starting_time_diffusion = '15min'
+            print(self.diffusion_model.type_embedder.weight.data)
         else:
-            self.starting_time_diffusion = '10000min'
-        print(self.diffusion_model.type_embedder.weight.data)
+            self.starting_time_diffusion = '100000min'
+        
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -118,7 +119,7 @@ class WorldAgent(Agent):
             self.first_wakeup = False
 
         # if current time is between 09:30 and 10:00, then we are in the pre-open phase
-        elif self.mkt_open < currentTime <= self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
+        elif self.mkt_open <= currentTime <= self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             next_order = self.historical_orders[self.next_historical_orders_index]
             self.last_offset_time = next_order[0]
             self.placeOrder(currentTime, next_order)

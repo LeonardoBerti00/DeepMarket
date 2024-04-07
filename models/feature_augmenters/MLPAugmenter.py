@@ -13,16 +13,33 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         super().__init__()
         augment_dim = augment_dim
         self.input_size = input_size
-        self.fwd_fc = nn.Linear(input_size, augment_dim, dtype=torch.float32)
-        self.bck_fc = nn.Linear(augment_dim, input_size, dtype=torch.float32)
-        if chosen_model == cst.Models.CDT.value:
-            self.v_fc = nn.Linear(augment_dim, input_size, dtype=torch.float32)
+        self.fwd_mlp = nn.Sequential(
+            nn.Linear(input_size, augment_dim//2, dtype=torch.float32),
+            nn.PReLU(init=0.01),
+            nn.LayerNorm(augment_dim//2),
+            nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
+        )
+        self.bck_mlp = nn.Sequential(
+            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            nn.PReLU(init=0.01),
+            nn.LayerNorm(augment_dim//2),
+            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+        )
+        self.v_mlp = nn.Sequential(
+            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            nn.PReLU(init=0.01),
+            nn.LayerNorm(augment_dim//2),
+            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+        )
 
     def augment(self, input):
-        return self.fwd_fc(input)
+        x = self.fwd_mlp(input)
+        return x
     
     def deaugment(self, input, v=None):
         if v is not None:
-            return self.bck_fc(input), self.v_fc(v)
+            input = self.bck_mlp(input)
+            v = self.v_mlp(v)
+            return input, v
         else:
-            return self.bck_fc(input)
+            return self.bck_mlp(input)
