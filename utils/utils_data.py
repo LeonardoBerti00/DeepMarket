@@ -26,7 +26,10 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
     # check if there are null values, then raise value error
     if data.isnull().values.any():
         raise ValueError("data contains null value")
-
+    print("mean_size LOB: ", mean_size)
+    print("std_size LOB: ", std_size)
+    print("mean_prices LOB: ", mean_prices)
+    print("std_prices LOB: ", std_prices)
     return data, mean_size, mean_prices, std_size,  std_prices
 
 
@@ -66,6 +69,15 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     # order_type = 1 -> cancel order
     # order_type = 2 -> market order
     
+    print("mean_size INTC: ", mean_size)
+    print("std_size INTC: ", std_size)
+    print("mean_prices INTC: ", mean_prices)
+    print("std_prices INTC: ", std_prices)
+    print("mean_time INTC: ", mean_time)
+    print("std_time INTC: ", std_time)
+    print("mean_depth INTC: ", mean_depth)
+    print("std_depth INTC: ", std_depth)
+
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth
 
 

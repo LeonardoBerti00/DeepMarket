@@ -34,6 +34,7 @@ def set_torch():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.autograd.set_detect_anomaly(False)
+    #print("REMEMBER TO PUT DETECT ANOMALY TO FALSE")
     torch.set_float32_matmul_precision('high')
 
 def plot_graphs(real_data_path, gen_data_path):
@@ -81,7 +82,7 @@ if __name__ == "__main__":
             split_rates=config.SPLIT_RATES,
         )
         data_builder.prepare_save_datasets()
-        
+        exit()
     if config.IS_WANDB:
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)

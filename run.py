@@ -89,7 +89,7 @@ def run(config, accelerator, model=None):
         num_sanity_val_steps=0,
         detect_anomaly=False,
         profiler="simple",
-        check_val_every_n_epoch=2
+        check_val_every_n_epoch=1
     )
     train(config, trainer)
 
@@ -136,7 +136,7 @@ def run_wandb(config, accelerator):
             num_sanity_val_steps=0,
             logger=wandb_logger,
             detect_anomaly=False,
-            check_val_every_n_epoch=2,
+            check_val_every_n_epoch=1,
         )
 
         # log simulation details in WANDB console
@@ -144,7 +144,6 @@ def run_wandb(config, accelerator):
         run.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
         run.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
         run.log({"cond type": config.COND_TYPE}, commit=False)
-        run.log({"cond method": config.COND_METHOD}, commit=False)
         run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
         run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
         #run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
@@ -188,7 +187,6 @@ def print_setup(config):
         print("CDT depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH])
         print("CDT num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS])
     print("Conditioning type: ", config.COND_TYPE)
-    print("Conditioning method: ", config.COND_METHOD)
     print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
     print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
     print("Batch size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE])

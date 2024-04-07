@@ -138,12 +138,26 @@ if symbol == "TSLA":
     }
 
 elif symbol == "INTC":
-    normalization_terms = {"lob": [cst.INTC_LOB_MEAN_SIZE_10, cst.INTC_LOB_STD_SIZE_10, cst.INTC_LOB_MEAN_PRICE_10,
-                                   cst.INTC_LOB_STD_PRICE_10],
-                           "event": [cst.INTC_EVENT_MEAN_SIZE, cst.INTC_EVENT_STD_SIZE, cst.INTC_EVENT_MEAN_PRICE, 
-                                     cst.INTC_EVENT_STD_PRICE, cst.INTC_EVENT_MEAN_TIME, cst.INTC_EVENT_STD_TIME]}
+    normalization_terms = {
+        "lob": [
+            cst.INTC_LOB_MEAN_SIZE_10, 
+            cst.INTC_LOB_STD_SIZE_10, 
+            cst.INTC_LOB_MEAN_PRICE_10,
+            cst.INTC_LOB_STD_PRICE_10
+            ],
+        "event": [
+            cst.INTC_EVENT_MEAN_SIZE, 
+            cst.INTC_EVENT_STD_SIZE, 
+            cst.INTC_EVENT_MEAN_PRICE, 
+            cst.INTC_EVENT_STD_PRICE, 
+            cst.INTC_EVENT_MEAN_TIME, 
+            cst.INTC_EVENT_STD_TIME,
+            cst.INTC_EVENT_MEAN_DEPTH,
+            cst.INTC_EVENT_STD_DEPTH
+        ]
+    }
 
-starting_cash = 1000000000  # Cash in this simulator is always in CENTS.
+starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 
 # 1) Exchange Agent
 
@@ -170,7 +184,6 @@ agent_types.extend("ExchangeAgent")
 agent_count += 1
 
 # 2) World Agent
-
 
 
 if args.diffusion:
@@ -213,9 +226,9 @@ agents.extend([WorldAgent(id=1,
                           date_trading_days=cst.DATE_TRADING_DAYS,
                           diffusion_model=model,
                           data_dir=cst.DATA_DIR,
-                          cond_type=config.COND_TYPE,
-                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
-                          size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB],
+                          cond_type=config.COND_TYPE if args.diffusion else None,
+                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE] if args.diffusion else None,
+                          size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB] if args.diffusion else None,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
                               seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),

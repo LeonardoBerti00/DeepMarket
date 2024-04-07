@@ -1,6 +1,8 @@
 __pycache__
 data/reconstructions
 data/TSLA
+data/INTC/
+data/INTC/INTC_2015-01-02_2015-01-30/
 data/checkpoints
 data/plot
 lightning_logs/

@@ -7,7 +7,7 @@ from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from models.diffusers.CDT.CDT import CDT, DiT
+from models.diffusers.CDT.CDT import CDT
 
 """
 Functions -> _vlb_loss, _p_mean, _q_posterior_mean_var, _normal_kl, _gaussian_log_likelihood, _approx_standard_normal_cdf 
@@ -19,7 +19,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     def __init__(self, config, feature_augmenter):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
-        self.cond_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
@@ -29,7 +28,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
         self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
-        self.type = config.COND_METHOD
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         if config.IS_AUGMENTATION:
@@ -39,36 +37,19 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         else:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
             self.cond_size = config.COND_SIZE
-        if (self.type == 'adaln_zero'):
-            self.NN = DiT(
-                self.input_size,
-                self.cond_seq_size,
-                self.cond_size,
-                self.num_diffusionsteps,
-                self.depth,
-                self.num_heads,
-                self.x_seq_size,
-                self.mlp_ratio,
-                self.cond_dropout_prob,
-                self.IS_AUGMENTATION,
-                self.dropout
-            )
-        elif (self.type == 'concatenation'):
-            self.NN = CDT(
-                self.input_size,
-                self.cond_seq_size,
-                self.cond_size,
-                self.num_diffusionsteps,
-                self.depth,
-                self.num_heads,
-                self.x_seq_size,
-                self.mlp_ratio,
-                self.cond_dropout_prob,
-                self.IS_AUGMENTATION,
-                self.dropout
-            )
-        else:
-            raise ValueError("Invalid conditioning type")
+        self.NN = CDT(
+            self.input_size,
+            self.cond_seq_size,
+            self.cond_size,
+            self.num_diffusionsteps,
+            self.depth,
+            self.num_heads,
+            self.x_seq_size,
+            self.mlp_ratio,
+            self.cond_dropout_prob,
+            self.IS_AUGMENTATION,
+            self.dropout
+        )
 
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
@@ -124,6 +105,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=x_0.shape[-1])
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t_aug, cond, t)
+        #check for nan in x_t_aug and cond and noise_t
+        if torch.isnan(x_t_aug).any():
+            print("x_t_aug:", x_t_aug)
+        if torch.isnan(cond).any():
+            print("cond:", cond)
+        if torch.isnan(noise_t).any():
+            print("noise_t:", noise_t)
         if self.IS_AUGMENTATION:
             noise_t, v = self.deaugment(noise_t, v)
         # Compute the variance for the current time step using the formula from the IDDPM paper
@@ -197,6 +185,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         kl = self._normal_kl(
             true_mean, true_log_variance_clipped, pred_mean, pred_log_var
         )
+        #check for nan in kl and print
+        if torch.isnan(kl).any():
+            print("kl:", kl)
         kl = self._mean_flat(kl) / np.log(2.0)
         decoder_nll = -self._gaussian_log_likelihood(
             x_0, means=pred_mean, log_scales=pred_log_var*0.5
@@ -213,7 +204,23 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         '''
         Get the mean of the prior p(x_{t-1} | x_t).
         '''
+        #check for nan in each variable input
+        if torch.isnan(noise_t).any():
+            print("noise_t:", noise_t)
+        if torch.isnan(x_t).any():
+            print("x_t:", x_t)
+        if torch.isnan(t).any():
+            print("t:", t)
+        if torch.isnan(beta_t).any():
+            print("beta_t:", beta_t)
+        if torch.isnan(alpha_t).any():
+            print("alpha_t:", alpha_t)
+        if torch.isnan(alpha_cumprod_t).any():
+            print("alpha_cumprod_t:", alpha_cumprod_t)
         pred_mean = 1/torch.sqrt(alpha_t) * (x_t - (beta_t*noise_t/torch.sqrt(1-alpha_cumprod_t)))
+        #check for nan and print
+        if torch.isnan(pred_mean).any():
+            print("p_mean:", pred_mean)
         return pred_mean
 
     def _q_posterior_mean_var(self, x_0, x_t, t):
@@ -255,6 +262,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         :return: a tensor like x of log probabilities (in nats).
         """
         assert x.shape == means.shape == log_scales.shape
+        #check for nan and print in x
+        if torch.isnan(x).any():
+            print("gaussian likelihood:", x)
         centered_x = x - means
         inv_stdv = torch.exp(log_scales)
         plus_in = inv_stdv * (centered_x + 1.0)

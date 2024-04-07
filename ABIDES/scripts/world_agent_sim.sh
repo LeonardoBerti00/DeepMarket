@@ -1,7 +1,7 @@
 #!/bin/bash
 NUM_JOBS=32
 # market replay simulation
-python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -st '09:30:00' -et '12:00:00'
+python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -st '09:30:00' -et '16:00:00'
 # market replay with pov agent
 python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -p 0.1 -e True -st '09:30:00' -et '12:00:00'
 # world agent with diffusion simulation
