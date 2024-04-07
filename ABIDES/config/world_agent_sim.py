@@ -82,6 +82,13 @@ parser.add_argument('-d',
                     type=bool,
                     default=False,
                     help='Using diffusion')
+#add a parser argument that takes in nput a float value for the proportion of volume
+# that the agent will trade
+parser.add_argument('-id',
+                    '--id',
+                    type=float,
+                    default=None,
+                    help='diffusion-id-which-is-best-val-loss')
 
 args, remaining_args = parser.parse_known_args()
 
@@ -164,23 +171,32 @@ agent_count += 1
 
 # 2) World Agent
 
-chosen_model = args.chosen_model
-dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
-best_val_loss = 1000000
-for file in dir_path.iterdir():
-    try:
-        val_loss = float(file.name.split("=")[1].split("_")[0])
-        #if val_loss < best_val_loss:
-        if val_loss == 0.836:
-            best_val_loss = val_loss
-            checkpoint_reference = file
-    except:
-        continue
-print("checkpoint used: ", checkpoint_reference)
-checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
-config = checkpoint["hyper_parameters"]["config"]
+
 
 if args.diffusion:
+    chosen_model = args.chosen_model
+    dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
+    best_val_loss = 1000000
+    if args.id is None:
+        for file in dir_path.iterdir():
+            try:
+                val_loss = float(file.name.split("=")[1].split("_")[0])
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    checkpoint_reference = file
+            except:
+                continue
+    else:
+        for file in dir_path.iterdir():
+            try:
+                val_loss = float(file.name.split("=")[1].split("_")[0])
+                if val_loss == args.id:
+                    checkpoint_reference = file
+            except:
+                continue
+    print("checkpoint used: ", checkpoint_reference)
+    checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
+    config = checkpoint["hyper_parameters"]["config"]
     # load checkpoint
     model = NNEngine.load_from_checkpoint(checkpoint_reference, map_location=cst.DEVICE)
     # we freeze the model
@@ -198,7 +214,7 @@ agents.extend([WorldAgent(id=1,
                           diffusion_model=model,
                           data_dir=cst.DATA_DIR,
                           cond_type=config.COND_TYPE,
-                          cond_seq_size=config.COND_SEQ_SIZE,
+                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
                           size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB],
                           log_orders=log_orders,
                           random_state=np.random.RandomState(

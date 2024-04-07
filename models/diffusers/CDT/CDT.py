@@ -175,6 +175,7 @@ class CDT(nn.Module):
         self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
+        self.is_augmented = is_augmented
         if is_augmented:
             self.layers = nn.ModuleList([
                 nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=input_size*mlp_ratio, dropout=dropout, batch_first=True) for _ in range(depth)
@@ -200,7 +201,10 @@ class CDT(nn.Module):
         diff_time_emb = self.t_embedder[t]
         full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
         for layer in self.layers:
-            full_input = layer(full_input)
+            if self.is_augmented:
+                full_input = layer(full_input)
+            else:
+                full_input, _ = layer(full_input)
         full_input = rearrange(full_input, 'n l f -> n (l f)')
         noise = self.fc_noise(full_input)
         var = self.fc_var(full_input)
