@@ -12,8 +12,8 @@ def main(real_path, generated_path):
     column = "TYPE"
 
     # compute the percentage of each value of the feature in the two dataframes
-    percentage_gen = df1[column].value_counts(normalize=True)
-    percentage_real = df2[column].value_counts(normalize=True)
+    percentage_real = df1[column].value_counts(normalize=True)
+    percentage_gen = df2[column].value_counts(normalize=True)
 
     # join the two percentages in a single dataframe
     df_combined = pd.DataFrame({

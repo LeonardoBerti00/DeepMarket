@@ -26,6 +26,7 @@ class CDT(nn.Module):
         self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
         self.pos_embed = sinusoidal_positional_embedding(self.seq_size, input_size)
+        self.is_augmented = is_augmented
         if is_augmented:
             self.layers = TransformerEncoder(num_heads, input_size, depth, dropout, cond_type)
         else:

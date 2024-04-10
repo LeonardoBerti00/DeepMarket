@@ -82,6 +82,8 @@ parser.add_argument('-d',
                     type=bool,
                     default=False,
                     help='Using diffusion')
+#add a parser argument that takes in nput a float value for the proportion of volume
+# that the agent will trade
 parser.add_argument('-id',
                     '--id',
                     type=float,
