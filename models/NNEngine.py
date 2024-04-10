@@ -55,16 +55,13 @@ class NNEngine(L.LightningModule):
         self.num_violations_size = 0
         self.chosen_model = config.CHOSEN_MODEL.name
         self.last_path_ckpt_ema = None
-
+        self.cond_size = config.COND_SIZE
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.chosen_model)
+            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
             
-        if self.IS_AUGMENTATION and self.cond_type == 'full':
-            self.conditioning_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, cst.N_LOB_LEVELS*cst.LEN_LEVEL, self.augment_dim, self.chosen_model)
-
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
@@ -89,8 +86,6 @@ class NNEngine(L.LightningModule):
             recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
-            if self.IS_AUGMENTATION and self.cond_type == 'full':
-                cond_lob = self.conditioning_augmenter.augment(cond_lob)
             for i in range(self.num_diffusionsteps-1, -1, -1):
                 recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
                 self.t -= 1
@@ -153,12 +148,10 @@ class NNEngine(L.LightningModule):
     def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor, is_train: bool):
         if self.IS_AUGMENTATION:
             full_input = torch.cat([cond_orders, x_t], dim=1)
-            full_input_aug = self.feature_augmenter.augment(full_input)
+            full_input_aug, cond_lob_aug = self.feature_augmenter.augment(full_input, cond_lob)
             cond_orders = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-            if self.cond_type == 'full':
-                cond_lob = self.conditioning_augmenter.augment(cond_lob)
-        return x_t, cond_orders, cond_lob
+        return x_t, cond_orders, cond_lob_aug
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
