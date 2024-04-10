@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
+        self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
 
         # evaluation
@@ -19,7 +19,7 @@ class Configuration:
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = False
+        self.IS_AUGMENTATION = True
 
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.75, .05, .2)
@@ -58,7 +58,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3    # try higher values
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3    
         self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
         if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
@@ -81,13 +81,12 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
-        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
+        self.COND_TYPE = "full"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
-            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
+            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
-        elif self.COND_TYPE == "only_lob":
-            self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
+
 
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
 

@@ -28,7 +28,7 @@ class AdaptiveMarketMakerAgent(TradingAgent):
 
     def __init__(self, id, name, type, symbol, starting_cash, pov=0.05, min_order_size=20, window_size=5, anchor=ANCHOR_MIDDLE_STR,
                  num_ticks=20, level_spacing=0.5, wake_up_freq='1s', subscribe=False, subscribe_freq=10e9, subscribe_num_levels=1, cancel_limit_delay=50,
-                 skew_beta=0, spread_alpha=0.85, backstop_quantity=None, log_orders=False, random_state=None):
+                 skew_beta=0, spread_alpha=0.85, backstop_quantity=None, log_orders=False, random_state=None, wakeup_time=None):
 
         super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
         self.is_adaptive = False
@@ -63,6 +63,7 @@ class AdaptiveMarketMakerAgent(TradingAgent):
         self.last_spread = INITIAL_SPREAD_VALUE  # last observed spread moving average
         self.tick_size = None if self.is_adaptive else ceil(self.last_spread * self.level_spacing)
         self.LIQUIDITY_DROPOUT_WARNING = f"Liquidity dropout for agent {self.name}."
+        self.wakeup_time = wakeup_time
 
 
     def initialiseState(self):
@@ -118,6 +119,9 @@ class AdaptiveMarketMakerAgent(TradingAgent):
             self.subscription_requested = True
             self.get_transacted_volume(self.symbol, lookback_period=self.subscribe_freq)
             self.state = self.initialiseState()
+
+        elif currentTime <= self.wakeup_time:
+            self.setWakeup(currentTime + self.getWakeFrequency())
 
         elif can_trade and not self.subscribe:
             self.cancelAllOrders()

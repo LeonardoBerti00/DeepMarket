@@ -9,6 +9,6 @@ HP_CDT = {
 
 HP_CDT_FIXED = {
     cst.LearningHyperParameter.CDT_DEPTH.value: 8,
-    cst.LearningHyperParameter.AUGMENT_DIM.value: 256,
+    cst.LearningHyperParameter.AUGMENT_DIM.value: 128,
     cst.LearningHyperParameter.SEQ_SIZE.value: 256,
 } 

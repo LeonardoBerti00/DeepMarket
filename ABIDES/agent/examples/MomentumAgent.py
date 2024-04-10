@@ -12,10 +12,11 @@ class MomentumAgent(TradingAgent):
 
     def __init__(self, id, name, type, symbol, starting_cash,
                  min_size, max_size, wake_up_freq='60s',
-                 subscribe=False, log_orders=False, random_state=None):
+                 subscribe=False, log_orders=False, random_state=None, wakeup_time=None):
 
         super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
         self.symbol = symbol
+        self.wakeup_time = wakeup_time
         self.min_size = min_size  # Minimum order size
         self.max_size = max_size  # Maximum order size
         self.size = self.random_state.randint(self.min_size, self.max_size)
@@ -45,16 +46,20 @@ class MomentumAgent(TradingAgent):
         super().receiveMessage(currentTime, msg)
         if not self.subscribe and self.state == 'AWAITING_SPREAD' and msg.body['msg'] == 'QUERY_SPREAD':
             bid, _, ask, _ = self.getKnownBidAsk(self.symbol)
-            self.placeOrders(bid, ask)
+            self.placeOrders(currentTime, bid, ask)
             self.setWakeup(currentTime + self.getWakeFrequency())
             self.state = 'AWAITING_WAKEUP'
+        elif currentTime < self.wakeup_time:
+            return
         elif self.subscribe and self.state == 'AWAITING_MARKET_DATA' and msg.body['msg'] == 'MARKET_DATA':
             bids, asks = self.known_bids[self.symbol], self.known_asks[self.symbol]
-            if bids and asks: self.placeOrders(bids[0][0], asks[0][0])
+            if bids and asks: self.placeOrders(currentTime, bids[0][0], asks[0][0])
             self.state = 'AWAITING_MARKET_DATA'
 
-    def placeOrders(self, bid, ask):
+    def placeOrders(self, currentTime, bid, ask):
         """ Momentum Agent actions logic """
+        if currentTime < self.wakeup_time:
+            return
         if bid and ask:
             self.mid_list.append((bid + ask) / 2)
             if len(self.mid_list) > 20: self.avg_20_list.append(MomentumAgent.ma(self.mid_list, n=20)[-1].round(2))

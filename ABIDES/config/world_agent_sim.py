@@ -186,8 +186,8 @@ if args.diffusion:
     for file in dir_path.iterdir():
         try:
             val_loss = float(file.name.split("=")[1].split("_")[0])
-            if val_loss < best_val_loss:
-            #if val_loss == 0.836:
+            #if val_loss < best_val_loss:
+            if val_loss == 1.503:
                 best_val_loss = val_loss
                 checkpoint_reference = file
         except:
@@ -212,7 +212,7 @@ agents.extend([WorldAgent(id=1,
                           diffusion_model=model,
                           data_dir=cst.DATA_DIR,
                           cond_type=config.COND_TYPE if args.diffusion else None,
-                          cond_seq_size=config.COND_SEQ_SIZE if args.diffusion else None,
+                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE] if args.diffusion else None,
                           size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB] if args.diffusion else None,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(

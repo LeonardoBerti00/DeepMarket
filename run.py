@@ -123,7 +123,7 @@ def run_wandb(config, accelerator):
         diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         augmenter = config.CHOSEN_AUGMENTER
         size_type = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "aug_" + str(is_augmentation) + "_diffsteps_" + str(diffsteps) + "_size_type_" + str(size_type) 
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
         wandb_instance_name = config.FILENAME_CKPT
         trainer = L.Trainer(
             accelerator=accelerator,

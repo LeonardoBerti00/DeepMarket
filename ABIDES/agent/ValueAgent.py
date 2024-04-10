@@ -10,7 +10,7 @@ class ValueAgent(TradingAgent):
 
     def __init__(self, id, name, type, symbol='IBM', starting_cash=100000, sigma_n=10000,
                  r_bar=100000, kappa=0.05, sigma_s=100000,
-                 lambda_a=0.005, log_orders=False, log_to_file=True, random_state=None):
+                 lambda_a=0.005, log_orders=False, log_to_file=True, random_state=None, wakeup_time=pd.Timedelta('0s')):
 
         # Base class init.
         super().__init__(id, name, type, starting_cash=starting_cash,
@@ -23,7 +23,7 @@ class ValueAgent(TradingAgent):
         self.kappa = kappa  # mean reversion parameter
         self.sigma_s = sigma_s  # shock variance
         self.lambda_a = lambda_a  # mean arrival rate of ZI agents
-
+        self.wakeup_time = wakeup_time
         # The agent uses this to track whether it has begun its strategy or is still
         # handling pre-market tasks.
         self.trading = False
@@ -59,7 +59,7 @@ class ValueAgent(TradingAgent):
         # Print end of day valuation.
         H = int(round(self.getHoldings(self.symbol), -2) / 100)
         # May request real fundamental value from oracle as part of final cleanup/stats.
-
+        return 
         #marked to fundamental
         rT = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=0, random_state=self.random_state)
 
@@ -106,7 +106,11 @@ class ValueAgent(TradingAgent):
 
         delta_time = self.random_state.exponential(scale=1.0 / self.lambda_a)
         self.setWakeup(currentTime + pd.Timedelta('{}ns'.format(int(round(delta_time)))))
-
+        
+        if currentTime <= self.wakeup_time:
+            # This wakeup was set by the agent itself.
+            return
+        
         if self.mkt_closed and (not self.symbol in self.daily_close_price):
             self.getCurrentSpread(self.symbol)
             self.state = 'AWAITING_SPREAD'
@@ -127,8 +131,7 @@ class ValueAgent(TradingAgent):
 
         # The agent obtains a new noisy observation of the current fundamental value
         # and uses this to update its internal estimates in a Bayesian manner.
-        obs_t = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=self.sigma_n,
-                                         random_state=self.random_state)
+        obs_t = self.last_trade[self.symbol]
 
         log_print("{} observed {} at {}", self.name, obs_t, self.currentTime)
 

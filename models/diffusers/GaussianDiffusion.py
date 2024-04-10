@@ -40,15 +40,14 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.NN = CDT(
             self.input_size,
             self.cond_seq_size,
-            self.cond_size,
             self.num_diffusionsteps,
             self.depth,
             self.num_heads,
             self.x_seq_size,
-            self.mlp_ratio,
             self.cond_dropout_prob,
             self.IS_AUGMENTATION,
-            self.dropout
+            self.dropout,
+            config.COND_TYPE
         )
 
         self.betas = config.BETAS
@@ -75,15 +74,17 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         x_t = context['x_t']
         assert 'noise_true' in context
         noise_true = context['noise_true']
-        assert 'conditioning' in context
-        cond = context['conditioning_aug']
+        cond_orders = context['cond_orders_aug']
+        cond_lob = context['cond_lob_aug']
+        cond_type = context['cond_type']
         assert 't' in context
         t = context['t']
         assert 'x_0' in context
         x_0 = context['x_0']
         assert 'weights' in context
         weights = context['weights']
-        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond, noise_true, weights)
+
+        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob, cond_type)
 
 
     def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
@@ -92,7 +93,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         x_t, noise = super().forward_reparametrized(x_0, t)
         return x_t, {'noise_true': noise, 'conditioning': cond}
 
-    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond, noise_true, weights):
+    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob, cond_type):
         '''
         Compute the reverse diffusion process for the current time step
         '''
@@ -104,12 +105,10 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         alpha_t = repeat(alpha_t, 'b -> b 1 d', d=x_0.shape[-1])
         alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=x_0.shape[-1])
         # Get the noise and v outputs from the neural network for the current time step
-        noise_t, v = self.NN(x_t_aug, cond, t)
+        noise_t, v = self.NN(x_t_aug, cond_orders, t, cond_lob)
         #check for nan in x_t_aug and cond and noise_t
         if torch.isnan(x_t_aug).any():
             print("x_t_aug:", x_t_aug)
-        if torch.isnan(cond).any():
-            print("cond:", cond)
         if torch.isnan(noise_t).any():
             print("noise_t:", noise_t)
         if self.IS_AUGMENTATION:

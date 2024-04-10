@@ -44,7 +44,7 @@ class NoiseAgent(TradingAgent):
     def kernelStopping(self):
         # Always call parent method to be safe.
         super().kernelStopping()
-
+        return
         # Print end of day valuation.
         H = int(round(self.getHoldings(self.symbol), -2) / 100)
 
@@ -54,7 +54,7 @@ class NoiseAgent(TradingAgent):
         if bid and ask:
             rT = int(bid + ask)/2
         else:
-            rT = self.last_trade[ self.symbol ]
+            rT = self.last_trade[self.symbol]
 
         # final (real) fundamental value times shares held.
         surplus = rT * H
