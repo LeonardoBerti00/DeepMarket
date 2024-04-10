@@ -10,6 +10,11 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "args": ["-c", "rmsc03", "-t", "TSLA", "-d", "20150130", "-s", "12345", "-l", "IABS", "--end-time", "09:50:00", "--start-time", "09:30:00"]
+        }
+    ],
+    "gino": [
+        {
             "args": ["-c", "world_agent_sim", "-t", "INTC", "-date", "20150128", "-s", "1234"]
         }
     ]

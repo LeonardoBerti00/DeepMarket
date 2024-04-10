@@ -1,8 +1,7 @@
 __pycache__
 data/reconstructions
 data/TSLA
-data/INTC/
-data/INTC/INTC_2015-01-02_2015-01-30/
+data/INTC
 data/checkpoints
 data/plot
 lightning_logs/
@@ -13,3 +12,4 @@ output
 launch.sh
 launch_sim.sh
 evaluation/visualizations/prova.ipynb
+ABIDES/log/IABS_1/

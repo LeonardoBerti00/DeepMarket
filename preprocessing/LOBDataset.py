@@ -31,13 +31,18 @@ class LOBDataset(data.Dataset):
     def __getitem__(self, index):
         index_cond = self.cond_seq_size + index
         index_x = self.cond_seq_size + index + self.x_seq_size
-        cond = self.data[index:index_cond, :]
-        x_0 = self.data[index_cond:index_x, :cst.LEN_EVENT]
-        return cond, x_0
+        cond = self.orders[index:index_cond]
+        x_0 = self.orders[index_cond:index_x]
+        lob = self.lob[index:index_x]
+        return cond, x_0, lob
 
     def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path)).float()        
+        self.data = torch.from_numpy(np.load(self.path)).float()
+        self.orders = self.data[:, :cst.LEN_EVENT]
+        self.lob = self.data[:, cst.LEN_EVENT:]
+        self.lob = np.roll(self.lob, 1, axis=0)
+        self.lob[0, :] = 0
 
 
 

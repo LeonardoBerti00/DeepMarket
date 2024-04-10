@@ -39,7 +39,6 @@ class NNEngine(L.LightningModule):
         self.one_hot_encoding_type = config.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]
         self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
-        self.cond_size = config.COND_SIZE
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
@@ -56,16 +55,15 @@ class NNEngine(L.LightningModule):
         self.num_violations_size = 0
         self.chosen_model = config.CHOSEN_MODEL.name
         self.last_path_ckpt_ema = None
-        # TODO: Why not choose this augmenter from the config?
-        # TODO: make both conditioning as default to switch to nn.Identity
+
         if self.IS_AUGMENTATION:
             self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.chosen_model)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
             
-        if self.IS_AUGMENTATION and self.cond_type in ['full', 'only_lob']:
-            self.conditioning_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, config.COND_SIZE, self.augment_dim, self.chosen_model)
+        if self.IS_AUGMENTATION and self.cond_type == 'full':
+            self.conditioning_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, cst.N_LOB_LEVELS*cst.LEN_LEVEL, self.augment_dim, self.chosen_model)
 
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
@@ -78,63 +76,61 @@ class NNEngine(L.LightningModule):
         self.simple_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         
 
-    def forward(self, cond, x_0, is_train, batch_idx=None):
+    def forward(self, cond_orders, x_0, cond_lob, is_train, batch_idx=None):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
         if not self.one_hot_encoding_type:
-            x_0, cond = self.type_embedding(x_0, cond)
-        real_input, real_cond = x_0.detach().clone(), cond.detach().clone()
+            x_0, cond_orders = self.type_embedding(x_0, cond_orders)
+        real_input, real_cond = x_0.detach().clone(), cond_orders.detach().clone()
         if is_train:
             if isinstance(self.diffuser, CSDIDiffuser) and is_train:
                 self.t = torch.randint(low=1, high=self.num_diffusionsteps, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
             elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
                 self.t, _ = self.sampler.sample(x_0.shape[0])
-            recon, context = self.single_step(cond, x_0, is_train, real_cond)
+            recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
             if self.IS_AUGMENTATION and self.cond_type == 'full':
-                cond = self.conditioning_augmenter.augment(cond)
+                cond_lob = self.conditioning_augmenter.augment(cond_lob)
             for i in range(self.num_diffusionsteps-1, -1, -1):
-                recon, context = self.single_step(cond, x_0, is_train, real_cond)
+                recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
                 self.t -= 1
         return recon, context
 
-    def sampling(self, cond, x_0):
+    def sampling(self, cond_orders, x_0, cond_lob):
         self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
         if not self.one_hot_encoding_type:
-            x_0, cond = self.type_embedding(x_0, cond)
-        real_cond = cond.detach().clone()
-        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
+            x_0, cond_orders = self.type_embedding(x_0, cond_orders)
+        real_cond_orders = cond_orders.detach().clone()
+        real_cond_lob = cond_lob.detach().clone()
+        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
         context.update({'x_t': x_t.detach().clone()})
         for i in range(self.num_diffusionsteps-1, -1, -1):
             # augment
-            x_t, cond = self.augment(x_t, real_cond, False)
+            x_t, cond_orders, cond_lob = self.augment(x_t, real_cond_orders, real_cond_lob)
 
             context.update({
                 'is_train': False,
                 't': self.t,
                 'x_0': x_0,
-                'conditioning_aug': cond,
-                'weights': self.sampler.weights()
+                'cond_orders_aug': cond_orders,
+                'cond_lob_aug': cond_lob,
+                'weights': self.sampler.weights(),
+                'cond_type': self.cond_type
             })
 
             x_t, reverse_context = self.diffuser(x_t, context)
 
-            reverse_context.update({'conditioning': real_cond})
+            reverse_context.update({'conditioning': real_cond_orders})
             # return the deaugmented denoised input and the reverse context
             self.t -= 1
         return x_t
 
-    def single_step(self, cond, x_0, is_train, real_cond):
+    def single_step(self, cond_orders, x_0, cond_lob, is_train, real_cond):
         # forward process
-        #check for nan in x_0
-        if torch.isnan(x_0).any():
-            print(f'x_0 has nan values')
-        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond})
-        if torch.isnan(x_t).any():
-            print(f'x_t has nan values')
+        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
         context.update({'x_t': x_t.detach().clone()})
         # augment
-        x_t, cond = self.augment(x_t, context['conditioning'], is_train)
+        x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob, is_train)
         if torch.isnan(x_t).any():
             print(f'x_t has nan values after augmentation')
         
@@ -142,8 +138,10 @@ class NNEngine(L.LightningModule):
             'is_train': is_train,
             't': self.t,
             'x_0': x_0,
-            'conditioning_aug': cond,
-            'weights': self.sampler.weights()
+            'cond_orders_aug': cond_orders,
+            'cond_lob_aug': cond_lob,
+            'weights': self.sampler.weights(),
+            'cond_type': self.cond_type
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
@@ -152,18 +150,15 @@ class NNEngine(L.LightningModule):
         # return the deaugmented denoised input and the reverse context
         return x_recon, reverse_context
 
-
-    def augment(self, x_t: torch.Tensor, cond: torch.Tensor, is_train: bool):
-        if self.IS_AUGMENTATION and self.cond_type == 'only_event':
-            full_input = torch.cat([cond, x_t], dim=1)
+    def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor, is_train: bool):
+        if self.IS_AUGMENTATION:
+            full_input = torch.cat([cond_orders, x_t], dim=1)
             full_input_aug = self.feature_augmenter.augment(full_input)
-            cond = full_input_aug[:, :self.cond_seq_size, :]
+            cond_orders = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-        elif self.IS_AUGMENTATION and (self.cond_type == 'only_lob' or self.cond_type == 'full'):
-            x_t = self.feature_augmenter.augment(x_t)
-            cond = self.conditioning_augmenter.augment(cond)
-            assert self.augment_dim == self.cond_size
-        return x_t, cond
+            if self.cond_type == 'full':
+                cond_lob = self.conditioning_augmenter.augment(cond_lob)
+        return x_t, cond_orders, cond_lob
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
@@ -184,9 +179,11 @@ class NNEngine(L.LightningModule):
         if self.global_step == 0 and self.IS_WANDB:
             self._define_log_metrics()
         x_0 = input[1]
-        full_cond = input[0]
-        cond = self._select_cond(full_cond, self.cond_type)
-        recon, reverse_context = self.forward(cond, x_0, is_train=True, batch_idx=batch_idx)
+        cond_orders = input[0]
+        cond_lob = input[2]
+        if self.cond_type != 'full':
+            cond_lob = None
+        recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=True, batch_idx=batch_idx)
         reverse_context.update({'is_train': True})
         if isinstance(self.diffuser, GaussianDiffusion):
             batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
@@ -241,12 +238,14 @@ class NNEngine(L.LightningModule):
 
     def validation_step(self, input, batch_idx):
         x_0 = input[1]
-        full_cond = input[0]
-        cond = self._select_cond(full_cond, self.cond_type)
+        cond_orders = input[0]
+        cond_lob = input[2]
+        if self.cond_type != 'full':
+            cond_lob = None
         # Validation: with EMA
         with self.ema.average_parameters():
             current_time = time.time()
-            recon, reverse_context = self.forward(cond, x_0, is_train=False)
+            recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=False)
             reverse_context.update({'is_train': False})
             if isinstance(self.diffuser, GaussianDiffusion):
                 batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
@@ -302,13 +301,6 @@ class NNEngine(L.LightningModule):
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")
         wandb.define_metric("val_ema_loss", summary="min")
-
-    def _select_cond(self, cond, cond_type):
-        if cond_type == 'only_event':
-            cond = cond[:, :, :cst.LEN_EVENT]
-        elif cond_type == 'only_lob':
-            cond = cond[:, :, cst.LEN_EVENT:]
-        return cond
 
     def _model_checkpointing(self, loss):
         if self.last_path_ckpt_ema is not None:

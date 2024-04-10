@@ -261,7 +261,7 @@ class TradingAgent(FinancialAgent):
       # to its trading frequency.
       ns_offset = self.getWakeFrequency()
 
-      self.setWakeup(self.mkt_open + ns_offset)
+      self.setWakeup(currentTime + ns_offset)
 
 
   # Used by any Trading Agent subclass to query the last trade price for a symbol.

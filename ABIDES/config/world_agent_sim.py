@@ -218,6 +218,7 @@ if args.diffusion:
 else:
     model = None
 
+
 agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
