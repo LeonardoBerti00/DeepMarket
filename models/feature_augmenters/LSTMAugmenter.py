@@ -9,7 +9,7 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 class LSTMAugmenter(AugmenterAB, nn.Module):
     
-    def __init__(self, input_size, augment_dim, cond_size, cond_type):
+    def __init__(self, input_size, augment_dim, cond_size, cond_type, cond_augmenter):
         super().__init__()
         augment_dim = augment_dim
         self.input_size = input_size

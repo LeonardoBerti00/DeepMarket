@@ -70,7 +70,7 @@ class WorldAgent(Agent):
             self.starting_time_diffusion = '15min'
             print(self.diffusion_model.type_embedder.weight.data)
         else:
-            self.starting_time_diffusion = '15min'
+            self.starting_time_diffusion = '1000000min'
         
 
     def kernelStarting(self, startTime):
@@ -131,7 +131,6 @@ class WorldAgent(Agent):
                 return
 
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
-            return
             self.state = 'GENERATING'
 
             # we generate the first order then the others will be generated everytime we receive the update of the lob
@@ -229,19 +228,23 @@ class WorldAgent(Agent):
     def _generate_order(self, currentTime):
         generated = None
         while generated is None:
-            if self.cond_type == 'only_lob':
-                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size:])
-                cond = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
+            if self.cond_type == 'full':
+                orders = np.array(self.placed_orders[-self.cond_seq_size:])
+                cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size-1:])
+                cond_lob = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
+                cond_lob = cond_lob.unsqueeze(0)
             elif self.cond_type == 'only_event':
                 orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                cond = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                cond_lob = None
                 #cond = one_hot_encoding_type(orders_preprocessed).to(cst.DEVICE)
                 #cond = tanh_encoding_type(orders_preprocessed).to(cst.DEVICE)
             else:
                 raise ValueError("cond_type not recognized")
-            cond = cond.unsqueeze(0)
+            cond_orders = cond_orders.unsqueeze(0)   
             x = torch.zeros(1, 1, cst.LEN_EVENT, device=cst.DEVICE, dtype=torch.float32)
-            generated = self.diffusion_model.sampling(cond, x)
+            generated = self.diffusion_model.sampling(cond_orders, x, cond_lob)
             generated = generated[0, 0, :]
             generated = self._postprocess_generated(generated)
         return generated

@@ -82,8 +82,8 @@ class TransformerBlockSelfAtt(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(d_model, 4 * d_model),
             nn.PReLU(init=0.01),
-            nn.Dropout(dropout),
             nn.Linear(4 * d_model, d_model),
+            nn.Dropout(dropout),
         )
         self.num_heads = num_heads
         self.d_model = d_model
@@ -91,7 +91,8 @@ class TransformerBlockSelfAtt(nn.Module):
         self.to_k = nn.Linear(d_model, d_model, bias=False)
         self.to_v = nn.Linear(d_model, d_model, bias=False)
         self.to_out = nn.Linear(d_model, d_model, bias=False)
-        self.layer_norm = nn.LayerNorm(d_model)
+        self.layer_norm1 = nn.LayerNorm(d_model)
+        self.layer_norm2 = nn.LayerNorm(d_model)
 
     def forward(self, x, mask=None, cond=None):
         # x.shape = B, L, D
@@ -117,8 +118,8 @@ class TransformerBlockSelfAtt(nn.Module):
         # Pass the output through the output linear layer
         out_att = self.to_out(out_att)
         # Apply the residual connection and layer normalization
-        out_att = self.layer_norm(out_att + x)
+        out_att = self.layer_norm1(out_att + x)
         # Pass the output through the MLP
         out = self.mlp(out_att)
 
-        return self.layer_norm(out + out_att)
+        return self.layer_norm2(out + out_att)

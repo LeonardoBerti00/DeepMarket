@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
-        self.IS_TRAINING = True
+        self.IS_TRAINING = False
         self.IS_DEBUG = False
 
         # evaluation
@@ -22,10 +22,11 @@ class Configuration:
         self.IS_AUGMENTATION = True
 
         self.IS_DATA_PREPROCESSED = True
-        self.SPLIT_RATES = (.75, .05, .2)
+        self.SPLIT_RATES = (.85, .05, .10)
 
         self.CHOSEN_MODEL = cst.Models.CDT
         self.CHOSEN_AUGMENTER = "MLP"
+        self.CHOSEN_COND_AUGMENTER = "MLP"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -42,7 +43,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_11-00-00_val_ema=0.832_epoch=9_TSLA_only_event_MLP_seq_size_64_augment_dim_64_CDT_depth_4_aug_True_diffsteps_100_size_type_3/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_11-00-00_val_ema=0.836_epoch=4_TSLA_only_event_MLP_co_0.0_au_128_CD_8_CD_2_aug_True_128/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -52,7 +53,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 512        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
@@ -70,7 +71,7 @@ class Configuration:
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 2
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_CHANNELS] = 2
@@ -81,7 +82,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
-        self.COND_TYPE = "full"  # it can be full or only_event or only_lob
+        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":

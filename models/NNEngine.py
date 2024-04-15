@@ -57,7 +57,7 @@ class NNEngine(L.LightningModule):
         self.last_path_ckpt_ema = None
         self.cond_size = config.COND_SIZE
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type)
+            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
@@ -125,10 +125,11 @@ class NNEngine(L.LightningModule):
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
         context.update({'x_t': x_t.detach().clone()})
         # augment
-        x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob, is_train)
+        x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob)
         if torch.isnan(x_t).any():
             print(f'x_t has nan values after augmentation')
-        
+        if torch.isnan(cond_orders).any():
+            print(f'cond_orders has nan values after augmentation')
         context.update({
             'is_train': is_train,
             't': self.t,
@@ -145,7 +146,7 @@ class NNEngine(L.LightningModule):
         # return the deaugmented denoised input and the reverse context
         return x_recon, reverse_context
 
-    def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor, is_train: bool):
+    def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
         if self.IS_AUGMENTATION:
             full_input = torch.cat([cond_orders, x_t], dim=1)
             full_input_aug, cond_lob_aug = self.feature_augmenter.augment(full_input, cond_lob)
@@ -192,6 +193,17 @@ class NNEngine(L.LightningModule):
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
         self.ema.update()
+        '''
+        #check if all the parameters layers are training successfully
+        print(self.feature_augmenter.fwd_cond_lob[0].weight.grad)
+        print(self.feature_augmenter.fwd_cond_lob[0].weight.sum())
+        print(self.diffuser.NN.fc_noise.weight.grad)
+        print(self.diffuser.NN.fc_noise.weight.sum())
+        print(self.diffuser.NN.fc_var.weight.grad)
+        print(self.diffuser.NN.fc_var.weight.sum())
+        print(self.diffuser.NN.layers.layers[0].to_q.weight.grad)
+        print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
+        '''
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:

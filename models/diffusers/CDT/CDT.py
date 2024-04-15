@@ -35,7 +35,7 @@ class CDT(nn.Module):
             ])  
         self.fc_noise = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
         self.fc_var = nn.Linear(input_size*self.seq_size, input_size, device=cst.DEVICE)
-
+        self.layer_norm = nn.LayerNorm(input_size)
 
     def forward(self, x, cond_orders, t, cond_lob=None):
         """
@@ -49,6 +49,7 @@ class CDT(nn.Module):
         full_input = full_input.add(self.pos_embed)
         diff_time_emb = self.t_embedder[t]
         full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
+        full_input = self.layer_norm(full_input)
         full_input = self.layers(full_input, mask=None, cond=cond_lob) 
         full_input = rearrange(full_input, 'n l f -> n (l f)')
         noise = self.fc_noise(full_input)

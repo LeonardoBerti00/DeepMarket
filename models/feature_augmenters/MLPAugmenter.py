@@ -4,33 +4,47 @@ import torch.nn as nn
 import constants as cst
 import torch
 
+from models.diffusers.CDT.Transformer import TransformerEncoder
 from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 
 class MLPAugmenter(AugmenterAB, nn.Module):
     
-    def __init__(self, input_size, augment_dim, cond_size, cond_type):
+    def __init__(self, input_size, augment_dim, cond_size, cond_type, cond_augmenter):
         super().__init__()
         augment_dim = augment_dim
         self.input_size = input_size
         self.fwd_mlp = nn.Sequential(
             nn.Linear(input_size, augment_dim//2, dtype=torch.float32),
+            nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
+            nn.LayerNorm(augment_dim),
         )
         self.bck_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+            nn.LayerNorm(input_size),
         )
         self.v_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+            nn.LayerNorm(input_size),
         )
         self.cond_type = cond_type
         if cond_type == "full":
-            self.fwd_cond_lob = nn.Sequential(
-                nn.Linear(cond_size, augment_dim//2, dtype=torch.float32),
-                nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
-            )
+            if cond_augmenter == "MLP":
+                self.fwd_cond_lob = nn.Sequential(
+                    nn.Linear(cond_size, augment_dim//2, dtype=torch.float32),
+                    nn.LayerNorm(augment_dim//2),
+                    nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
+                    nn.LayerNorm(augment_dim),
+                )
+            elif cond_augmenter == "Transformer":
+                self.fwd_cond_lob = nn.Sequential(
+                    nn.Linear(cond_size, augment_dim, dtype=torch.float32),
+                    TransformerEncoder(2, augment_dim, 2, 0.1, "only_event"))
 
     def augment(self, input, cond=None):
         x = self.fwd_mlp(input)
