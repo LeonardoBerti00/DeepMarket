@@ -43,7 +43,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_11-00-00_val_ema=0.836_epoch=4_TSLA_only_event_MLP_co_0.0_au_128_CD_8_CD_2_aug_True_128/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/IABS_TSLA_20150130_120000/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -53,7 +53,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 512        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0

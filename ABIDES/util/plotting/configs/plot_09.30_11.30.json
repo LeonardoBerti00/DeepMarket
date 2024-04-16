@@ -1,6 +1,6 @@
 {
   "xmin": "09:30:00",
-  "xmax": "11:00:00",
+  "xmax": "12:00:00",
   "linewidth": 0.7,
   "no_bids_color": "blue",
   "no_asks_color": "red",

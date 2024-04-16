@@ -580,7 +580,9 @@ class TradingAgent(FinancialAgent):
     cash = holdings['CASH']
     
     cash += self.basket_size * self.nav_diff
-
+    if self.last_trade[symbol] is None:
+      self.logEvent('MARKED_TO_MARKET', cash)
+      return cash
     for symbol, shares in holdings.items():
       if symbol == 'CASH': continue
 

@@ -158,10 +158,9 @@ class NNEngine(L.LightningModule):
         order_type = x_0[:, :, 1]
         type_emb = self.type_embedder(order_type.long())
         x_0 = torch.cat((x_0[:, :, :1], type_emb, x_0[:, :, 2:]), dim=2)
-        if self.cond_type == 'only_event' or self.cond_type == 'full':
-            cond_type = cond[:, :, 1]
-            cond_depth_emb = self.type_embedder(cond_type.long())
-            cond = torch.cat((cond[:, :, :1], cond_depth_emb, cond[:, :, 2:]), dim=2)
+        cond_type = cond[:, :, 1]
+        cond_depth_emb = self.type_embedder(cond_type.long())
+        cond = torch.cat((cond[:, :, :1], cond_depth_emb, cond[:, :, 2:]), dim=2)
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):

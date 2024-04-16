@@ -13,3 +13,4 @@ launch.sh
 launch_sim.sh
 evaluation/visualizations/prova.ipynb
 ABIDES/log/IABS_1/
+ABIDES/log/IABS*

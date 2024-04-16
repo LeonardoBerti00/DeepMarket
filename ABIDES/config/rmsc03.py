@@ -258,7 +258,7 @@ agent_count += 1
 
 
 # 2) Noise Agents
-wakeup_time = mkt_open + pd.to_timedelta("00:15:00")
+wakeup_time = mkt_open + pd.to_timedelta("00:00:00")
 num_noise = 5000
 noise_mkt_open = historical_date + pd.to_timedelta("09:00:00")  # These times needed for distribution of arrival times
                                                                 # of Noise Agents

@@ -70,7 +70,7 @@ class WorldAgent(Agent):
             self.starting_time_diffusion = '15min'
             print(self.diffusion_model.type_embedder.weight.data)
         else:
-            self.starting_time_diffusion = '1000000min'
+            self.starting_time_diffusion = '0min'
         
 
     def kernelStarting(self, startTime):
@@ -132,7 +132,7 @@ class WorldAgent(Agent):
 
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             self.state = 'GENERATING'
-
+            return
             # we generate the first order then the others will be generated everytime we receive the update of the lob
             if self.first_generation:
                 generated = self._generate_order(currentTime)

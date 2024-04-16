@@ -169,6 +169,10 @@ class AdaptiveMarketMakerAgent(TradingAgent):
                     self.state['AWAITING_SPREAD'] = False  # use last mid price and spread
 
             if self.state['AWAITING_SPREAD'] is False and self.state['AWAITING_TRANSACTED_VOLUME'] is False:
+                if self.last_mid is None:
+                    self.state = self.initialiseState()
+                    self.setWakeup(currentTime + self.getWakeFrequency())
+                    return 
                 self.placeOrders(mid)
                 self.state = self.initialiseState()
                 self.setWakeup(currentTime + self.getWakeFrequency())

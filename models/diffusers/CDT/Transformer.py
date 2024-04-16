@@ -44,7 +44,8 @@ class TransformerBlockCrossAtt(nn.Module):
         self.to_k = nn.Linear(d_model, d_model, bias=False)
         self.to_v = nn.Linear(d_model, d_model, bias=False)
         self.to_out = nn.Linear(d_model, d_model, bias=False)
-        self.layer_norm = nn.LayerNorm(d_model)
+        self.layer_norm1 = nn.LayerNorm(d_model)
+        self.layer_norm2 = nn.LayerNorm(d_model)
 
     def forward(self, x, mask=None, cond=None):
         # x.shape = B, L, D
@@ -70,11 +71,11 @@ class TransformerBlockCrossAtt(nn.Module):
         # Pass the output through the output linear layer
         out_att = self.to_out(out_att)
         # Apply the residual connection and layer normalization
-        out_att = self.layer_norm(out_att + x)
+        out_att = self.layer_norm1(out_att + x)
         # Pass the output through the MLP
         out = self.mlp(out_att)
 
-        return self.layer_norm(out + out_att)
+        return self.layer_norm2(out + out_att)
 
 class TransformerBlockSelfAtt(nn.Module):
     def __init__(self, d_model, num_heads, dropout):

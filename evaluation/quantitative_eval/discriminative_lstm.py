@@ -1,11 +1,12 @@
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 import random
 import numpy as np
-
+from tqdm import tqdm
+import constants as cst
 
 # REFERENCE: Time-series Generative Adversarial Networks
 
@@ -15,7 +16,22 @@ import numpy as np
 # if the accuracy is high, the model is able to discriminate between generated and not generated data (the dataset are different) otherwise the model is not able to discriminate between
 #    the two datasets (the dataset are similar)
 # ho fatto una prova con solo il dataset non generato e l'accuracy è ovviamente di circa il 50% (TODELETE)
- 
+class TDataset(Dataset):
+    def __init__(self, data1, data2):
+        self.data1 = data1
+        self.data2 = data2
+
+    def __len__(self):
+        return len(self.data1) + len(self.data2) - 200
+    
+    def __getitem__(self, index):
+        if index % 2 == 0:
+            index = index // 2
+            return self.data1[index:index+100], torch.zeros(1).to(cst.DEVICE)
+        else:
+            index = index // 2
+            return self.data2[index:index+100], torch.ones(1).to(cst.DEVICE)
+
 
 class Preprocessor:
     def __init__(self, df): # df in input is the merged dataset with the binary label "generated"
@@ -42,13 +58,16 @@ class Preprocessor:
 
     def _one_hot_encode(self):
         self.df = pd.get_dummies(self.df, columns=['TYPE'])
+        self.df['TYPE_LIMIT_ORDER'] = self.df['TYPE_LIMIT_ORDER'].apply(lambda x: 1 if x == 'True' else 0)
+        self.df['TYPE_ORDER_CANCELLED'] = self.df['TYPE_ORDER_CANCELLED'].apply(lambda x: 1 if x == 'True' else 0)
+        self.df['TYPE_ORDER_EXECUTED'] = self.df['TYPE_ORDER_EXECUTED'].apply(lambda x: 1 if x == 'True' else 0)
 
     def _remove_columns(self):
         self.df = self.df.drop(['ORDER_ID', 'SPREAD', 'ORDER_VOLUME_IMBALANCE'], axis=1)
         self.df = self.df.drop(['Unnamed: 0'], axis=1)
 
     def _binarization(self):
-        self.df['BUY_SELL_FLAG'] = self.df['BUY_SELL_FLAG'].apply(lambda x: 1 if x == 'True' else 0)
+        self.df['BUY_SELL_FLAG'] = self.df['BUY_SELL_FLAG'].apply(lambda x: 1 if x == 'True' else -1)
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -78,13 +97,23 @@ class Trainer:
 
     def train(self, epochs):
         self.model.train()
-        for epoch in range(epochs):
+        self.model.train()
+        last_loss = 1000000
+        for epoch in tqdm(range(epochs)):
+            losses = []
             for inputs, labels in self.train_loader:
+                inputs = inputs.to(self.device, non_blocking=True)
                 self.optimizer.zero_grad()
                 output = self.model(inputs)
                 loss = self.criterion(output, labels.unsqueeze(1))
                 loss.backward()
                 self.optimizer.step()
+                losses.append(loss.item())
+            print(f'Epoch {epoch+1}, Loss: {np.mean(losses)}')
+            if np.mean(losses) >= last_loss:
+                break
+            last_loss = np.mean(losses)
+
 
     def test(self):
         self.model.eval()
@@ -92,6 +121,7 @@ class Trainer:
         test_labels = torch.Tensor().to(self.device, non_blocking=True)
         with torch.no_grad():
             for inputs, labels in self.test_loader:
+                inputs = inputs.to(self.device, non_blocking=True)
                 output = self.model(inputs)
                 test_preds = torch.cat((test_preds, output), dim=0)
                 test_labels = torch.cat((test_labels, labels.unsqueeze(1)), dim=0)
@@ -114,48 +144,47 @@ def main(real_path, generated_path):
         merged_df = merged_df.sample(frac=1).reset_index(drop=True)
         return merged_df
 
-    df1 = pd.read_csv(real_path)
-    df2 = pd.read_csv(generated_path)
+    df_r = pd.read_csv(real_path)
+    df_g = pd.read_csv(generated_path)
 
     # remove the first 15 minutes of the generated dataset
-    df2["Time"] = df2['Unnamed: 0'].str.slice(11, 19)
-    df2 = df2.query("Time >= '09:45:00'")
-    df2 = df2.drop(['Time'], axis=1)
+    df_g["Time"] = df_g['Unnamed: 0'].str.slice(11, 19)
+    df_g = df_g.query("Time >= '09:45:00'")
+    df_g = df_g.drop(['Time'], axis=1)
 
-    # undersampling on the real dataset
-    n_remove = len(df1) - len(df2)
-    drop_indices = np.random.choice(df1.index, n_remove, replace=False)
-    df1 = df1.drop(drop_indices)
+    if len(df_r) > len(df_g):
+        n_remove = len(df_r) - len(df_g)
+        drop_indices = np.random.choice(df_r.index, n_remove, replace=False)
+        df_r = df_r.drop(drop_indices)
+    elif len(df_g) > len(df_r):
+        n_remove = len(df_g) - len(df_r)
+        drop_indices = np.random.choice(df_g.index, n_remove, replace=False)
+        df_g = df_g.drop(drop_indices)
 
-    df = Preprocessor(merge_dataframes_with_labels(df1, df2)).preprocess()
-
-    # Assuming df is already preprocessed
-    features = df.drop('generated', axis=1).values
-    labels = df['generated'].values
-
-    # Reshape input to be 3D [samples, timesteps, features]
-    features = features.reshape((features.shape[0], 1, features.shape[1]))
+    df_r = Preprocessor(df_r).preprocess()
+    df_g = Preprocessor(df_g).preprocess()
 
     # Split the data into training and test sets
-    train_X, test_X, train_y, test_y = train_test_split(features, labels, test_size=0.2, random_state=42)
-
+    train_X_r, test_X_r = train_test_split(df_r.values, test_size=0.2, random_state=42)
+    train_X_g, test_X_g = train_test_split(df_g.values, test_size=0.2, random_state=42)
+    
     # Convert to PyTorch tensors
-    train_X = torch.tensor(train_X, dtype=torch.float32)
-    train_y = torch.tensor(train_y, dtype=torch.float32)
-    test_X = torch.tensor(test_X, dtype=torch.float32)
-    test_y = torch.tensor(test_y, dtype=torch.float32)
-
+    train_X_r = torch.tensor(train_X_r, dtype=torch.float32)
+    test_X_r = torch.tensor(test_X_r, dtype=torch.float32)
+    train_X_g = torch.tensor(train_X_g, dtype=torch.float32)
+    test_X_g = torch.tensor(test_X_g, dtype=torch.float32)
+    train_X_g = train_X_g[:, :12]
     # Create data loaders
-    train_data = TensorDataset(train_X, train_y)
-    train_loader = DataLoader(train_data, batch_size=48)
-    test_data = TensorDataset(test_X, test_y)
+    train_data = TDataset(train_X_r, train_X_g)
+    train_loader = DataLoader(train_data, batch_size=48, shuffle=True)
+    test_data = TDataset(test_X_r, test_X_g)
     test_loader = DataLoader(test_data, batch_size=48)
 
-    model = LSTMModel(input_size=train_X.shape[2], hidden_size=128, num_layers=2, output_size=1)
+    model = LSTMModel(input_size=train_X_r.shape[1], hidden_size=128, num_layers=2, output_size=1)
     model.to(device)
-
+    print("Discriminative score: ")
     trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-    trainer.train(epochs=300)
+    trainer.train(epochs=100)
     trainer.test()
 
 
