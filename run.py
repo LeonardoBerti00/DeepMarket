@@ -118,12 +118,11 @@ def run_wandb(config, accelerator):
         aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = aug_dim // 64
         cond_type = config.COND_TYPE
-        is_augmentation = config.IS_AUGMENTATION
         stock_name = config.CHOSEN_STOCK.name
         diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         augmenter = config.CHOSEN_AUGMENTER
-        size_type = config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+        cond_augmenter = config.CHOSEN_COND_AUGMENTER
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "cond_aug" + str(cond_augmenter) + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
         wandb_instance_name = config.FILENAME_CKPT
         trainer = L.Trainer(
             accelerator=accelerator,

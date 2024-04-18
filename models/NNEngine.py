@@ -65,6 +65,7 @@ class NNEngine(L.LightningModule):
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -96,7 +97,10 @@ class NNEngine(L.LightningModule):
         if not self.one_hot_encoding_type:
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         real_cond_orders = cond_orders.detach().clone()
-        real_cond_lob = cond_lob.detach().clone()
+        if cond_lob is not None:
+            real_cond_lob = cond_lob.detach().clone()
+        else:
+            real_cond_lob = None
         x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
         context.update({'x_t': x_t.detach().clone()})
         for i in range(self.num_diffusionsteps-1, -1, -1):
@@ -126,6 +130,7 @@ class NNEngine(L.LightningModule):
         context.update({'x_t': x_t.detach().clone()})
         # augment
         x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob)
+        print("global step: ", self.global_step)
         if torch.isnan(x_t).any():
             print(f'x_t has nan values after augmentation')
         if torch.isnan(cond_orders).any():
@@ -191,7 +196,6 @@ class NNEngine(L.LightningModule):
         self.simple_sampler.update_losses(self.t, L_simple[0])
         if isinstance(self.diffuser, GaussianDiffusion):
             self.diffuser.init_losses()
-        self.ema.update()
         '''
         #check if all the parameters layers are training successfully
         print(self.feature_augmenter.fwd_cond_lob[0].weight.grad)
@@ -274,6 +278,8 @@ class NNEngine(L.LightningModule):
                 self.optimizer.param_groups[0]["lr"] /= 2  
             self.min_loss_ema = loss_ema
             self._model_checkpointing(loss_ema)
+        else:
+            self.optimizer.param_groups[0]["lr"] /= 2
 
         if isinstance(self.diffuser, GaussianDiffusion):
             L_simple = sum(self.simple_val_losses) / len(self.simple_val_losses)

@@ -15,36 +15,24 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         augment_dim = augment_dim
         self.input_size = input_size
         self.fwd_mlp = nn.Sequential(
-            nn.Linear(input_size, augment_dim//2, dtype=torch.float32),
-            nn.LayerNorm(augment_dim//2),
-            nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
-            nn.LayerNorm(augment_dim),
+            nn.Linear(input_size, augment_dim, dtype=torch.float32),
         )
         self.bck_mlp = nn.Sequential(
-            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
-            nn.LayerNorm(augment_dim//2),
-            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
-            nn.LayerNorm(input_size),
+            nn.Linear(augment_dim, input_size, dtype=torch.float32),
         )
         self.v_mlp = nn.Sequential(
-            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
-            nn.LayerNorm(augment_dim//2),
-            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
-            nn.LayerNorm(input_size),
+            nn.Linear(augment_dim, input_size, dtype=torch.float32),
         )
         self.cond_type = cond_type
         if cond_type == "full":
             if cond_augmenter == "MLP":
                 self.fwd_cond_lob = nn.Sequential(
-                    nn.Linear(cond_size, augment_dim//2, dtype=torch.float32),
-                    nn.LayerNorm(augment_dim//2),
-                    nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
-                    nn.LayerNorm(augment_dim),
+                    nn.Linear(cond_size, augment_dim, dtype=torch.float32),
                 )
             elif cond_augmenter == "Transformer":
                 self.fwd_cond_lob = nn.Sequential(
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
-                    TransformerEncoder(2, augment_dim, 2, 0.1, "only_event"))
+                    TransformerEncoder(2, augment_dim, 4, 0.1, "only_event"))
 
     def augment(self, input, cond=None):
         x = self.fwd_mlp(input)
