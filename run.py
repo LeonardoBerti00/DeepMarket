@@ -155,6 +155,8 @@ def run_wandb(config, accelerator):
         run.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
         run.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
         run.log({"size type emb": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]}, commit=False)
+        run.log({"cond augmenter": config.CHOSEN_COND_AUGMENTER}, commit=False)
+        run.log({"seed": cst.SEED}, commit=False)
         train(config, trainer)
         run.finish()
 
