@@ -147,7 +147,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             clip_denoised=False,
             weights=weights
         )
-
+        #check if there are nan in L_vlb
+        if torch.isnan(L_vlb).any():
+            print("L_vlb:", L_vlb)
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
         return x_recon, {}

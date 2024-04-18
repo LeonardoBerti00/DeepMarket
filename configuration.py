@@ -26,7 +26,7 @@ class Configuration:
 
         self.CHOSEN_MODEL = cst.Models.CDT
         self.CHOSEN_AUGMENTER = "MLP"
-        self.CHOSEN_COND_AUGMENTER = "MLP"
+        self.CHOSEN_COND_AUGMENTER = "Transformer"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -82,14 +82,14 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
-        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
+        self.COND_TYPE = "full"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
 
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
+        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 64
 
 
 
