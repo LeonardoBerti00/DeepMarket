@@ -30,6 +30,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
+        self.cond_method = config.COND_METHOD
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
@@ -47,7 +48,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.cond_dropout_prob,
             self.IS_AUGMENTATION,
             self.dropout,
-            config.COND_TYPE
+            config.COND_TYPE,
+            self.cond_method
         )
 
         self.betas = config.BETAS

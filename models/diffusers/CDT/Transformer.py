@@ -9,19 +9,20 @@ class TransformerEncoder(nn.Module):
                 d_model: int,  
                 num_layers: int, 
                 dropout: float, 
-                cond_type: str
+                cond_type: str,
+                cond_method: str
                 ):
         super(TransformerEncoder, self).__init__()
         self.d_model = d_model
         self.num_layers = num_layers
         self.num_heads = num_heads
         self.dropout = dropout
-        if cond_type == 'only_event':
-            self.layers = nn.ModuleList([TransformerBlockSelfAtt(d_model, num_heads, dropout) for _ in range(num_layers)])
-        elif cond_type == 'full':
+        if cond_type == 'full' and cond_method == 'crossattention':
             self.layers = nn.ModuleList(
                 [block(d_model, num_heads, dropout) for _ in range(num_layers//2) for block in (TransformerBlockSelfAtt, TransformerBlockCrossAtt)]
             )
+        else:
+            self.layers = nn.ModuleList([TransformerBlockSelfAtt(d_model, num_heads, dropout) for _ in range(num_layers)])
         self.layer_norm = nn.LayerNorm(d_model)
 
     def forward(self, x, mask=None, cond=None):

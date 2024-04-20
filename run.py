@@ -122,7 +122,7 @@ def run_wandb(config, accelerator):
         diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         augmenter = config.CHOSEN_AUGMENTER
         cond_augmenter = config.CHOSEN_COND_AUGMENTER
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "cond_aug" + str(cond_augmenter) + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_cond_aug_" + str(cond_augmenter) + "_" + config.COND_METHOD + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
         wandb_instance_name = config.FILENAME_CKPT
         trainer = L.Trainer(
             accelerator=accelerator,
@@ -145,9 +145,9 @@ def run_wandb(config, accelerator):
         run.log({"cond type": config.COND_TYPE}, commit=False)
         run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
         run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
-        #run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
-        #run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
-        #run.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
+        run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
+        run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
+        run.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
         run.log({"cdt num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
         run.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
         run.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
@@ -155,6 +155,7 @@ def run_wandb(config, accelerator):
         run.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
         run.log({"size type emb": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]}, commit=False)
         run.log({"cond augmenter": config.CHOSEN_COND_AUGMENTER}, commit=False)
+        run.log({"cond method": config.COND_METHOD}, commit=False)
         run.log({"seed": cst.SEED}, commit=False)
         train(config, trainer)
         run.finish()

@@ -3,7 +3,6 @@ import numpy as np
 from torch import nn
 import os
 
-import configuration
 import torch
 import lightning as L
 import constants as cst
@@ -14,9 +13,7 @@ import matplotlib.pyplot as plt
 import wandb
 from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from models.diffusers.CSDI.CSDI import CSDIDiffuser
-from utils.utils_data import unnormalize
 from utils.utils_models import pick_diffuser, pick_augmenter
-from models.feature_augmenters.LSTMAugmenter import LSTMAugmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.diffusers.CDT.Sampler import LossSecondMomentResampler
@@ -39,6 +36,7 @@ class NNEngine(L.LightningModule):
         self.one_hot_encoding_type = config.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]
         self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
+        self.cond_method = config.COND_METHOD
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
@@ -57,7 +55,7 @@ class NNEngine(L.LightningModule):
         self.last_path_ckpt_ema = None
         self.cond_size = config.COND_SIZE
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER)
+            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
@@ -65,7 +63,7 @@ class NNEngine(L.LightningModule):
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
-            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -130,11 +128,12 @@ class NNEngine(L.LightningModule):
         context.update({'x_t': x_t.detach().clone()})
         # augment
         x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob)
-        print("global step: ", self.global_step)
+        #print("global step: ", self.global_step)
         if torch.isnan(x_t).any():
             print(f'x_t has nan values after augmentation')
         if torch.isnan(cond_orders).any():
             print(f'cond_orders has nan values after augmentation')
+        
         context.update({
             'is_train': is_train,
             't': self.t,
@@ -207,6 +206,7 @@ class NNEngine(L.LightningModule):
         print(self.diffuser.NN.layers.layers[0].to_q.weight.grad)
         print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
         '''
+        self.ema.update()
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:
@@ -305,8 +305,8 @@ class NNEngine(L.LightningModule):
             self.optimizer = Lion(self.parameters(), lr=self.lr)
         return self.optimizer
 
-    def on_before_zero_grad(self, *args, **kwargs):
-        self.ema.update()
+    #def on_before_zero_grad(self, *args, **kwargs):
+    #    self.ema.update()
 
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")
