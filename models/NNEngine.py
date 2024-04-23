@@ -62,7 +62,7 @@ class NNEngine(L.LightningModule):
             
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
-            self.type_embedder.requires_grad_(False)
+            #self.type_embedder.requires_grad_(False)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
@@ -112,7 +112,8 @@ class NNEngine(L.LightningModule):
                 'cond_orders_aug': cond_orders,
                 'cond_lob_aug': cond_lob,
                 'weights': self.sampler.weights(),
-                'cond_type': self.cond_type
+                'cond_type': self.cond_type,
+                'cond_augmenter': self.feature_augmenter
             })
 
             x_t, reverse_context = self.diffuser(x_t, context)
@@ -141,7 +142,8 @@ class NNEngine(L.LightningModule):
             'cond_orders_aug': cond_orders,
             'cond_lob_aug': cond_lob,
             'weights': self.sampler.weights(),
-            'cond_type': self.cond_type
+            'cond_type': self.cond_type,
+            'cond_augmenter': self.feature_augmenter
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
@@ -168,9 +170,15 @@ class NNEngine(L.LightningModule):
         return x_0, cond
 
     def loss(self, real, recon, **kwargs):
-        #regularization_term = torch.norm(recon[:, 0, self.size_type_emb+1], p=2) / recon.shape[0]
-        L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
-        return L_hybrid, L_simple, L_vlb
+        # regularization term to avoid order with negative size
+        negative_values = recon[:, 0, self.size_type_emb+1][recon[:, 0, self.size_type_emb+1] < 0]
+        regularization_term = torch.norm(negative_values, p=5) / negative_values.shape[0]
+        if isinstance(self.diffuser, GaussianDiffusion):
+            L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
+            return L_hybrid+10*regularization_term, L_simple, L_vlb
+        else:
+            L_simple = self.diffuser.loss(real, recon, **kwargs)
+            return L_simple, L_simple, L_simple
 
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
@@ -182,12 +190,11 @@ class NNEngine(L.LightningModule):
             cond_lob = None
         recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=True, batch_idx=batch_idx)
         reverse_context.update({'is_train': True})
-        if isinstance(self.diffuser, GaussianDiffusion):
-            batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
-            self.simple_train_losses.append(torch.mean(L_simple).item())
-            self.vlb_train_losses.append(torch.mean(L_vlb).item())
-        else:
-            batch_loss = self.loss(x_0, recon, **reverse_context)
+        
+        batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+        self.simple_train_losses.append(torch.mean(L_simple).item())
+        self.vlb_train_losses.append(torch.mean(L_vlb).item())
+
         batch_loss_mean = torch.mean(batch_loss)
         self.train_losses.append(batch_loss_mean.item())
         self.sampler.update_losses(self.t, batch_loss[0])
@@ -207,6 +214,8 @@ class NNEngine(L.LightningModule):
         print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
         '''
         self.ema.update()
+        if batch_idx % 1000 == 0:
+            print(self.type_embedder.weight)
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:
@@ -252,15 +261,11 @@ class NNEngine(L.LightningModule):
             cond_lob = None
         # Validation: with EMA
         with self.ema.average_parameters():
-            current_time = time.time()
             recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=False)
             reverse_context.update({'is_train': False})
-            if isinstance(self.diffuser, GaussianDiffusion):
-                batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
-                self.simple_val_losses.append(torch.mean(L_simple).item())
-                self.vlb_val_losses.append(torch.mean(L_vlb).item())
-            else:
-                batch_loss = self.loss(x_0, recon, **reverse_context)
+            batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+            self.simple_val_losses.append(torch.mean(L_simple).item())
+            self.vlb_val_losses.append(torch.mean(L_vlb).item())
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
         if isinstance(self.diffuser, GaussianDiffusion):
