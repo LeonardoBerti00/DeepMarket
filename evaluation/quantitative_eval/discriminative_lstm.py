@@ -124,7 +124,7 @@ class Trainer:
                 inputs = inputs.to(self.device, non_blocking=True)
                 output = self.model(inputs)
                 test_preds = torch.cat((test_preds, output), dim=0)
-                test_labels = torch.cat((test_labels, labels.unsqueeze(1)), dim=0)
+                test_labels = torch.cat((test_labels, labels), dim=0)
         test_preds = torch.sigmoid(test_preds)
         test_preds_binary = (test_preds > 0.5).float()
         accuracy = (test_preds_binary == test_labels).sum().item() / test_labels.numel()

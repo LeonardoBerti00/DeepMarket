@@ -51,9 +51,8 @@ def plot_data(tsna2d, tsna2d_, generated_path):
 
     # Save the plot
     file_name = "tSNE_density_plot.pdf"
-    if not os.path.exists(generated_path):
-        os.makedirs(generated_path)
-    file_path = os.path.join(generated_path, file_name)
+    dirname = os.path.dirname(generated_path)
+    file_path = os.path.join(dirname, file_name)
     plt.savefig(file_path)
 
     # Show the plot

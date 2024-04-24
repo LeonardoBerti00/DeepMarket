@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
+        self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
 
         # evaluation
@@ -26,14 +26,14 @@ class Configuration:
 
         self.CHOSEN_MODEL = cst.Models.CDT
         self.CHOSEN_AUGMENTER = "MLP"
-        self.CHOSEN_COND_AUGMENTER = "Transformer"
+        self.CHOSEN_COND_AUGMENTER = "MLP"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.CHOSEN_STOCK = cst.Stocks.INTC
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -67,7 +67,7 @@ class Configuration:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT
         
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
-        self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 50
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
@@ -82,6 +82,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
+        self.COND_METHOD = "concatenation"
         self.COND_TYPE = "full"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
@@ -89,7 +90,7 @@ class Configuration:
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
 
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 64
+        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
 
 
 

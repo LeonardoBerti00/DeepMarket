@@ -68,6 +68,7 @@ class WorldAgent(Agent):
         self.last_ask_price = 0
         if using_diffusion:
             self.starting_time_diffusion = '15min'
+            #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             print(self.diffusion_model.type_embedder.weight.data)
         else:
             self.starting_time_diffusion = '0min'

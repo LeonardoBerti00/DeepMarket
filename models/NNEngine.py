@@ -27,6 +27,7 @@ class NNEngine(L.LightningModule):
         This is the skeleton of the diffusion models.
         """
         self.IS_WANDB = config.IS_WANDB
+        self.IS_DEBUG = config.IS_DEBUG
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.training = config.IS_TRAINING
@@ -62,7 +63,8 @@ class NNEngine(L.LightningModule):
             
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
-            #self.type_embedder.requires_grad_(False)
+            self.type_embedder.requires_grad_(False)
+            print(self.type_embedder.weight.data)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
@@ -147,7 +149,7 @@ class NNEngine(L.LightningModule):
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
-
+        
         reverse_context.update({'conditioning': real_cond})
         # return the deaugmented denoised input and the reverse context
         return x_recon, reverse_context
@@ -175,7 +177,7 @@ class NNEngine(L.LightningModule):
         regularization_term = torch.norm(negative_values, p=5) / negative_values.shape[0]
         if isinstance(self.diffuser, GaussianDiffusion):
             L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
-            return L_hybrid+10*regularization_term, L_simple, L_vlb
+            return L_hybrid+self.reg_term_weight*regularization_term, L_simple, L_vlb
         else:
             L_simple = self.diffuser.loss(real, recon, **kwargs)
             return L_simple, L_simple, L_simple
@@ -214,8 +216,6 @@ class NNEngine(L.LightningModule):
         print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
         '''
         self.ema.update()
-        if batch_idx % 1000 == 0:
-            print(self.type_embedder.weight)
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:
@@ -297,6 +297,7 @@ class NNEngine(L.LightningModule):
 
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
+        exit()
         
 
     def configure_optimizers(self):

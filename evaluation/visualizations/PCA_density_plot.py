@@ -40,8 +40,6 @@ def plot_data(pca2d, pca2d_, generated_path):
     plt.title('PCA2D Density Plot')
 
     file_name = "PCA_density_plot.pdf"
-    if not os.path.exists(generated_path):
-        os.makedirs(generated_path)
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
