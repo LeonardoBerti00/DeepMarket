@@ -59,7 +59,7 @@ class CSDIEpsilon(nn.Module):
         for layer in self.residual_layers:
             x, skip_connection = layer(x, cond_info, diffusion_emb)
             skip.append(skip_connection)
-
+            
         x = torch.sum(torch.stack(skip), dim=0) / math.sqrt(len(self.residual_layers))
         x = x.reshape(B, self.channels, K * L)
         x = self.output_projection1(x)  # (B,channel,K*L)

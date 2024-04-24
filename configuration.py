@@ -9,7 +9,7 @@ class Configuration:
 
         self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
 
         # evaluation
@@ -67,7 +67,7 @@ class Configuration:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT
         
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
-        self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 50
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
@@ -90,7 +90,7 @@ class Configuration:
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
 
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 64
+        self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 128
 
 
 

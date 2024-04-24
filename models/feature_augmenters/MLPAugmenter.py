@@ -15,8 +15,7 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         augment_dim = augment_dim
         self.input_size = input_size
         self.fwd_mlp = nn.Sequential(
-            nn.Linear(input_size, augment_dim//2, dtype=torch.float32),
-            nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
+            nn.Linear(input_size, augment_dim, dtype=torch.float32),
         )
         self.cond_type = cond_type
         if cond_type == "full":
@@ -31,12 +30,10 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         if cond_type == "full" and cond_method == "concatenation":
             augment_dim = augment_dim*2
         self.bck_mlp = nn.Sequential(
-            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
-            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+            nn.Linear(augment_dim, input_size, dtype=torch.float32),
         )
         self.v_mlp = nn.Sequential(
-            nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
-            nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
+            nn.Linear(augment_dim, input_size, dtype=torch.float32),
         )
         
 

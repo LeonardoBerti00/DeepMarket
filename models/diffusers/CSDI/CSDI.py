@@ -55,10 +55,11 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         return x_t, {'noise': noise, 'conditioning': kwargs['conditioning']}
         
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
-        assert 'conditioning_aug' in context
+        print(context)
+        assert 'cond_orders_aug' in context
         assert 'cond_augmenter' in context
         
-        cond = context['conditioning_aug']
+        cond = context['cond_orders_aug']
         
         assert cond.shape[-1] == x_T.shape[-1]
         
@@ -91,7 +92,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
                 t = (torch.ones(B) * set_t).long().to(self.device, non_blocking=True)
                 recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
         # de-augment the conditioning and the input
-        cond_mask, _ = cond_augmenter.deaugment(cond_mask)
+        cond_mask = cond_augmenter.deaugment(cond_mask)
         context.update({'cond_mask': cond_mask})
         if (self.IS_AUGMENTATION):
             recon = self.deaugment(recon)
@@ -101,7 +102,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], self.target_dim), device=cst.DEVICE)
         if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
             for i in range(input.shape[0]):
-                final_output[i], _ = self.feature_augmenter.deaugment(input[i], {})
+                final_output[i] = self.feature_augmenter.deaugment(input[i], {})
         return final_output
 
     def time_embedding(self, pos: torch.Tensor, d_model=128):
@@ -139,5 +140,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         noise = einops.repeat(noise, 'm n o -> k m n o', k=recon.shape[0])
         target_mask =  einops.repeat(target_mask, 'm n o -> k m n o', k=recon.shape[0])
         residual = ((noise - recon) * target_mask)**2
-        # return the mean for every instance in the batch B
-        return torch.mean(residual, dim=(2,3))
+        # return the mean for every instance in the batch B        
+        L_simple = torch.mean(residual, dim=(2,3))  
+        print(L_simple)
+        return L_simple
