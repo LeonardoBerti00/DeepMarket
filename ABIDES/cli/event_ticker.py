@@ -147,6 +147,6 @@ ax.set_ylabel('Baseline-Relative Price')
 
 #plt.savefig('background_{}.png'.format(b))
 
-plt.show()
+#plt.show()
 
 

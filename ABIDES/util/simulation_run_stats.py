@@ -119,7 +119,7 @@ if __name__ == '__main__':
     cols = expt_dfs[0].columns
 
     for col in cols[1:-1]:
-        fig = plt.figure(figsize=(11, 8))
+        fig = plt.figure(dpi=300,figsize=(11, 8))
         for df in expt_dfs:
             x = df['run_param_value']
             y = df[col]
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         plt.title(col)
         plt.xlabel('num_agents')
         plt.ylabel(col)
-        plt.show()
+        #plt.show()
         fig.savefig(f'timings-plots/{col}.png', format='png', dpi=300, transparent=False, bbox_inches='tight',
                     pad_inches=0.03)
 

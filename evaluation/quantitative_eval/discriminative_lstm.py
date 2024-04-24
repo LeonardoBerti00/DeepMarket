@@ -105,7 +105,7 @@ class Trainer:
                 inputs = inputs.to(self.device, non_blocking=True)
                 self.optimizer.zero_grad()
                 output = self.model(inputs)
-                loss = self.criterion(output, labels.unsqueeze(1))
+                loss = self.criterion(output, labels)
                 loss.backward()
                 self.optimizer.step()
                 losses.append(loss.item())
@@ -127,7 +127,8 @@ class Trainer:
                 test_labels = torch.cat((test_labels, labels.unsqueeze(1)), dim=0)
         test_preds = torch.sigmoid(test_preds)
         test_preds_binary = (test_preds > 0.5).float()
-        accuracy = (test_preds_binary == test_labels).sum().item() / test_labels.numel()
+        total = (test_preds_binary.flatten() == test_labels.flatten()).sum().item()
+        accuracy = total / test_labels.shape[0]
         print(f'Test Accuracy: {accuracy * 100:.2f}%')
 
 #################################################################################################################################################################################################
@@ -173,18 +174,21 @@ def main(real_path, generated_path):
     test_X_r = torch.tensor(test_X_r, dtype=torch.float32)
     train_X_g = torch.tensor(train_X_g, dtype=torch.float32)
     test_X_g = torch.tensor(test_X_g, dtype=torch.float32)
-    train_X_g = train_X_g[:, :12]
+    train_X_g = torch.concat((train_X_g[:, :7], train_X_g[:, -5:]), dim=1)
+    test_X_g = torch.concat((test_X_g[:, :7], test_X_g[:, -5:]), dim=1)
+    train_X_r = torch.concat((train_X_r[:, :7], train_X_r[:, -5:]), dim=1)
+    test_X_r = torch.concat((test_X_r[:, :7], test_X_r[:, -5:]), dim=1)
     # Create data loaders
     train_data = TDataset(train_X_r, train_X_g)
-    train_loader = DataLoader(train_data, batch_size=48, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
     test_data = TDataset(test_X_r, test_X_g)
-    test_loader = DataLoader(test_data, batch_size=48)
+    test_loader = DataLoader(test_data, batch_size=64)
 
     model = LSTMModel(input_size=train_X_r.shape[1], hidden_size=128, num_layers=2, output_size=1)
     model.to(device)
     print("Discriminative score: ")
     trainer = Trainer(model=model, train_loader=train_loader, test_loader=test_loader, criterion=nn.BCEWithLogitsLoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
-    trainer.train(epochs=100)
+    trainer.train(epochs=50)
     trainer.test()
 
 

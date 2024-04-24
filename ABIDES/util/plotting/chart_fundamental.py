@@ -48,7 +48,7 @@ def plot_fundamental(fundamentals_df_list, legend_labels, plot_title, output_dir
 
     fig.savefig(f'{output_dir}/{Constants.filename}.png', format='png', dpi=300, transparent=False, bbox_inches='tight',
                 pad_inches=0.03)
-    plt.show()
+    #plt.show()
 
 
 def validate_input(fundamentals, legend_labels):

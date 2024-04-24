@@ -24,7 +24,7 @@ def main(real_path, generated_path):
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 
@@ -44,7 +44,7 @@ def main(real_path, generated_path):
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 
@@ -64,7 +64,7 @@ def main(real_path, generated_path):
     dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 
@@ -83,7 +83,7 @@ def main(real_path, generated_path):
     file_name = "price.pdf"
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
     data1 = df1["MID_PRICE"]
@@ -101,7 +101,7 @@ def main(real_path, generated_path):
     file_name = "midprice.pdf"
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 

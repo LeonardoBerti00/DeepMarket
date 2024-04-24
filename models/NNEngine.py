@@ -63,7 +63,7 @@ class NNEngine(L.LightningModule):
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
         
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -292,6 +292,7 @@ class NNEngine(L.LightningModule):
 
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
+        exit()
         
 
     def configure_optimizers(self):

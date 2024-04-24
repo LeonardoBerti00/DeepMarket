@@ -72,5 +72,5 @@ axes[0].set_xlabel('Fundamental Time')
 
 #plt.savefig('background_{}.png'.format(b))
 
-plt.show()
+#plt.show()
 

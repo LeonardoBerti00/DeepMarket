@@ -30,7 +30,7 @@ def main(real_path, generated_path):
 
     plt.legend()
 
-    plt.show()
+    #plt.show()
 
 if __name__ == '__main__':
     main()

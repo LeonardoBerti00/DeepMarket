@@ -39,7 +39,7 @@ def preprocess_data(df):
     return df
 
 def plot_data(tsna2d, tsna2d_, generated_path):
-    plt.figure(figsize=(10, 8))
+    plt.figure(dpi=300,figsize=(10, 8))
 
     # Use seaborn's kdeplot for both real and generated data to visualize density
     sns.kdeplot(x=tsna2d[:, 0], y=tsna2d[:, 1], cmap="Reds", shade=True, bw_adjust=.5, label='real', alpha=0.8)
@@ -51,13 +51,13 @@ def plot_data(tsna2d, tsna2d_, generated_path):
 
     # Save the plot
     file_name = "tSNE_density_plot.pdf"
-    if not os.path.exists(generated_path):
-        os.makedirs(generated_path)
-    file_path = os.path.join(generated_path, file_name)
+    dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
+    plt.close()
 
     # Show the plot
-    plt.show()
+    #plt.show()
 
 
 

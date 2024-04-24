@@ -104,5 +104,5 @@ axes[0].get_xaxis().set_visible(False)
 
 #plt.savefig('background_{}.png'.format(b))
 
-plt.show()
+#plt.show()
 

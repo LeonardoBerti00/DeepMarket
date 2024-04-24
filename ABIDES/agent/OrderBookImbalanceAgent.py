@@ -187,7 +187,7 @@ class OrderBookImbalanceAgent(TradingAgent):
       #df = pd.DataFrame(self.plotme)
       #df.set_index('currentTime', inplace=True)
       #df.rolling(30).mean().plot(secondary_y=['bid_pct'], figsize=(12,9))
-      #plt.show()
+      ##plt.show()
       super().kernelTerminating()
 
 

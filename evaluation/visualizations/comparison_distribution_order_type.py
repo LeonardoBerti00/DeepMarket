@@ -22,7 +22,7 @@ def main(real_path, generated_path):
         'Percentage_real': percentage_real.values
     })
 
-    plt.figure()
+    plt.figure(dpi=300,)
 
     bar_width = 0.35
 
@@ -40,9 +40,9 @@ def main(real_path, generated_path):
     file_name = "order_type.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
+    print(file_path)
     plt.savefig(file_path)
-
-    plt.show()
+    #plt.show()
     plt.close()
 
 if __name__ == '__main__':

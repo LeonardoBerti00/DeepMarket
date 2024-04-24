@@ -18,7 +18,7 @@ def main(real_path, generated_path):
     time2 = pd.to_datetime(df2['TIME'])
     mid_price2 = df2['MID_PRICE']
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(dpi=300,figsize=(10, 6))
     # compute the mean mid price every second for the real data
     #mid_price1 = mid_price1.groupby([time1.dt.hour, time1.dt.minute, time1.dt.second]).mean()
     #time1 = time1.groupby([time1.dt.hour, time1.dt.minute, time1.dt.second]).first()
@@ -60,7 +60,7 @@ def main(real_path, generated_path):
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 

@@ -20,7 +20,7 @@ def main(days_paths):
         time = pd.to_datetime(df['TIME'])
         dfs.append((time, df['MID_PRICE']))
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(dpi=300,figsize=(10, 6))
     for i, (time, mid_price) in enumerate(dfs):
         plt.plot(time, mid_price, label=f'Days {i+1}')
 
@@ -37,7 +37,7 @@ def main(days_paths):
     dir_path = os.path.dirname(days_paths[0])
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 if __name__ == '__main__':

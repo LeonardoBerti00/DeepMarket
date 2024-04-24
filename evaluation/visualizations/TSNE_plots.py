@@ -40,15 +40,15 @@ def preprocess_data(df):
 
 def plot_data(tsna2d, tsna2d_, generated_path):
     # Plot tsna2d in red
-    plt.scatter(tsna2d[:, 0], tsna2d[:, 1], color='red', label='real')
+    plt.scatter(tsna2d[:, 0], tsna2d[:, 1], color='tab:red', label='real', alpha=0.1)
 
     # Plot tsna2d_ in blue
-    plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='blue', label='generated')
+    plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='tab:blue', label='real', alpha=0.1)
 
-    x_min = min(np.min(tsna2d[:, 0]), np.min(tsna2d_[:, 0]))
-    x_max = max(np.max(tsna2d[:, 0]), np.max(tsna2d_[:, 0]))
-    y_min = min(np.min(tsna2d[:, 1]), np.min(tsna2d_[:, 1]))
-    y_max = max(np.max(tsna2d[:, 1]), np.max(tsna2d_[:, 1]))
+    x_min = min(np.min(tsna2d[:, 0])-1, np.min(tsna2d_[:, 0])-1)
+    x_max = max(np.max(tsna2d[:, 0])+1, np.max(tsna2d_[:, 0])+1)
+    y_min = min(np.min(tsna2d[:, 1])-1, np.min(tsna2d_[:, 1])-1)
+    y_max = max(np.max(tsna2d[:, 1])+1, np.max(tsna2d_[:, 1])+1)
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
 
@@ -61,7 +61,7 @@ def plot_data(tsna2d, tsna2d_, generated_path):
     plt.title('TSNA2D Plot')
 
     # Show the plot
-    plt.show()
+    #plt.show()
 
 
 

@@ -29,11 +29,16 @@ def preprocess_data(df):
     return df
 
 def plot_data(pca2d, pca2d_, generated_path):
-    plt.figure(figsize=(10, 8))
-
+    plt.figure(dpi=300,figsize=(10, 8))
+    x_min = min(np.min(pca2d[:, 0])-1, np.min(pca2d_[:, 0])-1)
+    x_max = max(np.max(pca2d[:, 0])+1, np.max(pca2d_[:, 0])+1)
+    y_min = min(np.min(pca2d[:, 1])-1, np.min(pca2d_[:, 1])-1)
+    y_max = max(np.max(pca2d[:, 1])+1, np.max(pca2d_[:, 1])+1)
+    plt.xlim(x_min-1, x_max+1)
+    plt.ylim(y_min-1, y_max+1)
     # Use seaborn's kdeplot for both real and generated data to visualize density
-    sns.kdeplot(x=pca2d[:, 0], y=pca2d[:, 1], cmap="Reds", shade=True, bw_adjust=.5, label='real', alpha=0.8)
-    sns.kdeplot(x=pca2d_[:, 0], y=pca2d_[:, 1], cmap="Blues", shade=True, bw_adjust=.5, label='generated', alpha=0.8)
+    sns.kdeplot(x=pca2d[:, 0], y=pca2d[:, 1], cmap="Reds", label='real')
+    sns.kdeplot(x=pca2d_[:, 0], y=pca2d_[:, 1], cmap="Blues",label='generated', alpha=0.8)
 
     # Add legend and title
     plt.legend()
@@ -48,6 +53,8 @@ def plot_data(pca2d, pca2d_, generated_path):
 
     # Show the plot
     plt.show()
+    plt.close()
+    exit()
 
 def main(real_path, generated_path):
     df_real = pd.read_csv(real_path, header=0)

@@ -39,17 +39,17 @@ def preprocess_data(df):
 
 def plot_data(pca2d, pca2d_, generated_path):
     # Plot pca2d in red
-    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='red', label='real')
+    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='real', alpha=0.1)
 
     # Plot pca2d_ in blue
-    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='blue', label='generated')
+    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label='generated', alpha=0.1)
 
     # Limit x and y axes
     #compute the limit depending on max and min of the data
-    x_min = min(np.min(pca2d[:, 0]), np.min(pca2d_[:, 0]))
-    x_max = max(np.max(pca2d[:, 0]), np.max(pca2d_[:, 0]))
-    y_min = min(np.min(pca2d[:, 1]), np.min(pca2d_[:, 1]))
-    y_max = max(np.max(pca2d[:, 1]), np.max(pca2d_[:, 1]))
+    x_min = min(np.min(pca2d[:, 0])-1, np.min(pca2d_[:, 0])-1)
+    x_max = max(np.max(pca2d[:, 0])+1, np.max(pca2d_[:, 0])+1)
+    y_min = min(np.min(pca2d[:, 1])-1, np.min(pca2d_[:, 1])-1)
+    y_max = max(np.max(pca2d[:, 1])+1, np.max(pca2d_[:, 1])+1)
     plt.xlim(x_min-1, x_max+1)
     plt.ylim(y_min-1, y_max+1)
 
@@ -60,10 +60,11 @@ def plot_data(pca2d, pca2d_, generated_path):
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
     plt.title('PCA2D Plot')
-
     # Show the plot
     plt.show()
     plt.close()
+    exit()
+    
 
 
 

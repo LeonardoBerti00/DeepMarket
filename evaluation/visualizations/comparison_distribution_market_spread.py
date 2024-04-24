@@ -75,7 +75,7 @@ def main(real_path, generated_path, IS_REAL):
         dir_path = os.path.dirname(generated_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
-    plt.show()
+    #plt.show()
     plt.close()
 
 if __name__ == '__main__':

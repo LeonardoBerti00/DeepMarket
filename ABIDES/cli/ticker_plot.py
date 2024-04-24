@@ -212,5 +212,5 @@ else:
 
 #plt.savefig('background_{}.png'.format(b))
 
-plt.show()
+#plt.show()
 

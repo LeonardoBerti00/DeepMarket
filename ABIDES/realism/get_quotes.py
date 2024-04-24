@@ -45,8 +45,8 @@ df_sim.to_csv("simulated_quotes.csv")
 import matplotlib.pyplot as plt
 plt.plot(df_sim["BEST_BID"], color="g")
 plt.plot(df_sim["BEST_ASK"], color="r")
-plt.show()
+#plt.show()
 
 plt.plot(df_sim["BEST_ASK"]-df_sim["BEST_BID"])
-plt.show()
+#plt.show()
 '''

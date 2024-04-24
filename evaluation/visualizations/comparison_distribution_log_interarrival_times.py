@@ -30,7 +30,7 @@ def main(real_path, generated_path):
     max_bin = max(df1['inter_arrival'].max(), df2['inter_arrival'].max())
     bins = np.logspace(np.log10(min_bin), np.log10(max_bin), 50)
 
-    plt.figure(figsize=(10, 5))
+    plt.figure(dpi=300,figsize=(10, 5))
 
     plt.hist(df1['inter_arrival'], bins=bins, alpha=0.5, color='red', label='Generated Orders')
     plt.hist(df2['inter_arrival'], bins=bins, alpha=0.5, color='blue', label='Real Orders')
@@ -53,7 +53,7 @@ def main(real_path, generated_path):
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
 
-    plt.show()
+    #plt.show()
 
 
 

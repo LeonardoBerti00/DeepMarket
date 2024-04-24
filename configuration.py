@@ -7,7 +7,7 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
+        self.IS_WANDB = False
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
@@ -15,7 +15,7 @@ class Configuration:
         # evaluation
         self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
-        self.PLOT_GRAPHS = False #to activate the plot of the graphs
+        self.PLOT_GRAPHS = True #to activate the plot of the graphs
 
         self.VALIDATE_EVERY = 1
 
@@ -26,14 +26,14 @@ class Configuration:
 
         self.CHOSEN_MODEL = cst.Models.CDT
         self.CHOSEN_AUGMENTER = "MLP"
-        self.CHOSEN_COND_AUGMENTER = "Transformer"
+        self.CHOSEN_COND_AUGMENTER = "MLP"
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.CHOSEN_STOCK = cst.Stocks.INTC
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -43,7 +43,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/IABS_TSLA_20150130_120000/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_11-00-00_val_ema=0.817_epoch=0_TSLA_full_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -82,6 +82,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
+        self.COND_METHOD = "concatenation"
         self.COND_TYPE = "full"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS

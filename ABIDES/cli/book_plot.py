@@ -106,7 +106,7 @@ sns.set()
 df_book = read_book_quotes(book_file)
 #df_hist = read_historical_quotes('./data/nbbo/nbbo_2018/nbbom_20180518.bgz', 'IBM')
 
-fig = plt.figure(figsize=(12,9))
+fig = plt.figure(dpi=300,figsize=(12,9))
 
 # Use this to make all volume positive (ASK volume is negative in the dataframe).
 #df_book.Volume = df_book.Volume.abs()
@@ -235,7 +235,7 @@ plt.tight_layout()
 
 # This section plots the historical order book (no depth available).
 if PLOT_HISTORICAL:
-  fig = plt.figure(figsize=(12,9))
+  fig = plt.figure(dpi=300,figsize=(12,9))
 
   df_hist = df_hist.between_time('9:30', '16:00')
   #df_hist = df_hist.between_time('10:00', '10:05')
@@ -255,5 +255,5 @@ if PLOT_HISTORICAL:
   plt.tight_layout()
 
 # Show all the plots.
-plt.show()
+#plt.show()
 
