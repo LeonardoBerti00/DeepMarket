@@ -188,11 +188,16 @@ class NNEngine(L.LightningModule):
     def loss(self, real, recon, **kwargs):
         # regularization term to avoid order with negative size
         negative_values = recon[:, 0, self.size_type_emb+1][recon[:, 0, self.size_type_emb+1] < 0]
-        regularization_term = torch.norm(negative_values, p=self.p_norm) / negative_values.shape[0]
+        regularization_term = torch.norm(negative_values, p=self.p_norm)
+        regularization_term = regularization_term / negative_values.shape[0]
         if regularization_term.isnan() or regularization_term.isinf():
             regularization_term = torch.tensor(0.0, device=cst.DEVICE, dtype=torch.float32)
+        #print(f"regularization term: {regularization_term*10}")
         if isinstance(self.diffuser, GaussianDiffusion):
             L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
+            #print(f"hybrid loss: {L_hybrid.mean()}")
+            #print(f"simple loss: {L_simple.mean()}")
+            #print(f"vlb loss: {L_vlb.mean()}")
             return L_hybrid+self.reg_term_weight*regularization_term, L_simple, L_vlb
         else:
             L_simple = self.diffuser.loss(real, recon, **kwargs)
@@ -238,18 +243,23 @@ class NNEngine(L.LightningModule):
         #if batch_idx % 100 == 0:
         #    print(self.type_embedder.weight.data)
         #check for every layer if the gradients are nan or the values are nan
-        
-        if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight).any():
-            print("nan values in the parameters")
-        if torch.isnan(self.diffuser.NN.fc_noise.weight).any():
-            print("nan values in the parameters")
-        if torch.isnan(self.diffuser.NN.fc_var.weight).any():
-            print("nan values in the parameters")
-        if torch.isnan(self.diffuser.NN.layers.layers[0].to_q.weight).any():
-            print("nan values in the parameters")
-        if torch.isnan(self.type_embedder.weight.data).any():
-            print("nan values in the parameters")
-        
+        if self.global_step > 1:
+            if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight.grad).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.diffuser.NN.fc_noise.weight.grad).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.diffuser.NN.fc_noise.weight).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.diffuser.NN.fc_var.weight).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.diffuser.NN.fc_var.weight.grad).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.diffuser.NN.layers.layers[0].to_q.weight).any():
+                print("nan values in the parameters")
+            if torch.isnan(self.type_embedder.weight.data).any():
+                print("nan values in the parameters")
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:

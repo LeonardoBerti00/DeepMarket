@@ -195,6 +195,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         decoder_nll = -self._gaussian_log_likelihood(
             x_0, means=pred_mean, log_scales=pred_log_var*0.5
         )
+        if torch.isnan(decoder_nll).any():
+            print("decoder_nll:", decoder_nll)
         assert decoder_nll.shape == x_0.shape
         decoder_nll = self._mean_flat(decoder_nll) / np.log(2.0)
 
@@ -242,6 +244,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 + posterior_mean_coef2 * x_t
         )
         true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=x_0.shape[-1])
+        if torch.isnan(true_mean).any():
+            print("true_mean:", true_mean)
         return true_mean, true_log_var_clipped
 
 
@@ -253,6 +257,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         scalars, among other use cases.
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
+        if torch.isnan(output).any():
+            print("normal kl:", output)
         return output
 
     def _gaussian_log_likelihood(self, x, means, log_scales):
@@ -272,8 +278,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         inv_stdv = torch.exp(log_scales)
         plus_in = inv_stdv * (centered_x + 1.0)
         cdf_plus = self._approx_standard_normal_cdf(plus_in)
+        if torch.isnan(cdf_plus).any():
+            print("cdf_plus:", cdf_plus)
         min_in = inv_stdv * (centered_x - 1.0)
         cdf_min = self._approx_standard_normal_cdf(min_in)
+        if torch.isnan(cdf_min).any():
+            print("cdf_min:", cdf_min)
         log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-6))
         log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-6))
         cdf_delta = cdf_plus - cdf_min
