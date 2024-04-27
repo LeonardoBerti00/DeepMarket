@@ -7,9 +7,9 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
-        self.IS_TRAINING = True
+        self.IS_TRAINING = False
         self.IS_DEBUG = False
 
         # evaluation
@@ -33,7 +33,7 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
 
-        self.CHOSEN_STOCK = cst.Stocks.INTC
+        self.CHOSEN_STOCK = cst.Stocks.TSLA
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -59,7 +59,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3    
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3
         self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
         if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
@@ -68,6 +68,7 @@ class Configuration:
         
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 50
+        self.HYPER_PARAMETERS[LearningHyperParameter.P_NORM] = 2 if self.CHOSEN_STOCK == cst.Stocks.INTC else 5
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4

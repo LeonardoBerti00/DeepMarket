@@ -10,12 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["-u", "ABIDES/abides.py", "-c", "world_agent_sim", "-t", "TSLA", "-date", "20150130", "-s", "1234", "-d", "True", "-m", "CDT", "-st", "'09:30:00'", "-et", "'11:00:00'", "-id", "0.846"]
+            "args": ["-u", "ABIDES/abides.py", "-c", "world_agent_sim", "-t", "INTC", "-date", "20150130", "-s", "1234", "-d", "True", "-m", "CDT", "-st", "'09:30:00'", "-et", "'11:00:00'", "-id", "2.317"]
         }
     ],
-    "gino": [
-        {
-            "args": ["-u", "ABIDES/abides.py", "-c", "world_agent_sim", "-t", "TSLA", "-date", "20150130", "-s", "1234", "-d", "True", "-m", "CDT", "-st", "'09:30:00'", "-et", "'11:00:00'", "-id", "0.817"]
-        }
-    ]
 }

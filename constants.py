@@ -29,6 +29,7 @@ class LearningHyperParameter(str, Enum):
     CSDI_N_HEADS = "CSDI_n_heads"
     REG_TERM_WEIGHT = "reg_term_weight"
     ONE_HOT_ENCODING_TYPE = "one_hot_encoding_type"
+    P_NORM = "p_norm"
 
 
 class Optimizers(Enum):
@@ -132,7 +133,7 @@ INTC_EVENT_MEAN_DEPTH = 1.3685517399834501
 INTC_EVENT_STD_DEPTH = 2.333747222206966
 
 
-SEED = 6
+SEED = 20
 
 PRECISION = 32
 N_LOB_LEVELS = 10
