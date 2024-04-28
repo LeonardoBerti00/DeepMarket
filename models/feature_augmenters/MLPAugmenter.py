@@ -16,24 +16,29 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         self.input_size = input_size
         self.fwd_mlp = nn.Sequential(
             nn.Linear(input_size, augment_dim, dtype=torch.float32),
+            nn.LayerNorm(augment_dim),
         )
         self.cond_type = cond_type
         if cond_type == "full":
             if cond_augmenter == "MLP":
                 self.fwd_cond_lob = nn.Sequential(
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
+                    nn.LayerNorm(augment_dim),
                 )
             elif cond_augmenter == "Transformer":
                 self.fwd_cond_lob = nn.Sequential(
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
+                    nn.LayerNorm(augment_dim),
                     TransformerEncoder(2, augment_dim, 4, 0.1, "only_event", ""))
         if cond_type == "full" and cond_method == "concatenation":
             augment_dim = augment_dim*2
         self.bck_mlp = nn.Sequential(
             nn.Linear(augment_dim, input_size, dtype=torch.float32),
+            nn.LayerNorm(input_size),
         )
         self.v_mlp = nn.Sequential(
             nn.Linear(augment_dim, input_size, dtype=torch.float32),
+            nn.LayerNorm(input_size),
         )
         
 
