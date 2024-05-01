@@ -7,6 +7,8 @@ import random
 import numpy as np
 from tqdm import tqdm
 
+from utils.utils import calculate_ftsd, plot, compute_prd_from_embedding, knn_precision_recall_features, compute_prdc
+
 # given real data and generated data
 # train a lstm with real data, train a lstm with generated data
 # test the two lstm on real data test set
@@ -74,9 +76,9 @@ class LSTMModel(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
-        out, _ = self.lstm(x, (h0, c0))  
-        out = self.fc(out[:, -1, :])
-        return out
+        ht, _ = self.lstm(x, (h0, c0))  
+        out = self.fc(ht[:, -1, :])
+        return out, ht[:, -1, :]
 
 
 class Trainer:
@@ -87,6 +89,7 @@ class Trainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
+        self.hidden_states = []
 
     def train(self, epochs):
         self.model.train()
@@ -95,7 +98,7 @@ class Trainer:
             losses = []
             for inputs, labels in self.train_loader:
                 self.optimizer.zero_grad()
-                output = self.model(inputs)
+                output, _ = self.model(inputs)
                 loss = self.criterion(output, labels.unsqueeze(1))
                 loss.backward()
                 self.optimizer.step()
@@ -112,9 +115,10 @@ class Trainer:
         with torch.no_grad():
             for inputs, labels in self.test_loader:
                 #print(inputs)
-                output = self.model(inputs)
+                output, h = self.model(inputs)
                 test_preds = torch.cat((test_preds, output), dim=0)
                 test_labels = torch.cat((test_labels, labels), dim=0)
+                self.hidden_states.append(h.cpu().numpy())
                 #print("Predicted Values:", output)
         mse = nn.functional.mse_loss(test_preds, test_labels.unsqueeze(1)).item()
         print(f'Test MSE: {mse}')
@@ -223,8 +227,18 @@ def main(real_data_path, generated_data_path):
     trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
     trainer_g.train(epochs=100)
     trainer_g.test()
-
-
+    
+    #compute FTSD
+    hidden_states_r = np.array(trainer_r.hidden_states)
+    hidden_states_g = np.array(trainer_g.hidden_states)
+    hidden_states_r = hidden_states_r.reshape(hidden_states_r.shape[0]*hidden_states_r.shape[1], hidden_states_r.shape[2])
+    hidden_states_g = hidden_states_g.reshape(hidden_states_g.shape[0]*hidden_states_g.shape[1], hidden_states_g.shape[2])
+    print("FTSD: ", calculate_ftsd(hidden_states_r, hidden_states_g))
+    plot(compute_prd_from_embedding(hidden_states_g, hidden_states_r), "PRD")
+    print("Improved Precision and Recall: ", knn_precision_recall_features(hidden_states_r, hidden_states_g))
+    print("PRDC: ", compute_prdc(hidden_states_r, hidden_states_g, nearest_k=5))
+    
+    
     ################## Train with both real and generated data ##################
     print("\n Predictive Score Real and Generated data:")
     #concatenate train_X_r and train_X_g

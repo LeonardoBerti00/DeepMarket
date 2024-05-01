@@ -35,11 +35,15 @@ def train(config, trainer):
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-
+    test_set = LOBDataset(
+        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
+        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+    )
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
     #print("size of test set: ", test_set.data.size())
-
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]

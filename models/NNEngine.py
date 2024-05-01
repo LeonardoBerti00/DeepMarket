@@ -66,10 +66,11 @@ class NNEngine(L.LightningModule):
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
             print(self.type_embedder.weight.data)
-            self.type_embedder.weight.data = torch.tensor([[-0.045], [0.03], [0.105]], device=cst.DEVICE, dtype=torch.float32)
-            #self.type_embedder.weight.data = torch.tensor([[-0.045, -0.045, -0.045], [0.03, 0.03, 0.03], [0.105, 0.105, 0.105]], device=cst.DEVICE, dtype=torch.float32)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-        
+            self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
+            if self.IS_WANDB:
+                wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
+            
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
@@ -182,6 +183,7 @@ class NNEngine(L.LightningModule):
             #print(f"simple loss: {L_simple.mean()}")
             #print(f"vlb loss: {L_vlb.mean()}")
             return L_hybrid+self.reg_term_weight*regularization_term, L_simple, L_vlb
+            #return L_hybrid, L_simple, L_vlb
         else:
             L_simple = self.diffuser.loss(real, recon, **kwargs)
             return L_simple, L_simple, L_simple
@@ -227,15 +229,9 @@ class NNEngine(L.LightningModule):
         if self.global_step > 1:
             if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight).any():
                 print("nan values in the parameters")
-            if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight.grad).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.diffuser.NN.fc_noise.weight.grad).any():
-                print("nan values in the parameters")
             if torch.isnan(self.diffuser.NN.fc_noise.weight).any():
                 print("nan values in the parameters")
             if torch.isnan(self.diffuser.NN.fc_var.weight).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.diffuser.NN.fc_var.weight.grad).any():
                 print("nan values in the parameters")
             if torch.isnan(self.diffuser.NN.layers.layers[0].to_q.weight).any():
                 print("nan values in the parameters")
@@ -322,7 +318,6 @@ class NNEngine(L.LightningModule):
 
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
-        exit()
         
 
     def configure_optimizers(self):

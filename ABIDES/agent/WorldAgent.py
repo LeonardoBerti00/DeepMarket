@@ -70,6 +70,8 @@ class WorldAgent(Agent):
             self.starting_time_diffusion = '15min'
             #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             print(self.diffusion_model.type_embedder.weight.data)
+            #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
+
         else:
             self.starting_time_diffusion = '0min'
         
@@ -98,8 +100,8 @@ class WorldAgent(Agent):
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
-        #make a print every 10 minutes
-        if currentTime.minute % 2 == 0 and currentTime.second % 30 == 0:
+        #make a print every 5 minutes
+        if currentTime.minute % 5 == 0 and currentTime.second == 00:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))

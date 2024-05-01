@@ -54,11 +54,6 @@ parser.add_argument('-et',
                     type=parse,
                     help='Ending time of simulation.'
                     )
-parser.add_argument('-s',
-                    '--seed',
-                    type=int,
-                    default=None,
-                    help='numpy.random.seed() for simulation')
 parser.add_argument('--config_help',
                     action='store_true',
                     help='Print argument options for this config file')
@@ -96,9 +91,7 @@ if args.config_help:
     parser.print_help()
     sys.exit()
 
-seed = args.seed  # Random seed specification on the command line.
-if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
-np.random.seed(seed)
+seed = cst.SEED  # Random seed specification on the command line.
 
 exchange_log_orders = True
 log_orders = True
@@ -178,7 +171,7 @@ agents.extend([ExchangeAgent(id=0,
                              book_freq=0,
                              wide_book=True,
                              random_state=np.random.RandomState(
-                                 seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')))
+                                 seed=seed))
                ])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
@@ -210,8 +203,9 @@ if args.diffusion:
     print("checkpoint used: ", checkpoint_reference)
     checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
     config = checkpoint["hyper_parameters"]["config"]
+    config.IS_WANDB = False
     # load checkpoint
-    model = NNEngine.load_from_checkpoint(checkpoint_reference, map_location=cst.DEVICE)
+    model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
     # we freeze the model
     for param in model.parameters():
         param.requires_grad = False
@@ -232,7 +226,7 @@ agents.extend([WorldAgent(id=1,
                           size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB] if args.diffusion else None,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
+                              seed=cst.SEED),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion
                           )
@@ -267,8 +261,7 @@ pov_agent = POVExecutionAgent(id=agent_count,
                               quantity=pov_quantity,
                               trade=trade_pov,
                               log_orders=True,  # needed for plots so conflicts with others
-                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                        dtype='uint64')))
+                              random_state=np.random.RandomState(seed=seed))
 if trade_pov:
     execution_agents = [pov_agent]
     agents.extend(execution_agents)
@@ -277,8 +270,7 @@ if trade_pov:
 
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
-kernel = Kernel("World Agent Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 16,
-                                                                                                dtype='uint64')))
+kernel = Kernel("World Agent Kernel", random_state=np.random.RandomState(seed=seed))
 kernelStartTime = mkt_open
 kernelStopTime = mkt_close + pd.to_timedelta('00:00:01')
 
