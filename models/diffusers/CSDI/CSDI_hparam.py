@@ -7,5 +7,5 @@ HP_CSDI = {
 
 HP_CSDI_FIXED = {
     cst.LearningHyperParameter.LEARNING_RATE.value: 0.001,
-    cst.LearningHyperParameter.CSDI_LAYERS: 6,
+    cst.LearningHyperParameter.CSDI_LAYERS: 2,
 }

@@ -13,8 +13,8 @@ def pick_diffuser(config, model_name, augmenter):
     else:
         raise ValueError("Diffuser not found")
 
-def pick_augmenter(augmenter_name, input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method):
+def pick_augmenter(augmenter_name, input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method, chosen_model):
     if augmenter_name == 'MLP':
-        return MLPAugmenter(input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method).to(cst.DEVICE, non_blocking=True)
+        return MLPAugmenter(input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method, chosen_model).to(cst.DEVICE, non_blocking=True)
     else:
         raise ValueError("Augmenter not found")

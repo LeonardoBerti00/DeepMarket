@@ -205,7 +205,7 @@ if args.diffusion:
     config = checkpoint["hyper_parameters"]["config"]
     config.IS_WANDB = False
     # load checkpoint
-    model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+    model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE, strict=False)
     # we freeze the model
     for param in model.parameters():
         param.requires_grad = False
