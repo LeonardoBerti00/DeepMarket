@@ -161,6 +161,7 @@ def run_wandb(config, accelerator):
         run.log({"cond augmenter": config.CHOSEN_COND_AUGMENTER}, commit=False)
         run.log({"cond method": config.COND_METHOD}, commit=False)
         run.log({"seed": cst.SEED}, commit=False)
+        run.log({"lambda": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LAMBDA]}, commit=False)        
         train(config, trainer)
         run.finish()
 

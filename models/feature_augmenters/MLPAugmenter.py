@@ -30,7 +30,7 @@ class MLPAugmenter(AugmenterAB, nn.Module):
             elif cond_augmenter == "Transformer":
                 self.fwd_cond_lob = nn.Sequential(
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
-                    nn.LayerNorm(augment_dim),
+                    #nn.LayerNorm(augment_dim),
                     TransformerEncoder(2, augment_dim, 4, 0.1, "only_event", ""))
         if cond_type == "full" and cond_method == "concatenation":
             augment_dim = augment_dim*2

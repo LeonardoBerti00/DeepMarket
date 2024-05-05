@@ -40,13 +40,12 @@ class NNEngine(L.LightningModule):
         self.cond_method = config.COND_METHOD
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
-        self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
-        self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = 10000000
         self.filename_ckpt = config.FILENAME_CKPT
         self.save_hyperparameters()
+        self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
@@ -65,9 +64,9 @@ class NNEngine(L.LightningModule):
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
-            print(self.type_embedder.weight.data)
+            #print(self.type_embedder.weight.data)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -172,17 +171,12 @@ class NNEngine(L.LightningModule):
     
     def loss(self, real, recon, **kwargs):
         # regularization term to avoid order with negative size
-        negative_values = recon[:, 0, self.size_type_emb+1][recon[:, 0, self.size_type_emb+1] < 0]
-        regularization_term = torch.norm(negative_values, p=self.p_norm) / negative_values.shape[0]
-        if regularization_term.isnan() or regularization_term.isinf():
-            regularization_term = torch.tensor(0.0, device=cst.DEVICE, dtype=torch.float32)
-        #print(f"regularization term: {regularization_term*10}")
         if isinstance(self.diffuser, GaussianDiffusion):
             L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
             #print(f"hybrid loss: {L_hybrid.mean()}")
             #print(f"simple loss: {L_simple.mean()}")
             #print(f"vlb loss: {L_vlb.mean()}")
-            return L_hybrid+self.reg_term_weight*regularization_term, L_simple, L_vlb
+            return L_hybrid, L_simple, L_vlb
             #return L_hybrid, L_simple, L_vlb
         else:
             L_simple = self.diffuser.loss(real, recon, **kwargs)
@@ -225,6 +219,7 @@ class NNEngine(L.LightningModule):
         print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
         '''
         self.ema.update()
+        print(batch_loss_mean.item())
         #check for every layer if the gradients are nan or the values are nan
         if self.global_step > 1:
             if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight).any():
