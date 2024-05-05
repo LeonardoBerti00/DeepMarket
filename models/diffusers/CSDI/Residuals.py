@@ -1,4 +1,5 @@
 
+from einops import rearrange
 import torch.nn as nn
 import torch
 import math
@@ -16,27 +17,28 @@ class ResidualBlock(nn.Module):
         self.output_projection = Conv1d_with_init(channels, 2 * channels, 1)
 
         self.time_layer = nn.TransformerEncoder(nn.TransformerEncoderLayer(
-            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu"), num_layers=1)
+            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu", batch_first=True), num_layers=1)
         
         self.feature_layer = nn.TransformerEncoder(nn.TransformerEncoderLayer(
-            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu"), num_layers=1)
+            d_model=channels, nhead=nheads, dim_feedforward=64, activation="gelu", batch_first=True), num_layers=1)
         
     def forward_time(self, y, base_shape):
         B, channel, K, L = base_shape
         if L == 1:
             return y
-        y = y.reshape(B, channel, K, L).permute(0, 2, 1, 3).reshape(B * K, channel, L)
-        y = self.time_layer(y.permute(2, 0, 1)).permute(1, 2, 0)
-        y = y.reshape(B, K, channel, L).permute(0, 2, 1, 3).reshape(B, channel, K * L)
+        y = y.contiguous()
+        y = rearrange(y, 'B C (K L) -> (B K) L C', K=K, L=L)
+        y = self.time_layer(y)
+        y = rearrange(y, '(B K) L C -> B K C L', B=B, K=K, L=L)
         return y
 
     def forward_feature(self, y, base_shape):
         B, channel, K, L = base_shape
         if K == 1:
             return y
-        y = y.reshape(B, channel, K, L).permute(0, 3, 1, 2).reshape(B * L, channel, K)
-        y = self.feature_layer(y.permute(2, 0, 1)).permute(1, 2, 0)
-        y = y.reshape(B, L, channel, K).permute(0, 2, 3, 1).reshape(B, channel, K * L)
+        y = rearrange(y, 'B K C L -> (B L) K C', K=K, L=L)
+        y = self.feature_layer(y)
+        y = rearrange(y, '(B L) K C -> B C (K L)', B=B, L=L, K=K)
         return y
 
     def forward(self, x: torch.Tensor, cond_info: torch.Tensor, diffusion_emb):
@@ -51,9 +53,8 @@ class ResidualBlock(nn.Module):
         y = self.forward_feature(y, base_shape)  # (B,channel,K*L)
         y = self.mid_projection(y)  # (B,2*channel,K*L)
 
-        cond_info = cond_info.permute(0,3,2,1)
-        _, cond_dim, _, _ = cond_info.shape
-        cond_info = cond_info.reshape(B, cond_dim, -1)
+        C = cond_info.shape[-1]
+        cond_info = cond_info.contiguous().view(B, C, K * L)
         cond_info = self.cond_projection(cond_info)  # (B,2*channel,K*L)
         y = y + cond_info
 

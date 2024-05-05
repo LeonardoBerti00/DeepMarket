@@ -40,6 +40,7 @@ class NNEngine(L.LightningModule):
         self.cond_method = config.COND_METHOD
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
+        #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = 10000000
@@ -56,7 +57,7 @@ class NNEngine(L.LightningModule):
         self.last_path_ckpt_ema = None
         self.cond_size = config.COND_SIZE
         if self.IS_AUGMENTATION:
-            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method)
+            self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method, self.chosen_model)
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
         else:
             self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
@@ -67,6 +68,8 @@ class NNEngine(L.LightningModule):
             #print(self.type_embedder.weight.data)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             #self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.3847,  1.1294]], device=cst.DEVICE, dtype=torch.float32)
+            
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -185,9 +188,9 @@ class NNEngine(L.LightningModule):
     def training_step(self, input, batch_idx):
         if self.global_step == 0 and self.IS_WANDB:
             self._define_log_metrics()
-        x_0 = input[1]
-        cond_orders = input[0]
-        cond_lob = input[2]
+        x_0 = input[1].contiguous()
+        cond_orders = input[0].contiguous()
+        cond_lob = input[2].contiguous()
         x_0.requires_grad_(True)
         cond_orders.requires_grad_(True)
         cond_lob.requires_grad_(True)
@@ -205,8 +208,7 @@ class NNEngine(L.LightningModule):
         self.sampler.update_losses(self.t, batch_loss[0])
         self.vlb_sampler.update_losses(self.t, L_vlb[0])
         self.simple_sampler.update_losses(self.t, L_simple[0])
-        if isinstance(self.diffuser, GaussianDiffusion):
-            self.diffuser.init_losses()
+        self.diffuser.init_losses()
         '''
         #check if all the parameters layers are training successfully
         print(self.feature_augmenter.fwd_cond_lob[0].weight.grad)
@@ -219,19 +221,6 @@ class NNEngine(L.LightningModule):
         print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
         '''
         self.ema.update()
-        print(batch_loss_mean.item())
-        #check for every layer if the gradients are nan or the values are nan
-        if self.global_step > 1:
-            if torch.isnan(self.feature_augmenter.fwd_cond_lob[0].weight).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.diffuser.NN.fc_noise.weight).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.diffuser.NN.fc_var.weight).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.diffuser.NN.layers.layers[0].to_q.weight).any():
-                print("nan values in the parameters")
-            if torch.isnan(self.type_embedder.weight.data).any():
-                print("nan values in the parameters")
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:
@@ -284,8 +273,7 @@ class NNEngine(L.LightningModule):
             self.vlb_val_losses.append(torch.mean(L_vlb).item())
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
-        if isinstance(self.diffuser, GaussianDiffusion):
-            self.diffuser.init_losses()
+        self.diffuser.init_losses()
         return batch_loss_mean
 
 

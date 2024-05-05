@@ -39,10 +39,10 @@ def preprocess_data(df):
 
 def plot_data(pca2d, pca2d_, generated_path):
     # Plot pca2d in red
-    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='real', alpha=0.1)
+    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='real', alpha=0.1, s=10)
 
     # Plot pca2d_ in blue
-    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label='generated', alpha=0.1)
+    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label='generated', alpha=0.1, s=10)
 
     # Limit x and y axes
     #compute the limit depending on max and min of the data

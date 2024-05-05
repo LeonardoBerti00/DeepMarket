@@ -45,25 +45,23 @@ class CSDIEpsilon(nn.Module):
 
 
     def forward(self, x: torch.Tensor, cond_info: torch.Tensor, diffusion_step):
+        #check if x and conf info are contiguous
+        #print(x.is_contiguous())
+        #print(cond_info.is_contiguous())
         B, inputdim, K, L = x.shape
-        
         x = x.reshape(B, inputdim, K * L)
-        
         x = self.input_projection(x)
         x = F.relu(x)
         x = x.reshape(B, self.channels, K, L)
-
         diffusion_emb = self.diffusion_embedding(diffusion_step)
-        
         skip = []
         for layer in self.residual_layers:
             x, skip_connection = layer(x, cond_info, diffusion_emb)
             skip.append(skip_connection)
-            
         x = torch.sum(torch.stack(skip), dim=0) / math.sqrt(len(self.residual_layers))
         x = x.reshape(B, self.channels, K * L)
         x = self.output_projection1(x)  # (B,channel,K*L)
         x = F.relu(x)
         x = self.output_projection2(x)  # (B,1,K*L)
-        x = x.reshape(B, K, L)
+        x = x.reshape(B, L, K)
         return x

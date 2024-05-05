@@ -40,10 +40,10 @@ def preprocess_data(df):
 
 def plot_data(tsna2d, tsna2d_, generated_path):
     # Plot tsna2d in red
-    plt.scatter(tsna2d[:, 0], tsna2d[:, 1], color='tab:red', label='real', alpha=0.1)
+    plt.scatter(tsna2d[:, 0], tsna2d[:, 1], color='tab:red', label='real', alpha=0.1, s=10)
 
     # Plot tsna2d_ in blue
-    plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='tab:blue', label='real', alpha=0.1)
+    plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='tab:blue', label='real', alpha=0.1, s=10)
 
     x_min = min(np.min(tsna2d[:, 0])-1, np.min(tsna2d_[:, 0])-1)
     x_max = max(np.max(tsna2d[:, 0])+1, np.max(tsna2d_[:, 0])+1)

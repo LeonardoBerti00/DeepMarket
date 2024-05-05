@@ -10,7 +10,7 @@ from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 class MLPAugmenter(AugmenterAB, nn.Module):
     
-    def __init__(self, input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method):
+    def __init__(self, input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method, chosen_model):
         super().__init__()
         augment_dim = augment_dim
         self.input_size = input_size
@@ -32,7 +32,7 @@ class MLPAugmenter(AugmenterAB, nn.Module):
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
                     #nn.LayerNorm(augment_dim),
                     TransformerEncoder(2, augment_dim, 4, 0.1, "only_event", ""))
-        if cond_type == "full" and cond_method == "concatenation":
+        if cond_type == "full" and cond_method == "concatenation" and chosen_model == cst.Models.CDT.value:
             augment_dim = augment_dim*2
         self.bck_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),

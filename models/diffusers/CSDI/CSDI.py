@@ -37,6 +37,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         
         # TODO: change into dynamic input dim
         self.input_dim = 2
+        self.mse_losses = []
         self.diffuser = CSDIEpsilon(self.num_steps, self.embedding_dim, self.side_dim, self.n_heads, self.input_dim, self.layers)
         
     def forward_reparametrized(self, input: torch.Tensor, diffusion_step: int, **kwargs):
@@ -52,19 +53,16 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         x_t, noise = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
         x_t = x_t[:, self.cond_seq_size:, :]
         
-        return x_t, {'noise': noise, 'conditioning': kwargs['conditioning']}
+        return x_t, {'noise_true': noise, 'conditioning': kwargs['conditioning']}
         
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
-        print(context)
+        #print(context)
         assert 'cond_orders_aug' in context
         assert 'cond_augmenter' in context
         
         cond = context['cond_orders_aug']
-        
+        noise_true = context['noise_true']
         assert cond.shape[-1] == x_T.shape[-1]
-        
-        is_train = context.get('is_train', True)
-        cond_augmenter: AugmenterAB = context['cond_augmenter']
         
         # condition mask
         whole_input = torch.cat([cond, x_T], dim=1)
@@ -83,6 +81,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         total_input = torch.cat([cond, x_T], dim=-1) # (B,L,K,2)
         total_input = total_input.permute(0, 3, 2, 1)  # (B,2,K,L)
         B, _, K, L = total_input.shape
+        '''
         if is_train:
             t = torch.randint(0, self.num_steps, [B]).to(self.device, non_blocking=True)
             recon = self.diffuser(total_input, side_info, t).permute(0,2,1).unsqueeze(0)
@@ -91,12 +90,34 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
             for set_t in range(self.num_steps):
                 t = (torch.ones(B) * set_t).long().to(self.device, non_blocking=True)
                 recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
+        '''
+        t = context["t"]
+        noise_t = self.diffuser(total_input, side_info, t)
         # de-augment the conditioning and the input
-        cond_mask = cond_augmenter.deaugment(cond_mask)
+        cond_mask = self.feature_augmenter.deaugment(cond_mask)
         context.update({'cond_mask': cond_mask})
         if (self.IS_AUGMENTATION):
-            recon = self.deaugment(recon)
-        return recon, context
+            noise_t = self.feature_augmenter.deaugment(noise_t)
+        beta_t = self.betas[t]
+        alpha_t = self.alphas[t]
+        alpha_cumprod_t = self.alphas_cumprod[t]
+        beta_t = einops.repeat(beta_t, 'b -> b l k', l=L, k=K)
+        alpha_t = einops.repeat(alpha_t, 'b -> b l k', l=L, k=K)
+        alpha_cumprod_t = einops.repeat(alpha_cumprod_t, 'b -> b l k', l=L, k=K)
+        # Sample a standard normal random variable z
+        z = torch.distributions.normal.Normal(0, 1).sample(x_T.shape).to(cst.DEVICE, non_blocking=True)
+        #take the indexes for which t = 1
+        indexes = torch.where(t == 0)
+        z[indexes] = 0.0
+        std_t = torch.sqrt(beta_t)
+        x_T = x_T.squeeze(-1)
+        # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
+        x_recon = 1 / torch.sqrt(alpha_t) * (x_T - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
+        # Compute the mean squared error loss between the noise and the true noise
+        target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
+        residual = ((noise_t - noise_true) * target_mask)**2
+        self.mse_losses.append(torch.mean(residual, dim=(2,3)))
+        return x_recon, context
 
     def deaugment(self, input: torch.Tensor):
         final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], self.target_dim), device=cst.DEVICE)
@@ -118,7 +139,6 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         pe[:, :, 1::2] = torch.cos(position * div_term)
         return pe
 
-
     def get_side_info(self, observed_tp: torch.Tensor, cond_mask: torch.Tensor):
         # we don't have discrete features, so we don't use them
         B, L, K = cond_mask.shape
@@ -132,15 +152,9 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
         assert 'cond_mask' in kwargs
         assert 'noise' in kwargs
-        
-        cond_mask: torch.Tensor = kwargs['cond_mask']
-        noise: torch.Tensor = kwargs['noise']
-        
-        target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
-        noise = einops.repeat(noise, 'm n o -> k m n o', k=recon.shape[0])
-        target_mask =  einops.repeat(target_mask, 'm n o -> k m n o', k=recon.shape[0])
-        residual = ((noise - recon) * target_mask)**2
         # return the mean for every instance in the batch B        
-        L_simple = torch.mean(residual, dim=(2,3))  
-        print(L_simple)
+        L_simple = torch.stack(self.mse_losses).mean(dim=0)
         return L_simple
+
+    def init_losses(self):
+        self.mse_losses = []

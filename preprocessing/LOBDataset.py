@@ -38,7 +38,7 @@ class LOBDataset(data.Dataset):
 
     def _get_data(self):
         """ Loads the data. """
-        self.data = torch.from_numpy(np.load(self.path)).float()
+        self.data = torch.from_numpy(np.load(self.path)).float().contiguous()
         self.orders = self.data[:, :cst.LEN_EVENT]
         self.lob = self.data[:, cst.LEN_EVENT:]
         self.lob = np.roll(self.lob, 1, axis=0)

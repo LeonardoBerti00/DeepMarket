@@ -35,12 +35,6 @@ def train(config, trainer):
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
     )
-    test_set = LOBDataset(
-        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/test.npy",
-        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
-        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
-    )
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
     #print("size of test set: ", test_set.data.size())
@@ -48,7 +42,7 @@ def train(config, trainer):
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
-
+    val_set.data = val_set.data[:25600]
     data_module = DataModule(
         train_set=train_set,
         val_set=val_set,
@@ -88,7 +82,7 @@ def run(config, accelerator, model=None):
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
             EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
-            TQDMProgressBar(refresh_rate=1000)
+            TQDMProgressBar(refresh_rate=10)
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
@@ -134,7 +128,7 @@ def run_wandb(config, accelerator):
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             callbacks=[
                 EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
-                TQDMProgressBar(refresh_rate=10000)
+                TQDMProgressBar(refresh_rate=10)
             ],
             num_sanity_val_steps=0,
             logger=wandb_logger,
