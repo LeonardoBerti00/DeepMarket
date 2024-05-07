@@ -42,7 +42,8 @@ def train(config, trainer):
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
-    val_set.data = val_set.data[:25600]
+        
+    val_set.data = val_set.data[:51200]
     data_module = DataModule(
         train_set=train_set,
         val_set=val_set,

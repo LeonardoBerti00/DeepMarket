@@ -45,7 +45,12 @@ def main(real_path, generated_path):
     time2 = dates.date2num(time2)
     '''
     plt.plot(time1, mid_price1, label='real data', color='blue')
+    #get the min and max of the mid price
+    #xmin = min(mid_price1.min(), mid_price2.min())-100
+    #xmax = max(mid_price1.max(), mid_price2.max())+100
+    #plt.xlim([xmin, xmax])
     plt.plot(time2, mid_price2, label='generated data', color='red')
+    #plt.xlim([xmin, xmax])
     # Formatting the x-axis with hour:minute format
     time_format = dates.DateFormatter('%H:%M')
     plt.gca().xaxis.set_major_formatter(time_format)

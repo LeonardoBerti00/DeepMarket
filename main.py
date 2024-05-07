@@ -21,6 +21,9 @@ import evaluation.visualizations.comparison_multiple_days_midprice as comparison
 import evaluation.visualizations.TSNE_plots as TSNE_plots
 import evaluation.visualizations.comparison_volume_distribution as comparison_volume_distribution
 import evaluation.visualizations.comparison_distribution_log_interarrival_times as comparison_distribution_log_interarrival_times
+import evaluation.visualizations.comparison_core_coef_lags as comparison_core_coef_lags
+import evaluation.visualizations.comparison_correlation_coefficient as comparison_correlation_coefficient
+import evaluation.visualizations.comparison_log_return_frequency as comparison_log_return_frequency
 
 
 
@@ -46,6 +49,9 @@ def plot_graphs(real_data_path, gen_data_path):
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
     comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
     comparison_distribution_log_interarrival_times.main(real_data_path, gen_data_path)
+    comparison_core_coef_lags.main(real_data_path, gen_data_path)
+    comparison_correlation_coefficient.main(real_data_path, gen_data_path)
+    comparison_log_return_frequency.main(real_data_path, gen_data_path)
     TSNE_plots.main(real_data_path, gen_data_path)
     
 

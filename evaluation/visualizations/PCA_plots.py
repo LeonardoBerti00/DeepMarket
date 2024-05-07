@@ -61,9 +61,9 @@ def plot_data(pca2d, pca2d_, generated_path):
     plt.savefig(file_path)
     plt.title('PCA2D Plot')
     # Show the plot
-    plt.show()
+    #plt.show()
     plt.close()
-    exit()
+    
     
 
 

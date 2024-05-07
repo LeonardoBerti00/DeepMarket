@@ -50,10 +50,11 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
     
         whole_input = torch.cat([cond, input], dim=1)
                         
-        x_t, noise = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
-        x_t = x_t[:, self.cond_seq_size:, :]
+        whole_input, noise = DiffusionAB.forward_reparametrized(self, whole_input, diffusion_step)
         
-        return x_t, {'noise_true': noise, 'conditioning': kwargs['conditioning']}
+        x_t = whole_input[:, self.cond_seq_size:, :]
+        
+        return x_t, {'noise_true': noise, 'conditioning': kwargs['conditioning'], 'input': input}
         
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
         #print(context)
@@ -62,12 +63,13 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         
         cond = context['cond_orders_aug']
         noise_true = context['noise_true']
+        input_orig = context['input']
         assert cond.shape[-1] == x_T.shape[-1]
         
         # condition mask
         whole_input = torch.cat([cond, x_T], dim=1)
         cond_mask = torch.zeros(whole_input.shape, device=cst.DEVICE)
-        cond_mask[:, :self.cond_seq_size + 1, :] = 1
+        cond_mask[:, :self.cond_seq_size, :] = 1
         
         # calculate conditioning and x_T
         cond = whole_input * cond_mask
@@ -81,50 +83,32 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         total_input = torch.cat([cond, x_T], dim=-1) # (B,L,K,2)
         total_input = total_input.permute(0, 3, 2, 1)  # (B,2,K,L)
         B, _, K, L = total_input.shape
-        '''
-        if is_train:
-            t = torch.randint(0, self.num_steps, [B]).to(self.device, non_blocking=True)
-            recon = self.diffuser(total_input, side_info, t).permute(0,2,1).unsqueeze(0)
-        else:
-            recon = torch.zeros((self.num_steps, B, L, K))
-            for set_t in range(self.num_steps):
-                t = (torch.ones(B) * set_t).long().to(self.device, non_blocking=True)
-                recon[set_t] = self.diffuser(total_input, side_info, t).permute(0,2,1)
-        '''
         t = context["t"]
         noise_t = self.diffuser(total_input, side_info, t)
         # de-augment the conditioning and the input
-        cond_mask = self.feature_augmenter.deaugment(cond_mask)
+        cond_mask = cond_mask[:, :, :input_orig.shape[-1]]
+        
         context.update({'cond_mask': cond_mask})
         if (self.IS_AUGMENTATION):
             noise_t = self.feature_augmenter.deaugment(noise_t)
         beta_t = self.betas[t]
         alpha_t = self.alphas[t]
         alpha_cumprod_t = self.alphas_cumprod[t]
-        beta_t = einops.repeat(beta_t, 'b -> b l k', l=L, k=K)
-        alpha_t = einops.repeat(alpha_t, 'b -> b l k', l=L, k=K)
-        alpha_cumprod_t = einops.repeat(alpha_cumprod_t, 'b -> b l k', l=L, k=K)
+        beta_t = einops.repeat(beta_t, 'b -> b l k', l=L, k=input_orig.shape[-1])
+        alpha_t = einops.repeat(alpha_t, 'b -> b l k', l=L, k=input_orig.shape[-1])
+        alpha_cumprod_t = einops.repeat(alpha_cumprod_t, 'b -> b l k', l=L, k=input_orig.shape[-1])
         # Sample a standard normal random variable z
-        z = torch.distributions.normal.Normal(0, 1).sample(x_T.shape).to(cst.DEVICE, non_blocking=True)
+        z = torch.distributions.normal.Normal(0, 1).sample(input_orig.shape).to(cst.DEVICE, non_blocking=True)
         #take the indexes for which t = 1
         indexes = torch.where(t == 0)
         z[indexes] = 0.0
         std_t = torch.sqrt(beta_t)
         x_T = x_T.squeeze(-1)
         # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
-        x_recon = 1 / torch.sqrt(alpha_t) * (x_T - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
-        # Compute the mean squared error loss between the noise and the true noise
-        target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
-        residual = ((noise_t - noise_true) * target_mask)**2
-        self.mse_losses.append(torch.mean(residual, dim=(2,3)))
+        x_recon = 1 / torch.sqrt(alpha_t) * (input_orig - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
+        residual = torch.norm(noise_t[:, -1, :] - noise_true[:, -1, :], p=2, dim=1)
+        self.mse_losses.append(residual)
         return x_recon, context
-
-    def deaugment(self, input: torch.Tensor):
-        final_output = torch.zeros((input.shape[0], input.shape[1], input.shape[2], self.target_dim), device=cst.DEVICE)
-        if self.IS_AUGMENTATION and isinstance(self.diffuser, CSDIDiffuser):
-            for i in range(input.shape[0]):
-                final_output[i] = self.feature_augmenter.deaugment(input[i], {})
-        return final_output
 
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """
@@ -150,10 +134,8 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         return side_info
 
     def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs) -> torch.Tensor:
-        assert 'cond_mask' in kwargs
-        assert 'noise' in kwargs
         # return the mean for every instance in the batch B        
-        L_simple = torch.stack(self.mse_losses).mean(dim=0)
+        L_simple = torch.stack(self.mse_losses)
         return L_simple
 
     def init_losses(self):

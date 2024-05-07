@@ -31,11 +31,14 @@ def main(real_path, generated_path):
     data1 = df1["SIZE"]
     data2 = df2["SIZE"]
 
-    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(data1, color='blue', label='Generated')
 
-    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(data2, color='orange', label='Real')
 
     plt.title("Order Size")
+    xmin = min(data1.min(), data2.min())-1000
+    xmax = 3000
+    plt.xlim([xmin, xmax])
     plt.xlabel("Shares")
     plt.ylabel("Density")
 

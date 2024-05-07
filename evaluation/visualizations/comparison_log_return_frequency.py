@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -30,7 +31,11 @@ def main(real_path, generated_path):
     plt.title('Minutely Log Returns Comparison')
 
     plt.legend()
-
+    file_name = "log_return.pdf"
+    generated_path = os.path.dirname(generated_path)
+    file_path = os.path.join(generated_path, file_name)
+    plt.savefig(file_path)
+    plt.close()
     #plt.show()
 
 

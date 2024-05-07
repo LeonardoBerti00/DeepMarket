@@ -42,8 +42,8 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_10-00-00_val_ema=0.957_epoch=0_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
+        self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.957_epoch=0_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -88,7 +88,6 @@ class Configuration:
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
-
 
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 64
 

@@ -1,10 +1,13 @@
+from collections import namedtuple
 import math
 from matplotlib import pyplot as plt
 from numpy import cov, sqrt, trace
 import numpy
 import numpy as np
 import sklearn
+from sklearn.cluster import MiniBatchKMeans
 import torch
+from tqdm import trange
 import constants as cst
 
 
@@ -125,7 +128,8 @@ def compute_prd_from_embedding(eval_data, ref_data, num_clusters=20,
     recalls.append(recall)
   precision = np.mean(precisions, axis=0)
   recall = np.mean(recalls, axis=0)
-  return precision, recall
+  result = np.concatenate([[precision], [recall]]).T
+  return result
 
 def _cluster_into_bins(eval_data, ref_data, num_clusters):
   """Clusters the union of the data points and returns the cluster distribution.
@@ -145,7 +149,7 @@ def _cluster_into_bins(eval_data, ref_data, num_clusters):
   """
 
   cluster_data = np.vstack([eval_data, ref_data])
-  kmeans = sklearn.cluster.MiniBatchKMeans(n_clusters=num_clusters, n_init=10)
+  kmeans = MiniBatchKMeans(n_clusters=num_clusters, n_init=10)
   labels = kmeans.fit(cluster_data).labels_
 
   eval_labels = labels[:len(eval_data)]
@@ -266,186 +270,113 @@ def plot(precision_recall_pairs, labels=None, out_path=None,
     plt.savefig(out_path, bbox_inches='tight', dpi=dpi)
     plt.close()
     
-    
-# the next functions are taken from https://github.com/kynkaat/improved-precision-and-recall-metric/blob/master/precision_recall.py#L57
-import tensorflow as tf
-from time import time
 
-#----------------------------------------------------------------------------
+# the next class and 4 function are ported from https://github.com/youngjung/improved-precision-and-recall-metric-pytorch/blob/master/improved_precision_recall.py#L239
 
-def batch_pairwise_distances(U, V):
-    """Compute pairwise distances between two batches of feature vectors."""
-    with tf.variable_scope('pairwise_dist_block'):
-        # Squared norms of each row in U and V.
-        norm_u = tf.reduce_sum(tf.square(U), 1)
-        norm_v = tf.reduce_sum(tf.square(V), 1)
-        
-        # norm_u as a column and norm_v as a row vectors.
-        norm_u = tf.reshape(norm_u, [-1, 1])
-        norm_v = tf.reshape(norm_v, [1, -1])
+import torch
+import torchvision.models as models
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 
-        # Pairwise squared Euclidean distances.
-        D = tf.maximum(norm_u - 2*tf.matmul(U, V, False, True) + norm_v, 0.0)
+Manifold = namedtuple('Manifold', ['features', 'radii'])
+PrecisionAndRecall = namedtuple('PrecisinoAndRecall', ['precision', 'recall'])
 
-    return D
 
-#----------------------------------------------------------------------------
+class IPR():
+    def __init__(self, batch_size=50, k=3, num_samples=10000):
+        self.manifold_ref = None
+        self.batch_size = batch_size
+        self.k = k
+        self.num_samples = num_samples
 
-class DistanceBlock():
-    """Provides multi-GPU support to calculate pairwise distances between two batches of feature vectors."""
-    def __init__(self, num_features, num_gpus):
-        self.num_features = num_features
-        self.num_gpus = num_gpus
+    def __call__(self, subject):
+        return self.precision_and_recall(subject)
 
-        # Initialize TF graph to calculate pairwise distances.
-        with tf.device('/cpu:0'):
-            self._features_batch1 = tf.placeholder(tf.float32, shape=[None, self.num_features])
-            self._features_batch2 = tf.placeholder(tf.float32, shape=[None, self.num_features])
-            features_split2 = tf.split(self._features_batch2, self.num_gpus, axis=0)
-            distances_split = []
-            for gpu_idx in range(self.num_gpus):
-                with tf.device('/gpu:%d' % gpu_idx):
-                    distances_split.append(batch_pairwise_distances(self._features_batch1, features_split2[gpu_idx]))
-            self._distance_block = tf.concat(distances_split, axis=1)
+    def precision_and_recall(self, subject):
+        '''
+        Compute precision and recall for given subject
+        reference should be precomputed by IPR.compute_manifold_ref()
+        args:
+            subject: path or images
+                path: a directory containing images or precalculated .npz file
+                images: torch.Tensor of N x C x H x W
+        returns:
+            PrecisionAndRecall
+        '''
+        assert self.manifold_ref is not None, "call IPR.compute_manifold_ref() first"
 
-    def pairwise_distances(self, U, V):
-        """Evaluate pairwise distances between two batches of feature vectors."""
-        return self._distance_block.eval(feed_dict={self._features_batch1: U, self._features_batch2: V})
+        manifold_subject = self.compute_manifold(subject)
+        precision = compute_metric(self.manifold_ref, manifold_subject.features, 'computing precision...')
+        recall = compute_metric(manifold_subject, self.manifold_ref.features, 'computing recall...')
+        return PrecisionAndRecall(precision, recall)
 
-#----------------------------------------------------------------------------
+    def compute_manifold_ref(self, path):
+        self.manifold_ref = self.compute_manifold(path)
 
-class ManifoldEstimator():
-    """Estimates the manifold of given feature vectors."""
+    def compute_manifold(self, feats):
+        distances = compute_pairwise_distances(feats)
+        radii = distances2radii(distances, k=self.k)
+        return Manifold(feats, radii)
 
-    def __init__(self, distance_block, features, row_batch_size=25000, col_batch_size=50000,
-                 nhood_sizes=[3], clamp_to_percentile=None, eps=1e-5):
-        """Estimate the manifold of given feature vectors.
-        
-            Args:
-                distance_block: DistanceBlock object that distributes pairwise distance
-                    calculation to multiple GPUs.
-                features (np.array/tf.Tensor): Matrix of feature vectors to estimate their manifold.
-                row_batch_size (int): Row batch size to compute pairwise distances
-                    (parameter to trade-off between memory usage and performance).
-                col_batch_size (int): Column batch size to compute pairwise distances.
-                nhood_sizes (list): Number of neighbors used to estimate the manifold.
-                clamp_to_percentile (float): Prune hyperspheres that have radius larger than
-                    the given percentile.
-                eps (float): Small number for numerical stability.
-        """
-        num_images = features.shape[0]
-        self.nhood_sizes = nhood_sizes
-        self.num_nhoods = len(nhood_sizes)
-        self.eps = eps
-        self.row_batch_size = row_batch_size
-        self.col_batch_size = col_batch_size
-        self._ref_features = features
-        self._distance_block = distance_block
+def compute_pairwise_distances(X, Y=None):
+    '''
+    args:
+        X: np.array of shape N x dim
+        Y: np.array of shape N x dim
+    returns:
+        N x N symmetric np.array
+    '''
+    num_X = X.shape[0]
+    if Y is None:
+        num_Y = num_X
+    else:
+        num_Y = Y.shape[0]
+    X = X.astype(np.float64)  # to prevent underflow
+    X_norm_square = np.sum(X**2, axis=1, keepdims=True)
+    if Y is None:
+        Y_norm_square = X_norm_square
+    else:
+        Y_norm_square = np.sum(Y**2, axis=1, keepdims=True)
+    X_square = np.repeat(X_norm_square, num_Y, axis=1)
+    Y_square = np.repeat(Y_norm_square.T, num_X, axis=0)
+    if Y is None:
+        Y = X
+    XY = np.dot(X, Y.T)
+    diff_square = X_square - 2*XY + Y_square
 
-        # Estimate manifold of features by calculating distances to k-NN of each sample.
-        self.D = np.zeros([num_images, self.num_nhoods], dtype=np.float32)
-        distance_batch = np.zeros([row_batch_size, num_images], dtype=np.float32)
-        seq = np.arange(max(self.nhood_sizes) + 1, dtype=np.int32)
+    # check negative distance
+    min_diff_square = diff_square.min()
+    if min_diff_square < 0:
+        idx = diff_square < 0
+        diff_square[idx] = 0
+        print('WARNING: %d negative diff_squares found and set to zero, min_diff_square=' % idx.sum(),
+              min_diff_square)
 
-        for begin1 in range(0, num_images, row_batch_size):
-            end1 = min(begin1 + row_batch_size, num_images)
-            row_batch = features[begin1:end1]
+    distances = np.sqrt(diff_square)
+    return distances
 
-            for begin2 in range(0, num_images, col_batch_size):
-                end2 = min(begin2 + col_batch_size, num_images)
-                col_batch = features[begin2:end2]
+def distances2radii(distances, k=3):
+    num_features = distances.shape[0]
+    radii = np.zeros(num_features)
+    for i in range(num_features):
+        radii[i] = get_kth_value(distances[i], k=k)
+    return radii
 
-                # Compute distances between batches.
-                distance_batch[0:end1-begin1, begin2:end2] = self._distance_block.pairwise_distances(row_batch, col_batch)
-    
-            # Find the k-nearest neighbor from the current batch.
-            self.D[begin1:end1, :] = np.partition(distance_batch[0:end1-begin1, :], seq, axis=1)[:, self.nhood_sizes]
+def compute_metric(manifold_ref, feats_subject, desc=''):
+    num_subjects = feats_subject.shape[0]
+    count = 0
+    dist = compute_pairwise_distances(manifold_ref.features, feats_subject)
+    for i in trange(num_subjects, desc=desc):
+        count += (dist[:, i] < manifold_ref.radii).any()
+    return count / num_subjects
 
-        if clamp_to_percentile is not None:
-            max_distances = np.percentile(self.D, clamp_to_percentile, axis=0)
-            self.D[self.D > max_distances] = 0
-
-    def evaluate(self, eval_features, return_realism=False, return_neighbors=False):
-        """Evaluate if new feature vectors are at the manifold."""
-        num_eval_images = eval_features.shape[0]
-        num_ref_images = self.D.shape[0]
-        distance_batch = np.zeros([self.row_batch_size, num_ref_images], dtype=np.float32)
-        batch_predictions = np.zeros([num_eval_images, self.num_nhoods], dtype=np.int32)
-        max_realism_score = np.zeros([num_eval_images,], dtype=np.float32)
-        nearest_indices = np.zeros([num_eval_images,], dtype=np.int32)
-
-        for begin1 in range(0, num_eval_images, self.row_batch_size):
-            end1 = min(begin1 + self.row_batch_size, num_eval_images)
-            feature_batch = eval_features[begin1:end1]
-
-            for begin2 in range(0, num_ref_images, self.col_batch_size):
-                end2 = min(begin2 + self.col_batch_size, num_ref_images)
-                ref_batch = self._ref_features[begin2:end2]
-
-                distance_batch[0:end1-begin1, begin2:end2] = self._distance_block.pairwise_distances(feature_batch, ref_batch)
-
-            # From the minibatch of new feature vectors, determine if they are in the estimated manifold.
-            # If a feature vector is inside a hypersphere of some reference sample, then
-            # the new sample lies at the estimated manifold.
-            # The radii of the hyperspheres are determined from distances of neighborhood size k.
-            samples_in_manifold = distance_batch[0:end1-begin1, :, None] <= self.D
-            batch_predictions[begin1:end1] = np.any(samples_in_manifold, axis=1).astype(np.int32)
-
-            max_realism_score[begin1:end1] = np.max(self.D[:, 0] / (distance_batch[0:end1-begin1, :] + self.eps), axis=1)
-            nearest_indices[begin1:end1] = np.argmin(distance_batch[0:end1-begin1, :], axis=1)
-
-        if return_realism and return_neighbors:
-            return batch_predictions, max_realism_score, nearest_indices
-        elif return_realism:
-            return batch_predictions, max_realism_score
-        elif return_neighbors:
-            return batch_predictions, nearest_indices
-
-        return batch_predictions
-
-#----------------------------------------------------------------------------
-
-def knn_precision_recall_features(ref_features, eval_features, nhood_sizes=[3],
-                                  row_batch_size=10000, col_batch_size=50000, num_gpus=1):
-    """Calculates k-NN precision and recall for two sets of feature vectors.
-    
-        Args:
-            ref_features (np.array/tf.Tensor): Feature vectors of reference images.
-            eval_features (np.array/tf.Tensor): Feature vectors of generated images.
-            nhood_sizes (list): Number of neighbors used to estimate the manifold.
-            row_batch_size (int): Row batch size to compute pairwise distances
-                (parameter to trade-off between memory usage and performance).
-            col_batch_size (int): Column batch size to compute pairwise distances.
-            num_gpus (int): Number of GPUs used to evaluate precision and recall.
-
-        Returns:
-            State (dict): Dict that contains precision and recall calculated from
-            ref_features and eval_features.
-    """
-    state = dict()
-    num_images = ref_features.shape[0]
-    num_features = ref_features.shape[1]
-
-    # Initialize DistanceBlock and ManifoldEstimators.
-    distance_block = DistanceBlock(num_features, num_gpus)
-    ref_manifold = ManifoldEstimator(distance_block, ref_features, row_batch_size, col_batch_size, nhood_sizes) 
-    eval_manifold = ManifoldEstimator(distance_block, eval_features, row_batch_size, col_batch_size, nhood_sizes)
-
-    # Evaluate precision and recall using k-nearest neighbors.
-    print('Evaluating k-NN precision and recall with %i samples...' % num_images)
-    start = time()
-
-    # Precision: How many points from eval_features are in ref_features manifold.
-    precision = ref_manifold.evaluate(eval_features)
-    state['precision'] = precision.mean(axis=0)
-
-    # Recall: How many points from ref_features are in eval_features manifold.
-    recall = eval_manifold.evaluate(ref_features)
-    state['recall'] = recall.mean(axis=0)
-
-    print('Evaluated k-NN precision and recall in: %gs' % (time() - start))
-
-    return state
+def get_kth_value(np_array, k):
+    kprime = k+1  # kth NN should be (k+1)th because closest one is itself
+    idx = np.argpartition(np_array, kprime)
+    k_smallests = np_array[idx[:kprime]]
+    kth_value = k_smallests.max()
+    return kth_value
 
 
 # the next functions are taken from https://github.com/clovaai/generative-evaluation-prdc/blob/master/prdc/prdc.py

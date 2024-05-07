@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,7 +34,11 @@ def main(real_path, generated_path):
     plt.ylabel('Correlation Coefficient')
     plt.title('Volatility Clustering/Long Range Dependence')
     plt.legend()
-
+    file_name = "corr_coef_lag.pdf"
+    generated_path = os.path.dirname(generated_path)
+    file_path = os.path.join(generated_path, file_name)
+    plt.savefig(file_path)
+    plt.close()
     #plt.show()
 
 if __name__ == '__main__':

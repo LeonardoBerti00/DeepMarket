@@ -45,24 +45,21 @@ def plot_data(tsna2d, tsna2d_, generated_path):
     # Plot tsna2d_ in blue
     plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='tab:blue', label='real', alpha=0.1, s=10)
 
-    x_min = min(np.min(tsna2d[:, 0])-1, np.min(tsna2d_[:, 0])-1)
-    x_max = max(np.max(tsna2d[:, 0])+1, np.max(tsna2d_[:, 0])+1)
-    y_min = min(np.min(tsna2d[:, 1])-1, np.min(tsna2d_[:, 1])-1)
-    y_max = max(np.max(tsna2d[:, 1])+1, np.max(tsna2d_[:, 1])+1)
+    x_min = min(np.min(tsna2d[:, 0])-20, np.min(tsna2d_[:, 0])-20)+1
+    x_max = max(np.max(tsna2d[:, 0])+20, np.max(tsna2d_[:, 0])+20)
+    y_min = min(np.min(tsna2d[:, 1])-20, np.min(tsna2d_[:, 1])-20)+1
+    y_max = max(np.max(tsna2d[:, 1])+20, np.max(tsna2d_[:, 1])+20)
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
 
     # Add legend and title
     plt.legend()
-    file_name = "TSNA_plot.pdf"
+    file_name = "TSNE_plot.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
-    plt.title('TSNA2D Plot')
-
-    # Show the plot
-    #plt.show()
-
+    plt.title('t-SNE Plot')
+    plt.close()
 
 
 def main(real_path, generated_path):

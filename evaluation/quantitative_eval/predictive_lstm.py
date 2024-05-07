@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import torch
 from torch import nn
@@ -7,7 +8,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from utils.utils import calculate_ftsd, plot, compute_prd_from_embedding, knn_precision_recall_features, compute_prdc
+from utils.utils import calculate_ftsd, plot, compute_prd_from_embedding, compute_prdc, IPR
 
 # given real data and generated data
 # train a lstm with real data, train a lstm with generated data
@@ -76,9 +77,9 @@ class LSTMModel(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device, non_blocking=True)
-        ht, _ = self.lstm(x, (h0, c0))  
-        out = self.fc(ht[:, -1, :])
-        return out, ht[:, -1, :]
+        out, (h, c) = self.lstm(x, (h0, c0))  
+        out = self.fc(out[:, -1, :])
+        return out, c[-1, :, :]
 
 
 class Trainer:
@@ -137,7 +138,7 @@ def main(real_data_path, generated_data_path):
     df_g["Time"] = df_g['Unnamed: 0'].str.slice(11, 19)
     df_g = df_g.query("Time >= '09:45:00'")
     df_g = df_g.drop(['Time'], axis=1)
-
+    
     # undersampling on the real dataset
     if len(df_r) > len(df_g):
         n_remove = len(df_r) - len(df_g)
@@ -147,7 +148,7 @@ def main(real_data_path, generated_data_path):
         n_remove = len(df_g) - len(df_r)
         drop_indices = np.random.choice(df_g.index, n_remove, replace=False)
         df_g = df_g.drop(drop_indices)
-
+    
     df_r = Preprocessor(df_r).preprocess()
     df_g = Preprocessor(df_g).preprocess()
 
@@ -178,7 +179,8 @@ def main(real_data_path, generated_data_path):
     ############ TEST "real" lstm on "real" test set ############
 
     # Assuming df is already preprocessed
-    features_r = df_r.drop('MID_PRICE', axis=1).values
+    #drop from the dataframse bid price and ask price
+    features_r = df_r.values
     labels_r = df_r['MID_PRICE'].values
 
     # Split the data into training and test sets
@@ -207,12 +209,12 @@ def main(real_data_path, generated_data_path):
     ############ TEST "generated" lstm on "real" test set ############
 
     # Assuming df is already preprocessed
-    features_g = df_g.drop('MID_PRICE', axis=1).values
+    features_g = df_g.values
     labels_g = df_g['MID_PRICE'].values
 
     # Split the data into training and test sets
     train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
-    train_X_g = train_X_g[:, :11]
+    train_X_g = np.concatenate([train_X_g[:, :8], train_X_g[:, -4:]], axis=1)
     # Convert to PyTorch tensors
     train_X_g = torch.tensor(train_X_g, dtype=torch.float32).to(device, non_blocking=True)
     train_y_g = torch.tensor(train_y_g, dtype=torch.float32).to(device, non_blocking=True)
@@ -229,13 +231,17 @@ def main(real_data_path, generated_data_path):
     trainer_g.test()
     
     #compute FTSD
-    hidden_states_r = np.array(trainer_r.hidden_states)
-    hidden_states_g = np.array(trainer_g.hidden_states)
-    hidden_states_r = hidden_states_r.reshape(hidden_states_r.shape[0]*hidden_states_r.shape[1], hidden_states_r.shape[2])
-    hidden_states_g = hidden_states_g.reshape(hidden_states_g.shape[0]*hidden_states_g.shape[1], hidden_states_g.shape[2])
+    hidden_states_r = np.concatenate(trainer_r.hidden_states)
+    hidden_states_g = np.concatenate(trainer_g.hidden_states)
+    hidden_states_r = hidden_states_r[:hidden_states_g.shape[0]]
     print("FTSD: ", calculate_ftsd(hidden_states_r, hidden_states_g))
-    plot(compute_prd_from_embedding(hidden_states_g, hidden_states_r), "PRD")
-    print("Improved Precision and Recall: ", knn_precision_recall_features(hidden_states_r, hidden_states_g))
+    dir_path = os.path.dirname(generated_data_path)
+    out_path = os.path.join(dir_path, "prd.pdf")
+    plot(compute_prd_from_embedding(hidden_states_g, hidden_states_r), out_path=out_path)
+    ipr = IPR(num_samples=hidden_states_g.shape[0])
+    ipr.compute_manifold_ref(hidden_states_r)
+    precision, recall = ipr.precision_and_recall(hidden_states_g)
+    print(f"Improved Precision {precision} and Recall {recall}")
     print("PRDC: ", compute_prdc(hidden_states_r, hidden_states_g, nearest_k=5))
     
     
