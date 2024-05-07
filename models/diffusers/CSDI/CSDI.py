@@ -59,7 +59,6 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
     def forward(self, x_T: torch.Tensor, context: Dict[str, torch.Tensor]):
         #print(context)
         assert 'cond_orders_aug' in context
-        assert 'cond_augmenter' in context
         
         cond = context['cond_orders_aug']
         noise_true = context['noise_true']

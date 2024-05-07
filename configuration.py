@@ -13,13 +13,13 @@ class Configuration:
         self.IS_DEBUG = False
 
         # evaluation
-        self.QUANT_METRICS = True # to activate the predictive and discriminative evaluation
+        self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
-        self.PLOT_GRAPHS = False #to activate the plot of the graphs
+        self.PLOT_GRAPHS = True #to activate the plot of the graphs
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = True
+        self.IS_AUGMENTATION = False
 
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
@@ -43,7 +43,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.957_epoch=0_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 

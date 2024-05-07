@@ -57,7 +57,7 @@ def plot_graphs(real_data_path, gen_data_path):
 
 def predictive_discriminative_scores(real_data_path, gen_data_path):
     predictive_lstm.main(real_data_path, gen_data_path)
-    discriminative_lstm.main(real_data_path, gen_data_path)
+    #discriminative_lstm.main(real_data_path, gen_data_path)
 
 
 if __name__ == "__main__":

@@ -33,11 +33,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.cond_method = config.COND_METHOD
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
-            self.cond_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
         else:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
-            self.cond_size = config.COND_SIZE
         self.NN = CDT(
             self.input_size,
             self.cond_seq_size,
@@ -67,8 +65,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas)
             / (1.0 - self.alphas_cumprod)
         )
-        # if we use concatenation or crossattention, we need to use the feature augmentation or cond type full
-        assert config.COND_TYPE == 'only_event' or self.IS_AUGMENTATION or self.type == 'adaln_zero'
+        
 
 
     def forward(self, x_t_aug: torch.Tensor, context: Dict):

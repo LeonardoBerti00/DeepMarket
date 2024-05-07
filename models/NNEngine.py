@@ -68,8 +68,8 @@ class NNEngine(L.LightningModule):
             #print(self.type_embedder.weight.data)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             #self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888],  [ 0.8249,  0.5847,  0.1448],  [ 2.5600, -1.3847,  1.1294]], device=cst.DEVICE, dtype=torch.float32)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888],  [ 0.8249,  0.5847,  0.1448],  [ 1.7600, -1.3847,  1.1294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -121,7 +121,6 @@ class NNEngine(L.LightningModule):
                 'cond_lob_aug': cond_lob,
                 'weights': self.sampler.weights(),
                 'cond_type': self.cond_type,
-                'cond_augmenter': self.feature_augmenter
             })
 
             x_t, reverse_context = self.diffuser(x_t, context)
@@ -146,7 +145,6 @@ class NNEngine(L.LightningModule):
             'cond_lob_aug': cond_lob,
             'weights': self.sampler.weights(),
             'cond_type': self.cond_type,
-            'cond_augmenter': self.feature_augmenter
         })
 
         x_recon, reverse_context = self.diffuser(x_t, context)
@@ -158,10 +156,10 @@ class NNEngine(L.LightningModule):
     def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
         if self.IS_AUGMENTATION:
             full_input = torch.cat([cond_orders, x_t], dim=1)
-            full_input_aug, cond_lob_aug = self.feature_augmenter.augment(full_input, cond_lob)
+            full_input_aug, cond_lob = self.feature_augmenter.augment(full_input, cond_lob)
             cond_orders = full_input_aug[:, :self.cond_seq_size, :]
             x_t = full_input_aug[:, self.cond_seq_size:, :]
-        return x_t, cond_orders, cond_lob_aug
+        return x_t, cond_orders, cond_lob
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
