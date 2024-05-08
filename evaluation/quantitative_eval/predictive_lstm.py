@@ -232,7 +232,7 @@ def main(real_data_path, generated_data_path):
     trainer_g = Trainer(model=model_g, train_loader=train_loader_g, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
     trainer_g.train(epochs=100)
     trainer_g.test()
-    
+    '''
     #compute FTSD
     hidden_states_r = np.concatenate(trainer_r.hidden_states)
     hidden_states_g = np.concatenate(trainer_g.hidden_states)
@@ -246,7 +246,7 @@ def main(real_data_path, generated_data_path):
     precision, recall = ipr.precision_and_recall(hidden_states_g)
     print(f"Improved Precision {precision} and Recall {recall}")
     print("PRDC: ", compute_prdc(hidden_states_r, hidden_states_g, nearest_k=5))
-    
+    '''
     
     ################## Train with both real and generated data ##################
     print("\n Predictive Score Real and Generated data:")

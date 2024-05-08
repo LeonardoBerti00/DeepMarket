@@ -66,9 +66,9 @@ class NNEngine(L.LightningModule):
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
             #print(self.type_embedder.weight.data)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             #self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
-            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888],  [ 0.8249,  0.5847,  0.1448],  [ 1.7600, -1.3847,  1.1294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
@@ -211,12 +211,10 @@ class NNEngine(L.LightningModule):
         #check if all the parameters layers are training successfully
         print(self.feature_augmenter.fwd_cond_lob[0].weight.grad)
         print(self.feature_augmenter.fwd_cond_lob[0].weight.sum())
-        print(self.diffuser.NN.fc_noise.weight.grad)
-        print(self.diffuser.NN.fc_noise.weight.sum())
-        print(self.diffuser.NN.fc_var.weight.grad)
-        print(self.diffuser.NN.fc_var.weight.sum())
-        print(self.diffuser.NN.layers.layers[0].to_q.weight.grad)
-        print(self.diffuser.NN.layers.layers[0].to_q.weight.sum())
+        print(self.diffuser.diffuser.input_projection.weight.grad)
+        print(self.diffuser.diffuser.input_projection.weight.sum())
+        print(self.diffuser.diffuser.output_projection1.weight.grad)
+        print(self.diffuser.diffuser.output_projection1.weight.sum())
         '''
         self.ema.update()
         return batch_loss_mean

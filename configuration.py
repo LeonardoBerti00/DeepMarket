@@ -7,7 +7,7 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = False
+        self.IS_WANDB = True
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
@@ -15,16 +15,16 @@ class Configuration:
         # evaluation
         self.QUANT_METRICS = False # to activate the predictive and discriminative evaluation
 
-        self.PLOT_GRAPHS = True #to activate the plot of the graphs
+        self.PLOT_GRAPHS = False #to activate the plot of the graphs
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = False
+        self.IS_AUGMENTATION = True
 
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_MODEL = cst.Models.CSDI
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         
@@ -33,7 +33,7 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.CHOSEN_STOCK = cst.Stocks.INTC
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -42,8 +42,8 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
-        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
+        self.REAL_DATA_PATH = "ABIDES/log/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
+        self.GEN_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_12-00-00_val_ema=0.811_epoch=3_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256_augment_dim_64_CDT_depth_8__diffsteps_100/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -53,7 +53,7 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 128        #it's the sequencce length
+        self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0

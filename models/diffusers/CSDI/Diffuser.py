@@ -24,7 +24,6 @@ class CSDIEpsilon(nn.Module):
             embedding_dim=self.embedding_dim,
         )
         
-
         self.input_projection = Conv1d_with_init(input_dim, self.channels, 1)
         self.output_projection1 = Conv1d_with_init(self.channels, self.channels, 1)
         self.output_projection2 = Conv1d_with_init(self.channels, 1, 1)

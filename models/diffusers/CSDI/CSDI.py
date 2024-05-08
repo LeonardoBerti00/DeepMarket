@@ -105,8 +105,9 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         x_T = x_T.squeeze(-1)
         # Compute x_{t-1} from x_t through the reverse diffusion process for the current time step
         x_recon = 1 / torch.sqrt(alpha_t) * (input_orig - (beta_t / torch.sqrt(1 - alpha_cumprod_t) * noise_t)) + (std_t * z)
-        residual = torch.norm(noise_t[:, -1, :] - noise_true[:, -1, :], p=2, dim=1)
-        self.mse_losses.append(residual)
+        target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
+        residual = ((noise_t - noise_true) * target_mask)**2
+        self.mse_losses.append(torch.sum(residual, axis=(1, 2)) / noise_t.shape[2])
         return x_recon, context
 
     def time_embedding(self, pos: torch.Tensor, d_model=128):
