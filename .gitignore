@@ -2,7 +2,6 @@ __pycache__
 data/reconstructions
 data/TSLA
 data/INTC
-data/checkpoints
 data/plot
 lightning_logs/
 data/generated_orders.csv
