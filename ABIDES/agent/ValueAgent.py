@@ -55,11 +55,10 @@ class ValueAgent(TradingAgent):
     def kernelStopping(self):
         # Always call parent method to be safe.
         super().kernelStopping()
-
+        return 
         # Print end of day valuation.
         H = int(round(self.getHoldings(self.symbol), -2) / 100)
         # May request real fundamental value from oracle as part of final cleanup/stats.
-        return 
         #marked to fundamental
         rT = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=0, random_state=self.random_state)
 
@@ -194,7 +193,6 @@ class ValueAgent(TradingAgent):
         #estimate final value of the fundamental price
         #used for surplus calculation
         r_T = self.updateEstimates()
-
         bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)
 
         if bid and ask:

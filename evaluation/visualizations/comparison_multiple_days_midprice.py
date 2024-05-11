@@ -11,6 +11,11 @@ def main(days_paths):
 
     for path in days_paths:
         df = pd.read_csv(path)
+        df = df.query("ask_price_1 < 9999999")
+        df = df.query("bid_price_1 < 9999999")
+        df = df.query("ask_price_1 > -9999999")
+        df = df.query("bid_price_1 > -9999999")
+
         df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
 
         mid_price = np.array(df['MID_PRICE']).reshape(-1, 1)

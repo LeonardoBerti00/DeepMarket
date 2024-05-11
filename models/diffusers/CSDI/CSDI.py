@@ -108,7 +108,7 @@ class CSDIDiffuser(nn.Module, DiffusionAB):
         target_mask = torch.ones(cond_mask.shape, device=cst.DEVICE) - cond_mask
         residual = ((noise_t - noise_true) * target_mask)**2
         self.mse_losses.append(torch.sum(residual, axis=(1, 2)) / noise_t.shape[2])
-        return x_recon, context
+        return x_recon[:, -1:, :], context
 
     def time_embedding(self, pos: torch.Tensor, d_model=128):
         """

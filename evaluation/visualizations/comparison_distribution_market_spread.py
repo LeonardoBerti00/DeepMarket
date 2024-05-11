@@ -21,6 +21,10 @@ def main(real_path, generated_path, IS_REAL):
     else:
         df = pd.read_csv(generated_path, header=0)
 
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
 
     # rename 'Unnamed: 0' con TIME
     df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
@@ -77,6 +81,8 @@ def main(real_path, generated_path, IS_REAL):
     plt.savefig(file_path)
     #plt.show()
     plt.close()
+    
+    
 
 if __name__ == '__main__':
     main()

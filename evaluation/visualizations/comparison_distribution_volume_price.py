@@ -6,14 +6,22 @@ import os
 
 def main(real_path, generated_path):
     df1 = pd.read_csv(generated_path)
+    df1 = df1.query("ask_price_1 < 9999999")
+    df1 = df1.query("bid_price_1 < 9999999")
+    df1 = df1.query("ask_price_1 > -9999999")
+    df1 = df1.query("bid_price_1 > -9999999")
     data1 = df1["ORDER_VOLUME_IMBALANCE"]
 
     df2 = pd.read_csv(real_path)
+    df2 = df2.query("ask_price_1 < 9999999")
+    df2 = df2.query("bid_price_1 < 9999999")
+    df2 = df2.query("ask_price_1 > -9999999")
+    df2 = df2.query("bid_price_1 > -9999999")
     data2 = df2["ORDER_VOLUME_IMBALANCE"]
 
-    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(data1, bw=0.1, color='blue', shade=True, label='Generated')
 
-    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(data2, bw=0.1, color='orange', shade=True, label='Real')
 
     plt.title("Order Volume Imbalance")
     plt.xlabel("Shares")
@@ -31,9 +39,9 @@ def main(real_path, generated_path):
     data1 = df1["SIZE"]
     data2 = df2["SIZE"]
 
-    sns.kdeplot(data1, color='blue', label='Generated')
+    sns.kdeplot(data1, color='blue', shade=True, label='Generated')
 
-    sns.kdeplot(data2, color='orange', label='Real')
+    sns.kdeplot(data2, color='orange', shade=True, label='Real')
 
     plt.title("Order Size")
     xmin = min(data1.min(), data2.min())-1000
@@ -54,9 +62,9 @@ def main(real_path, generated_path):
     data1 = df1["VWAP"]
     data2 = df2["VWAP"]
 
-    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(data1, bw=0.1, color='blue', shade=True, label='Generated')
 
-    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(data2, bw=0.1, color='orange', shade=True, label='Real')
 
     plt.title("VWAP")
     plt.xlabel("Dollar")
@@ -74,9 +82,9 @@ def main(real_path, generated_path):
     data1 = df1["PRICE"]
     data2 = df2["PRICE"]
 
-    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(data1, bw=0.1, color='blue', shade=True,label='Generated')
 
-    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(data2, bw=0.1, color='orange',shade=True, label='Real')
 
     plt.title("Price")
     plt.xlabel("Dollar")
@@ -92,9 +100,9 @@ def main(real_path, generated_path):
     data1 = df1["MID_PRICE"]
     data2 = df2["MID_PRICE"]
 
-    sns.kdeplot(data1, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(data1, bw=0.1, color='blue', shade=True, label='Generated')
 
-    sns.kdeplot(data2, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(data2, bw=0.1, color='orange', shade=True, label='Real')
 
     plt.title("Mid Price")
     plt.xlabel("Dollar")

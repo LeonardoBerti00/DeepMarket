@@ -580,12 +580,12 @@ class TradingAgent(FinancialAgent):
     cash = holdings['CASH']
     
     cash += self.basket_size * self.nav_diff
-    if self.last_trade[symbol] is None:
-      self.logEvent('MARKED_TO_MARKET', cash)
-      return cash
+    
     for symbol, shares in holdings.items():
       if symbol == 'CASH': continue
-
+      if self.last_trade[symbol] is None:
+        self.logEvent('MARKED_TO_MARKET', cash)
+        return cash
       if use_midpoint:
         bid, ask, midpoint = self.getKnownBidAskMidpoint(symbol)
         if bid is None or ask is None or midpoint is None:

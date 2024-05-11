@@ -12,8 +12,12 @@ def load_and_compute_log_returns(file_path):
     df.rename(columns={'Unnamed: 0': 'time'}, inplace=True)
     df['time'] = pd.to_datetime(df['time'])
     df['minute'] = df['time'].dt.floor('T')
-    df = df.groupby('minute')['PRICE'].first().reset_index()
-    df['log_return'] = np.log(df['PRICE'] / df['PRICE'].shift(1))
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
+    df = df.groupby('minute')['mid_price'].first().reset_index()
+    df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(1))
     df.dropna(inplace=True)
     return df['log_return']
 
@@ -22,8 +26,12 @@ def load_and_compute_volatility(df, i):
     df['time'] = pd.to_datetime(df['time'])
     df['minute'] = df['time'].dt.floor('T')
     df['second'] = df['time'].dt.second
-    df = df.groupby(['minute', 'second'])['PRICE'].first().reset_index()
-    df['log_return'] = np.log(df['PRICE'] / df['PRICE'].shift(i))
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
+    df = df.groupby(['minute', 'second'])['mid_price'].first().reset_index()
+    df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(i))
     #take the indexes of the nan values
     std_dev = df['log_return'].rolling(window=100).std().reset_index(drop=True)
     nan_indexes = std_dev[std_dev.isna()].index
@@ -45,8 +53,12 @@ def load_and_compute_returns(df, i):
     df['time'] = pd.to_datetime(df['time'])
     df['minute'] = df['time'].dt.floor('T')
     df['second'] = df['time'].dt.second
-    df = df.groupby(['minute', 'second'])['PRICE'].first().reset_index()
-    df['log_return'] = np.log(df['PRICE'] / df['PRICE'].shift(i))
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
+    df = df.groupby(['minute', 'second'])['mid_price'].first().reset_index()
+    df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(i))
     returns = df['log_return'].rolling(window=100).sum().reset_index(drop=True)
     nan_indexes = returns[returns.isna()].index
     return returns, nan_indexes
@@ -69,7 +81,7 @@ def main(real_path, generated_path):
     plt.plot(range(1, 31, 2), correlations_real, marker='o', linestyle='-', label='Real')
     plt.plot(range(1, 31, 2), correlations_generated, marker='o', linestyle='-', label='Generated')
 
-    plt.xlabel('Lag')
+    plt.xlabel('Lag (minutes)')
     plt.ylabel('Correlation Coefficient')
     plt.title('Log Returns Autocorrelation')
     plt.legend()
@@ -102,9 +114,9 @@ def main(real_path, generated_path):
     
     #print(corr_real_coefs)
     #print(corr_generated_coefs)
-    sns.kdeplot(corr_generated_coefs, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(corr_generated_coefs, bw=0.1, shade=True,  color='blue', label='Generated')
 
-    sns.kdeplot(corr_real_coefs, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(corr_real_coefs, bw=0.1, shade=True,  color='orange', label='Real')
     plt.title("Correlation between volume and volatility")
     plt.xlabel("Correlation")
     plt.ylabel("Density")
@@ -139,9 +151,9 @@ def main(real_path, generated_path):
     
     #print(corr_real_coefs)
     #print(corr_generated_coefs)
-    sns.kdeplot(corr_generated_coefs, bw=0.5, color='blue', label='Generated')
+    sns.kdeplot(corr_generated_coefs, bw=0.1, shade=True, color='blue', label='Generated')
 
-    sns.kdeplot(corr_real_coefs, bw=0.5, color='orange', label='Real')
+    sns.kdeplot(corr_real_coefs, bw=0.1, shade=True, color='orange', label='Real')
     plt.title("Correlation between returns and volatility")
     plt.xlabel("Correlation")
     plt.ylabel("Density")

@@ -25,6 +25,10 @@ def preprocess_data(df):
     #drop the row with inf and nan values
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
     # Standardization on price and size
     df['PRICE'] = (df['PRICE'] - df['PRICE'].mean())/df['PRICE'].std()
     df['SIZE'] = (df['SIZE'] - df['SIZE'].mean())/df['SIZE'].std()

@@ -10,8 +10,12 @@ def main(real_path, generated_path):
         df.rename(columns={'Unnamed: 0': 'time'}, inplace=True)
         df['time'] = pd.to_datetime(df['time'])
         df['minute'] = df['time'].dt.floor('T')
-        df = df.groupby('minute')['PRICE'].first().reset_index()
-        df['log_return'] = np.log(df['PRICE'] / df['PRICE'].shift(1))
+        df = df.query("ask_price_1 < 9999999")
+        df = df.query("bid_price_1 < 9999999")
+        df = df.query("ask_price_1 > -9999999")
+        df = df.query("bid_price_1 > -9999999")
+        df = df.groupby('minute')['mid_price'].first().reset_index()
+        df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(1))
         df.dropna(inplace=True)
         return df['log_return']
 

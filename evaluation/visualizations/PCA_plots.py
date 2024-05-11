@@ -21,6 +21,10 @@ class PCA2D(torch.nn.Module):
 def preprocess_data(df):
 
     df = df[['PRICE', 'SIZE', 'ask_price_1', 'ask_size_1', 'bid_price_1', 'bid_size_1', 'MID_PRICE', 'ORDER_VOLUME_IMBALANCE', 'VWAP', 'SPREAD']]
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
     #drop the row with inf and nan values
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()

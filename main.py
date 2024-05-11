@@ -24,6 +24,7 @@ import evaluation.visualizations.comparison_distribution_log_interarrival_times 
 import evaluation.visualizations.comparison_core_coef_lags as comparison_core_coef_lags
 import evaluation.visualizations.comparison_correlation_coefficient as comparison_correlation_coefficient
 import evaluation.visualizations.comparison_log_return_frequency as comparison_log_return_frequency
+import evaluation.visualizations.comparison_depth as comparison_depth
 
 
 
@@ -38,26 +39,29 @@ def set_torch():
     #print("REMEMBER TO PUT DETECT ANOMALY TO FALSE")
     torch.set_float32_matmul_precision('high')
 
-def plot_graphs(real_data_path, gen_data_path):
-    comparison_distribution_order_type.main(real_data_path, gen_data_path)
-    comparison_distribution_volume_price.main(real_data_path, gen_data_path)
-    comparison_distribution_market_spread.main(real_data_path, gen_data_path, IS_REAL=True)
-    comparison_distribution_market_spread.main(real_data_path, gen_data_path, IS_REAL=False)
-    PCA_plots.main(real_data_path, gen_data_path)
-    comparison_midprice.main(real_data_path, gen_data_path)
-    comparison_multiple_days_midprice.main(days_paths=[real_data_path, gen_data_path])
-    comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=True)
-    comparison_volume_distribution.main(real_data_path, gen_data_path, IS_REAL=False)
-    comparison_distribution_log_interarrival_times.main(real_data_path, gen_data_path)
-    comparison_core_coef_lags.main(real_data_path, gen_data_path)
-    comparison_correlation_coefficient.main(real_data_path, gen_data_path)
-    comparison_log_return_frequency.main(real_data_path, gen_data_path)
-    TSNE_plots.main(real_data_path, gen_data_path)
+def plot_graphs(real_data_path, cdt_data_path, iabs_data_path):
+    #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=True)
+    #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=False)
+    #comparison_depth.main(real_data_path, iabs_data_path, IS_REAL=False)
+    #comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path)
+    comparison_distribution_volume_price.main(real_data_path, cdt_data_path)
+    comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=True)
+    comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=False)
+    PCA_plots.main(real_data_path, cdt_data_path)
+    comparison_midprice.main(real_data_path, cdt_data_path)
+    comparison_multiple_days_midprice.main(days_paths=[real_data_path, cdt_data_path])
+    comparison_volume_distribution.main(real_data_path, cdt_data_path, IS_REAL=True)
+    comparison_volume_distribution.main(real_data_path, cdt_data_path, IS_REAL=False)
+    comparison_distribution_log_interarrival_times.main(real_data_path, cdt_data_path)
+    comparison_core_coef_lags.main(real_data_path, cdt_data_path)
+    comparison_correlation_coefficient.main(real_data_path, cdt_data_path)
+    comparison_log_return_frequency.main(real_data_path, cdt_data_path)
+    TSNE_plots.main(real_data_path, cdt_data_path)
     
 
-def predictive_discriminative_scores(real_data_path, gen_data_path):
-    predictive_lstm.main(real_data_path, gen_data_path)
-    #discriminative_lstm.main(real_data_path, gen_data_path)
+def predictive_discriminative_scores(real_data_path, cdt_data_path):
+    predictive_lstm.main(real_data_path, cdt_data_path)
+    #discriminative_lstm.main(real_data_path, cdt_data_path)
 
 
 if __name__ == "__main__":
@@ -98,11 +102,12 @@ if __name__ == "__main__":
     elif config.IS_TRAINING:
         run(config, accelerator)
 
-    elif config.QUANT_METRICS:
-        predictive_discriminative_scores(config.REAL_DATA_PATH, config.GEN_DATA_PATH)
+    elif config.IS_EVALUATION:
+        plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH)
+        predictive_discriminative_scores(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
+        
 
-    elif config.PLOT_GRAPHS:
-        plot_graphs(config.REAL_DATA_PATH, config.GEN_DATA_PATH)
+        
 
 
 

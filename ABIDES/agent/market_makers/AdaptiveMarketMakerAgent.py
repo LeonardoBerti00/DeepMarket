@@ -266,7 +266,6 @@ class AdaptiveMarketMakerAgent(TradingAgent):
             :type mid: int
 
         """
-
         bid_orders, ask_orders = self.computeOrdersToPlace(mid)
 
         if self.backstop_quantity is not None:

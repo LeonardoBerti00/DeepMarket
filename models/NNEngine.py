@@ -102,6 +102,7 @@ class NNEngine(L.LightningModule):
         self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
         if not self.one_hot_encoding_type:
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
+        x_0 = torch.zeros_like(x_0)
         real_cond_orders = cond_orders.detach().clone()
         if cond_lob is not None:
             real_cond_lob = cond_lob.detach().clone()

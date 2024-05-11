@@ -8,7 +8,17 @@ import os
 def main(real_path, generated_path):
     df1 = pd.read_csv(real_path)
     df2 = pd.read_csv(generated_path)
+    
+    df1 = df1.query("ask_price_1 < 9999999")
+    df1 = df1.query("bid_price_1 < 9999999")
+    df1 = df1.query("ask_price_1 > -9999999")
+    df1 = df1.query("bid_price_1 > -9999999")
 
+    df2 = df2.query("ask_price_1 < 9999999")
+    df2 = df2.query("bid_price_1 < 9999999")
+    df2 = df2.query("ask_price_1 > -9999999")
+    df2 = df2.query("bid_price_1 > -9999999")
+    
     df1.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
     df2.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
 
@@ -55,7 +65,7 @@ def main(real_path, generated_path):
     time_format = dates.DateFormatter('%H:%M')
     plt.gca().xaxis.set_major_formatter(time_format)
     plt.xlabel('Trading Period')
-    plt.ylabel('MID_PRICE')
+    plt.ylabel('Mid Price')
     plt.title('Mid Price comparison')
     plt.legend()
     plt.grid(True)

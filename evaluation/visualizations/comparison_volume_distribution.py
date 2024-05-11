@@ -27,6 +27,10 @@ def main(real_path, generated_path, IS_REAL):
         df = pd.read_csv(real_path, header=0)
     else:
         df = pd.read_csv(generated_path, header=0)
+    df = df.query("ask_price_1 < 9999999")
+    df = df.query("bid_price_1 < 9999999")
+    df = df.query("ask_price_1 > -9999999")
+    df = df.query("bid_price_1 > -9999999")
 
     # rename 'Unnamed: 0' con TIME
     df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)

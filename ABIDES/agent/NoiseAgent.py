@@ -114,7 +114,6 @@ class NoiseAgent(TradingAgent):
     def placeOrder(self):
         #place order in random direction at a mid
         buy_indicator = np.random.randint(0, 1 + 1)
-
         bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)
 
         if buy_indicator and ask:

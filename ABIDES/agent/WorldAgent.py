@@ -66,6 +66,7 @@ class WorldAgent(Agent):
         self.depth_rounding = 0
         self.last_bid_price = 0
         self.last_ask_price = 0
+        self.using_diffusion = using_diffusion
         if using_diffusion:
             self.starting_time_diffusion = '15min'
             #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
@@ -73,7 +74,7 @@ class WorldAgent(Agent):
             #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
             #exit()
         else:
-            self.starting_time_diffusion = '0min'
+            self.starting_time_diffusion = '15min'
         
 
     def kernelStarting(self, startTime):
@@ -101,7 +102,7 @@ class WorldAgent(Agent):
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
         #make a print every 5 minutes
-        if currentTime.minute % 5 == 0 and currentTime.second == 00:
+        if currentTime.minute % 1 == 0 and currentTime.second == 00:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
@@ -133,7 +134,7 @@ class WorldAgent(Agent):
             else:
                 return
 
-        elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
+        elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and self.using_diffusion:
             self.state = 'GENERATING'
             # we generate the first order then the others will be generated everytime we receive the update of the lob
             if self.first_generation:

@@ -49,7 +49,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='11:30:00',
+                    default='12:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -73,6 +73,7 @@ parser.add_argument('--config_help',
 parser.add_argument('-e',
                     '--execution-agents',
                     action='store_true',
+                    default=False,
                     help='Flag to allow the execution agent to trade.')
 parser.add_argument('-p',
                     '--execution-pov',
@@ -258,7 +259,7 @@ agent_count += 1
 
 
 # 2) Noise Agents
-wakeup_time = mkt_open + pd.to_timedelta("00:00:00")
+wakeup_time = mkt_open + pd.to_timedelta("00:14:00")
 num_noise = 5000
 noise_mkt_open = historical_date + pd.to_timedelta("09:00:00")  # These times needed for distribution of arrival times
                                                                 # of Noise Agents

@@ -11,8 +11,12 @@ def main(real_path, generated_path):
         df['time'] = pd.to_datetime(df['time'])
         df['time'] = pd.to_datetime(df['time'])
         df['minute'] = df['time'].dt.floor('T')
-        df = df.groupby('minute')['PRICE'].first().reset_index()
-        df['log_return'] = np.log(df['PRICE'] / df['PRICE'].shift(1))
+        df = df.query("ask_price_1 < 9999999")
+        df = df.query("bid_price_1 < 9999999")
+        df = df.query("ask_price_1 > -9999999")
+        df = df.query("bid_price_1 > -9999999")
+        df = df.groupby('minute')['mid_price'].first().reset_index()
+        df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(1))
         df['rolling_corr'] = df['log_return'].rolling(window=window).corr(df['log_return'].shift(lag))
         return df['rolling_corr'].dropna()
 
@@ -27,7 +31,7 @@ def main(real_path, generated_path):
 
     plt.xlabel('Correlation Coefficient')
     plt.ylabel('Frequency')
-    plt.title('Rolling Correlation Coefficient Distribution')
+    plt.title('Correlation Coefficient Log Returns Distribution')
 
     plt.legend()
     file_name = "corr_coef.pdf"
