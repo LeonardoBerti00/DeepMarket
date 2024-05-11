@@ -3,6 +3,7 @@ data/reconstructions
 data/TSLA
 data/INTC
 data/plot
+data/checkpoints
 lightning_logs/
 data/generated_orders.csv
 data/real_orders.csv

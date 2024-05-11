@@ -30,7 +30,7 @@ class CDT(nn.Module):
         elif cond_method == 'concatenation' and cond_type == 'full' and not is_augmented:
             output_size = input_size
             input_size = input_size + cst.N_LOB_LEVELS * cst.LEN_LEVEL
-        elif cond_method == 'crossattention':
+        else:
             output_size = input_size
         self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len
@@ -38,8 +38,8 @@ class CDT(nn.Module):
         self.is_augmented = is_augmented
         self.cond_method = cond_method
         self.cond_type = cond_type
-        #self.layers = TransformerEncoder(num_heads, input_size, depth, dropout, cond_type, cond_method)
-        self.layers = nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout)
+        self.layers = TransformerEncoder(num_heads, input_size, depth, dropout, cond_type, cond_method)
+        #self.layers = nn.LSTM(input_size, input_size, 2, batch_first=True, dropout=dropout)
         self.fc_noise = nn.Linear(input_size*self.seq_size, output_size, device=cst.DEVICE)
         self.fc_var = nn.Linear(input_size*self.seq_size, output_size, device=cst.DEVICE)
         self.layer_norm = nn.LayerNorm(input_size)
@@ -59,7 +59,7 @@ class CDT(nn.Module):
         diff_time_emb = self.t_embedder[t]
         full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
         full_input = self.layer_norm(full_input)
-        full_input, _ = self.layers(full_input)#, mask=None, cond=cond_lob) 
+        full_input = self.layers(full_input)#, mask=None, cond=cond_lob) 
         full_input = rearrange(full_input, 'n l f -> n (l f)')
         noise = self.fc_noise(full_input)
         var = self.fc_var(full_input)

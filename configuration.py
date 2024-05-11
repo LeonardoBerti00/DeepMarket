@@ -24,7 +24,7 @@ class Configuration:
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CSDI
+        self.CHOSEN_MODEL = cst.Models.CDT
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         
@@ -33,7 +33,7 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
 
-        self.CHOSEN_STOCK = cst.Stocks.INTC
+        self.CHOSEN_STOCK = cst.Stocks.TSLA
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -83,7 +83,7 @@ class Configuration:
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
         self.COND_METHOD = "concatenation"
-        self.COND_TYPE = "full"  # it can be full or only_event or only_lob
+        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":
