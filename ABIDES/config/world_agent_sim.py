@@ -60,7 +60,7 @@ parser.add_argument('--config_help',
 # Execution agent config
 parser.add_argument('-e',
                     '--execution-agents',
-                    action='store_true',
+                    type=bool,
                     default=False,
                     help='Flag to allow the execution agent to trade.')
 parser.add_argument('-m',
@@ -239,7 +239,7 @@ trade_pov = True if args.execution_agents else False
 
 #### Participation of Volume Agent parameters
 # POV agent start one hour after market open and ends 30 minutes after 
-pov_agent_start_time = mkt_open + pd.to_timedelta('0:30:00')
+pov_agent_start_time = mkt_open + pd.to_timedelta('0:15:00')
 pov_agent_end_time = mkt_open + pd.to_timedelta('01:00:00')
 pov_proportion_of_volume = args.execution_pov
 pov_quantity = 1e5

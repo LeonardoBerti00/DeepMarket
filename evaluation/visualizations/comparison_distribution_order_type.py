@@ -39,10 +39,10 @@ def main(real_path, cdt_path, iabs_path):
     plt.ylabel("Percentage")
     plt.xticks(ind + bar_width, df_combined['Features values'])
     plt.legend()
-
-    file_name = "order_type.pdf"
-    generated_path = os.path.dirname(cdt_path)
-    file_path = os.path.join(generated_path, file_name)
+    simulated_day = real_path.split('/')[-2].split('_')[3]
+    dir_path = os.path.dirname(cdt_path)
+    file_name = f"corr_type_join.pdf"
+    file_path = os.path.join(dir_path, file_name)
     #print(file_path)
     plt.savefig(file_path)
     #plt.show()

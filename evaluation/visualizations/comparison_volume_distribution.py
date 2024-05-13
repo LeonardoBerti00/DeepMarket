@@ -41,7 +41,8 @@ def main(real_path, generated_path, IS_REAL):
     df_['TIME'] = pd.to_datetime(df_['TIME'])
     df_['TIME'] = df_['TIME'].dt.strftime('%d-%m-%Y %H:%M:%S')
 
-    df_grouped = df.groupby(df.index // 500).agg({'TIME': 'first', 'ask_size_1': ['mean','std'], 'bid_size_1': ['mean','std']})
+    dividend = df.shape[0] // 100
+    df_grouped = df.groupby(df.index // dividend).agg({'TIME': 'first', 'ask_size_1': ['mean','std'], 'bid_size_1': ['mean','std']})
 
     df_grouped.columns = ['TIME', 'asksize1_mean', 'asksize1_std', 'bidsize1_mean', 'bidsize1_std']
 
@@ -73,10 +74,19 @@ def main(real_path, generated_path, IS_REAL):
 
     plt.xlabel('Time')
     plt.ylabel('Volume at 1st level')
+    
     if IS_REAL:
         plt.title('Real Data')
     else:
-        plt.title('Generated Data')
+        if "IABS" in generated_path:
+            title = "Volume IABS simulation"
+        elif "CDT" in generated_path:
+            title = "Volume CDT simulation"
+        elif "GAN" in generated_path:
+            title = "Volume CGAN simulation"
+        else:
+            title = "Volume CDT simulation"
+        plt.title(title)
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 

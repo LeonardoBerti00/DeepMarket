@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def main(real_path, generated_path):
+def main(real_path, cdt_path, iabs_path):
     def load_and_compute_correlation(file_path, window=30, lag=1):
         df = pd.read_csv(file_path)
         df.rename(columns={'Unnamed: 0': 'time'}, inplace=True)
@@ -15,28 +15,39 @@ def main(real_path, generated_path):
         df = df.query("bid_price_1 < 9999999")
         df = df.query("ask_price_1 > -9999999")
         df = df.query("bid_price_1 > -9999999")
-        df = df.groupby('minute')['mid_price'].first().reset_index()
-        df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(1))
+        df = df.groupby('minute')['MID_PRICE'].first().reset_index()
+        df['log_return'] = np.log(df['MID_PRICE'] / df['MID_PRICE'].shift(1))
         df['rolling_corr'] = df['log_return'].rolling(window=window).corr(df['log_return'].shift(lag))
         return df['rolling_corr'].dropna()
 
     correlation_real = load_and_compute_correlation(real_path)
-    correlation_generated = load_and_compute_correlation(generated_path)
-
+    correlation_cdt = load_and_compute_correlation(cdt_path)
+    correlation_iabs = load_and_compute_correlation(iabs_path)
+    simulated_day = real_path.split('/')[-2].split('_')[3]
+    '''
+    if "IABS" in generated_path:
+        label = "IABS"
+    elif "CDT" in generated_path:
+        label = "CDT"
+    elif "GAN" in generated_path:
+        label = "CGAN"
+    else:
+        label = "CDT"
+    '''
     sns.set(style="whitegrid")
 
     sns.kdeplot(correlation_real, shade=True, color="blue", label='Real')
-
-    sns.kdeplot(correlation_generated, shade=True, color="red", label='Generated')
+    sns.kdeplot(correlation_iabs, shade=True, color="green", label='IABS')
+    sns.kdeplot(correlation_cdt, shade=True, color="red", label='CDT')
 
     plt.xlabel('Correlation Coefficient')
     plt.ylabel('Frequency')
-    plt.title('Correlation Coefficient Log Returns Distribution')
+    plt.title('Autocorrelation Log Returns Distribution')
 
     plt.legend()
-    file_name = "corr_coef.pdf"
-    generated_path = os.path.dirname(generated_path)
-    file_path = os.path.join(generated_path, file_name)
+    file_name = f"corr_coef_join.pdf"
+    dir_path = os.path.dirname(cdt_path)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.close()
     #plt.show()

@@ -30,7 +30,7 @@ class CDT(nn.Module):
         elif cond_method == 'concatenation' and cond_type == 'full' and not is_augmented:
             output_size = input_size
             input_size = input_size + cst.N_LOB_LEVELS * cst.LEN_LEVEL
-        else:
+        elif cond_method == "crossattention":
             output_size = input_size
         self.t_embedder = sinusoidal_positional_embedding(num_diffusionsteps, input_size) #TimestepEmbedder(input_size, input_size//4, num_diffusionsteps)
         self.seq_size = masked_sequence_size + cond_seq_len

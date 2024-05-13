@@ -106,7 +106,7 @@ class SparseMeanRevertingOracle(MeanRevertingOracle):
                                  scale = ((theta) / (2*gamma)) * (1 - exp(-2 * gamma * d)))
 
     # Apply the value adjustment that was passed in.
-    v += v_adj
+    v += v_adj 
 
     # The process is not permitted to become negative.
     v = max(0, v)

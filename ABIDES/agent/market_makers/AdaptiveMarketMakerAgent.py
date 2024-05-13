@@ -182,6 +182,7 @@ class AdaptiveMarketMakerAgent(TradingAgent):
                 bid = self.known_bids[self.symbol][0][0] if self.known_bids[self.symbol] else None
                 ask = self.known_asks[self.symbol][0][0] if self.known_asks[self.symbol] else None
                 if bid and ask:
+                    
                     mid = int((ask + bid) / 2)
                     self.last_mid = mid
                     if self.is_adaptive:

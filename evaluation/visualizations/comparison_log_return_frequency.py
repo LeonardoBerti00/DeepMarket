@@ -14,19 +14,25 @@ def main(real_path, generated_path):
         df = df.query("bid_price_1 < 9999999")
         df = df.query("ask_price_1 > -9999999")
         df = df.query("bid_price_1 > -9999999")
-        df = df.groupby('minute')['mid_price'].first().reset_index()
-        df['log_return'] = np.log(df['mid_price'] / df['mid_price'].shift(1))
+        df = df.groupby('minute')['MID_PRICE'].first().reset_index()
+        df['log_return'] = np.log(df['MID_PRICE'] / df['MID_PRICE'].shift(1))
         df.dropna(inplace=True)
         return df['log_return']
-
+    
+    if "IABS" in generated_path:
+        label = "IABS"
+    elif "CDT" in generated_path:
+        label = "CDT"
+    elif "GAN" in generated_path:
+        label = "CGAN"
+    else:
+        label = "CDT"
     log_returns_real = load_and_compute_log_returns(real_path)
-    log_returns_generated = load_and_compute_log_returns(generated_path)
-
+    log_returns_cdt = load_and_compute_log_returns(generated_path)
     sns.set(style="whitegrid")
 
     sns.kdeplot(log_returns_real, shade=True, color="blue", label='Real')
-
-    sns.kdeplot(log_returns_generated, shade=True, color="red", label='Generated')
+    sns.kdeplot(log_returns_cdt, shade=True, color="red", label=label)
 
     plt.yscale('log')
 
@@ -36,8 +42,8 @@ def main(real_path, generated_path):
 
     plt.legend()
     file_name = "log_return.pdf"
-    generated_path = os.path.dirname(generated_path)
-    file_path = os.path.join(generated_path, file_name)
+    dir_path = os.path.dirname(generated_path)
+    file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.close()
     #plt.show()

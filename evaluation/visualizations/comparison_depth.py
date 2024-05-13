@@ -1,3 +1,4 @@
+import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +19,8 @@ def ci(row, n, alpha):
     std = row['DEPTH_std']
 
     margin = st.t.interval(1-alpha, n-1, mean, std/np.sqrt(n))
-    if margin[0] is np.nan:
+    #check if is nan
+    if math.isnan(margin[0]):
         return pd.Series([mean, mean], index=['LOWER', 'UPPER'])
     return pd.Series(margin, index=['LOWER', 'UPPER'])
 
@@ -42,8 +44,8 @@ def main(real_path, generated_path, IS_REAL):
 
     df_['TIME'] = pd.to_datetime(df_['TIME'])
     df_['TIME'] = df_['TIME'].dt.strftime('%d-%m-%Y %H:%M:%S')
-
-    df_grouped = df.groupby(df.index // 100).agg({'TIME': 'first', 'DEPTH': ['mean','std']})
+    dividend = df.shape[0] // 100
+    df_grouped = df.groupby(df.index // dividend).agg({'TIME': 'first', 'DEPTH': ['mean','std']})
 
     df_grouped.columns = ['TIME', 'DEPTH_mean', 'DEPTH_std']
 
@@ -73,9 +75,17 @@ def main(real_path, generated_path, IS_REAL):
     plt.xlabel('Time')
     plt.ylabel('Depth')
     if IS_REAL:
-        plt.title('Real Data')
+        plt.title('Depth market replay')
     else:
-        plt.title('Generated Data')
+        if "IABS" in generated_path:
+            title = "Depth IABS simulation"
+        elif "CDT" in generated_path:
+            title = "Depth CDT simulation"
+        elif "GAN" in generated_path:
+            title = "Depth CGAN simulation"
+        else:
+            title = "Depth CDT simulation"
+        plt.title(title)
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 

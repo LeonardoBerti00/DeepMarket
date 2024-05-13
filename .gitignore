@@ -4,7 +4,7 @@ data/TSLA
 data/INTC
 data/plot
 data/checkpoints
-ABIDES/log/paper/IABS*
+ABIDES/log/
 lightning_logs/
 data/generated_orders.csv
 data/real_orders.csv

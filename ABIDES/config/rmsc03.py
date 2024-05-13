@@ -49,7 +49,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='12:00:00',
+                    default='11:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -157,13 +157,57 @@ agent_count, agents, agent_types = 0, [], []
 symbol = args.ticker
 starting_cash = 10000000  # Cash in this simulator is always in CENTS.
 
-r_bar = 1e5
-sigma_n = r_bar / 10
+#r_bar = 1e5
+#sigma_n = r_bar / 10
 kappa = 1.67e-15
 lambda_a = 7e-11
 
 # Oracle
-'''
+
+if symbol == "TSLA":
+    normalization_terms = {
+        "lob": [
+            cst.TSLA_LOB_MEAN_SIZE_10,
+            cst.TSLA_LOB_STD_SIZE_10,
+            cst.TSLA_LOB_MEAN_PRICE_10,
+            cst.TSLA_LOB_STD_PRICE_10,
+        ],
+        "event": [
+            cst.TSLA_EVENT_MEAN_SIZE,
+            cst.TSLA_EVENT_STD_SIZE,
+            cst.TSLA_EVENT_MEAN_PRICE,
+            cst.TSLA_EVENT_STD_PRICE,
+            cst.TSLA_EVENT_MEAN_TIME,
+            cst.TSLA_EVENT_STD_TIME,
+            cst.TSLA_EVENT_MEAN_DEPTH,
+            cst.TSLA_EVENT_STD_DEPTH,
+        ]
+    }
+    r_bar = cst.TSLA_EVENT_MEAN_PRICE*100
+    sigma_n = cst.TSLA_EVENT_STD_PRICE*100
+
+elif symbol == "INTC":
+    normalization_terms = {
+        "lob": [
+            cst.INTC_LOB_MEAN_SIZE_10, 
+            cst.INTC_LOB_STD_SIZE_10, 
+            cst.INTC_LOB_MEAN_PRICE_10,
+            cst.INTC_LOB_STD_PRICE_10
+            ],
+        "event": [
+            cst.INTC_EVENT_MEAN_SIZE, 
+            cst.INTC_EVENT_STD_SIZE, 
+            cst.INTC_EVENT_MEAN_PRICE, 
+            cst.INTC_EVENT_STD_PRICE, 
+            cst.INTC_EVENT_MEAN_TIME, 
+            cst.INTC_EVENT_STD_TIME,
+            cst.INTC_EVENT_MEAN_DEPTH,
+            cst.INTC_EVENT_STD_DEPTH
+        ]
+    }
+    r_bar = cst.INTC_EVENT_MEAN_PRICE*100
+    sigma_n = cst.INTC_EVENT_STD_PRICE*100
+
 symbols = {symbol: {'r_bar': r_bar,
                     'kappa': 1.67e-16,
                     'sigma_s': 0,
@@ -174,7 +218,7 @@ symbols = {symbol: {'r_bar': r_bar,
                     'random_state': np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64'))}}
 
 oracle = SparseMeanRevertingOracle(mkt_open, mkt_close, symbols)
-'''
+
 # 1) Exchange Agent
 
 #  How many orders in the past to store for transacted volume computation
@@ -196,45 +240,8 @@ agents.extend([ExchangeAgent(id=0,
                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
-if symbol == "TSLA":
-    normalization_terms = {
-        "lob": [
-            cst.TSLA_LOB_MEAN_SIZE_10,
-            cst.TSLA_LOB_STD_SIZE_10,
-            cst.TSLA_LOB_MEAN_PRICE_10,
-            cst.TSLA_LOB_STD_PRICE_10,
-        ],
-        "event": [
-            cst.TSLA_EVENT_MEAN_SIZE,
-            cst.TSLA_EVENT_STD_SIZE,
-            cst.TSLA_EVENT_MEAN_PRICE,
-            cst.TSLA_EVENT_STD_PRICE,
-            cst.TSLA_EVENT_MEAN_TIME,
-            cst.TSLA_EVENT_STD_TIME,
-            cst.TSLA_EVENT_MEAN_DEPTH,
-            cst.TSLA_EVENT_STD_DEPTH,
-        ]
-    }
 
-elif symbol == "INTC":
-    normalization_terms = {
-        "lob": [
-            cst.INTC_LOB_MEAN_SIZE_10, 
-            cst.INTC_LOB_STD_SIZE_10, 
-            cst.INTC_LOB_MEAN_PRICE_10,
-            cst.INTC_LOB_STD_PRICE_10
-            ],
-        "event": [
-            cst.INTC_EVENT_MEAN_SIZE, 
-            cst.INTC_EVENT_STD_SIZE, 
-            cst.INTC_EVENT_MEAN_PRICE, 
-            cst.INTC_EVENT_STD_PRICE, 
-            cst.INTC_EVENT_MEAN_TIME, 
-            cst.INTC_EVENT_STD_TIME,
-            cst.INTC_EVENT_MEAN_DEPTH,
-            cst.INTC_EVENT_STD_DEPTH
-        ]
-    }
+    
 agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
@@ -263,7 +270,7 @@ wakeup_time = mkt_open + pd.to_timedelta("00:14:00")
 num_noise = 5000
 noise_mkt_open = historical_date + pd.to_timedelta("09:00:00")  # These times needed for distribution of arrival times
                                                                 # of Noise Agents
-noise_mkt_close = historical_date + pd.to_timedelta("16:00:00")
+noise_mkt_close = historical_date + pd.to_timedelta("12:00:00")
 agents.extend([NoiseAgent(id=j,
                           name="NoiseAgent {}".format(j),
                           type="NoiseAgent",
@@ -439,6 +446,7 @@ kernel.runner(agents=agents,
               stopTime=kernelStopTime,
               agentLatencyModel=latency_model,
               defaultComputationDelay=defaultComputationDelay,
+              oracle=oracle,
               log_dir=log_dir)
 
 

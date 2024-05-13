@@ -42,11 +42,19 @@ def preprocess_data(df):
     return df
 
 def plot_data(pca2d, pca2d_, generated_path):
+    if "IABS" in generated_path:
+        label = "IABS"
+    elif "CDT" in generated_path:
+        label = "CDT"
+    elif "GAN" in generated_path:
+        label = "CGAN"
+    else:
+        label = "CDT"
     # Plot pca2d in red
-    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='real', alpha=0.1, s=10)
+    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='Real', alpha=0.1, s=10)
 
     # Plot pca2d_ in blue
-    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label='generated', alpha=0.1, s=10)
+    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label=label, alpha=0.1, s=10)
 
     # Limit x and y axes
     #compute the limit depending on max and min of the data
@@ -63,7 +71,7 @@ def plot_data(pca2d, pca2d_, generated_path):
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.savefig(file_path)
-    plt.title('PCA2D Plot')
+    plt.title('PCA 2D Plot')
     # Show the plot
     #plt.show()
     plt.close()

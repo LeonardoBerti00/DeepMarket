@@ -39,8 +39,8 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
-        self.CDT_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_seed_20/processed_orders.csv"
-        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_2015-01-29-12-00-00/processed_orders.csv"
+        self.CDT_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_seed_40/processed_orders.csv"
+        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_20150129_120000/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 

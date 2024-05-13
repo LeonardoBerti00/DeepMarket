@@ -102,7 +102,8 @@ class WorldAgent(Agent):
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
         #make a print every 5 minutes
-        if currentTime.minute % 1 == 0 and currentTime.second == 00:
+        
+        if currentTime.minute % 5 == 0 and currentTime.second == 00:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
@@ -145,14 +146,20 @@ class WorldAgent(Agent):
                 self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
                 return
 
-            # firstly we place the last order generated and next we generate the next order
-            if self.next_order is not None and len(self.kernel.messages.queue) == 0:
+            #check if in the kernel messages queue there are messages for the first agent
+            wait = False
+            for timestamp, msg in self.kernel.messages.queue:
+                if msg[0] == self.id:
+                    wait = True
+                    
+            # first we place the last order generated and next we generate the next order
+            if self.next_order is not None and not wait:
                 self.placeOrder(currentTime, self.next_order)
                 self.next_order = self._generate_order(currentTime)
                 offset_time = datetime.timedelta(seconds=self.next_order[0])
                 self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
 
-            elif (len(self.kernel.messages.queue) > 0):
+            elif wait:
                 self.setWakeup(currentTime + datetime.timedelta(microseconds=1))
 
 

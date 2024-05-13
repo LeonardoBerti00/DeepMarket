@@ -54,12 +54,20 @@ def main(real_path, generated_path):
     # convert time2 to matplotlib date format
     time2 = dates.date2num(time2)
     '''
-    plt.plot(time1, mid_price1, label='real data', color='blue')
+    if "IABS" in generated_path:
+        label = "IABS"
+    elif "CDT" in generated_path:
+        label = "CDT"
+    elif "GAN" in generated_path:
+        label = "CGAN"
+    else:
+        label = "CDT"
+    plt.plot(time1, mid_price1, label='Real', color='blue')
     #get the min and max of the mid price
     #xmin = min(mid_price1.min(), mid_price2.min())-100
     #xmax = max(mid_price1.max(), mid_price2.max())+100
     #plt.xlim([xmin, xmax])
-    plt.plot(time2, mid_price2, label='generated data', color='red')
+    plt.plot(time2, mid_price2, label=label, color='red')
     #plt.xlim([xmin, xmax])
     # Formatting the x-axis with hour:minute format
     time_format = dates.DateFormatter('%H:%M')

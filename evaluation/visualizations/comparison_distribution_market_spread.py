@@ -65,9 +65,17 @@ def main(real_path, generated_path, IS_REAL):
     plt.xlabel('Time')
     plt.ylabel('Spread')
     if IS_REAL:
-        plt.title('Real Data')
+        plt.title('Spread market replay')
     else:
-        plt.title('Generated Data')
+        if "IABS" in generated_path:
+            title = "Spread IABS simulation"
+        elif "CDT" in generated_path:
+            title = "Spread CDT simulation"
+        elif "GAN" in generated_path:
+            title = "Spread CGAN simulation"
+        else:
+            title = "Spread CDT simulation"
+        plt.title(title)
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 

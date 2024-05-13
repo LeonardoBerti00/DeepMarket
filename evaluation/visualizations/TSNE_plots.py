@@ -11,7 +11,7 @@ class TSNE2D(torch.nn.Module):
     def __init__(self, n_components=2):
         super(TSNE2D, self).__init__()
         self.n_components = n_components
-        self.tsne = TSNE(n_components=n_components)
+        self.tsne = TSNE(n_components=n_components, n_iter=300, perplexity=50)
 
     def forward(self, x):
         x = x.values
@@ -42,17 +42,27 @@ def preprocess_data(df):
     df['SPREAD'] = (df['SPREAD'] - df['SPREAD'].mean())/df['SPREAD'].std()
     return df
 
-def plot_data(tsna2d, tsna2d_, generated_path):
+def plot_data(tsna2d_real, tsna2d_gen, generated_path):
+    
+    if "IABS" in generated_path:
+        label = "IABS"
+    elif "CDT" in generated_path:
+        label = "CDT"
+    elif "GAN" in generated_path:
+        label = "CGAN"
+    else:
+        label = "CDT"
+    
     # Plot tsna2d in red
-    plt.scatter(tsna2d[:, 0], tsna2d[:, 1], color='tab:red', label='real', alpha=0.1, s=10)
+    plt.scatter(tsna2d_real[:, 0], tsna2d_real[:, 1], color='tab:red', label='Real', alpha=0.1, s=10)
 
     # Plot tsna2d_ in blue
-    plt.scatter(tsna2d_[:, 0], tsna2d_[:, 1], color='tab:blue', label='real', alpha=0.1, s=10)
+    plt.scatter(tsna2d_gen[:, 0], tsna2d_gen[:, 1], color='tab:blue', label=label, alpha=0.1, s=10)
 
-    x_min = min(np.min(tsna2d[:, 0])-20, np.min(tsna2d_[:, 0])-20)+1
-    x_max = max(np.max(tsna2d[:, 0])+20, np.max(tsna2d_[:, 0])+20)
-    y_min = min(np.min(tsna2d[:, 1])-20, np.min(tsna2d_[:, 1])-20)+1
-    y_max = max(np.max(tsna2d[:, 1])+20, np.max(tsna2d_[:, 1])+20)
+    x_min = min(np.min(tsna2d_real[:, 0])-20, np.min(tsna2d_gen[:, 0])-20)+1
+    x_max = max(np.max(tsna2d_real[:, 0])+20, np.max(tsna2d_gen[:, 0])+20)
+    y_min = min(np.min(tsna2d_real[:, 1])-20, np.min(tsna2d_gen[:, 1])-20)+1
+    y_max = max(np.max(tsna2d_real[:, 1])+20, np.max(tsna2d_gen[:, 1])+20)
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
 
@@ -73,10 +83,10 @@ def main(real_path, generated_path):
     df_real = preprocess_data(df_real)
     df_gen = preprocess_data(df_gen)
 
-    tsna2d = TSNE2D(n_components=2).forward(df_real)
-    tsna2d_ = TSNE2D(n_components=2).forward(df_gen)
+    tsna2d_real = TSNE2D(n_components=2).forward(df_real)
+    tsna2d_gen = TSNE2D(n_components=2).forward(df_gen)
 
-    plot_data(tsna2d, tsna2d_, generated_path)
+    plot_data(tsna2d_real, tsna2d_gen, generated_path)
 
 
 if __name__ == '__main__':

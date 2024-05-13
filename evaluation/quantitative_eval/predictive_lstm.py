@@ -128,7 +128,7 @@ class Trainer:
 
 #################################################################################################################################################################################################
 def main(real_data_path, generated_data_path):
-
+    print(generated_data_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     df_r = pd.read_csv(real_data_path)
@@ -155,30 +155,6 @@ def main(real_data_path, generated_data_path):
     df_r = Preprocessor(df_r).preprocess()
     df_g = Preprocessor(df_g).preprocess()
 
-    '''
-    # Check for NaN, null, inf, and missing values in df_g
-    nan_columns = df_g.columns[df_g.isna().any()].tolist()
-    null_columns = df_g.columns[df_g.isnull().any()].tolist()
-    inf_columns = df_g.columns[(df_g == np.inf).any()].tolist()
-    missing_columns = df_g.columns[df_g.isin([np.nan, np.inf, -np.inf, None]).any()].tolist()
-
-    # Print the columns with NaN values
-    print("Columns with NaN values:", nan_columns)
-
-    # Print the columns with null values
-    print("Columns with null values:", null_columns)
-
-    # Print the columns with inf values
-    print("Columns with inf values:", inf_columns)
-
-    # Print the columns with missing values (NaN, null, inf)
-    print("Columns with missing values:", missing_columns)
-
-
-    # stampa colonne di df_r e df_g e i loro tipi
-    # print(df_r.columns, df_g.columns)
-    '''
-
     ############ TEST "real" lstm on "real" test set ############
 
     # Assuming df is already preprocessed
@@ -188,7 +164,8 @@ def main(real_data_path, generated_data_path):
 
     # Split the data into training and test sets
     train_X_r, test_X_r, train_y_r, test_y_r = train_test_split(features_r, labels_r, test_size=0.2, random_state=42)
-
+    train_X_r = np.concatenate([train_X_r[:, :7], train_X_r[:, -4:]], axis=1)
+    test_X_r = np.concatenate([test_X_r[:, :7], test_X_r[:, -4:]], axis=1)
     # Convert to PyTorch tensors
     train_X_r = torch.tensor(train_X_r, dtype=torch.float32).to(device, non_blocking=True)
     train_y_r = torch.tensor(train_y_r, dtype=torch.float32).to(device, non_blocking=True)
@@ -217,7 +194,7 @@ def main(real_data_path, generated_data_path):
 
     # Split the data into training and test sets
     train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
-    train_X_g = np.concatenate([train_X_g[:, :8], train_X_g[:, -4:]], axis=1)
+    train_X_g = np.concatenate([train_X_g[:, :7], train_X_g[:, -4:]], axis=1)
     # Convert to PyTorch tensors
     train_X_g = torch.tensor(train_X_g, dtype=torch.float32).to(device, non_blocking=True)
     train_y_g = torch.tensor(train_y_g, dtype=torch.float32).to(device, non_blocking=True)

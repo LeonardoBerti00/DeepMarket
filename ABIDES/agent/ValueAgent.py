@@ -130,10 +130,9 @@ class ValueAgent(TradingAgent):
 
         # The agent obtains a new noisy observation of the current fundamental value
         # and uses this to update its internal estimates in a Bayesian manner.
-        obs_t = self.last_trade[self.symbol]
-        if obs_t is None:
-            # No new observation available.
-            return self.r_t
+        obs_t = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=self.sigma_n,
+                                         random_state=self.random_state)
+
         log_print("{} observed {} at {}", self.name, obs_t, self.currentTime)
 
         # Update internal estimates of the current fundamental value and our error of same.
