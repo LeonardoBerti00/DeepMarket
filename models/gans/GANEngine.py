@@ -1,5 +1,3 @@
-import numpy as np
-from torch import nn
 import os
 
 import torch
@@ -7,15 +5,11 @@ import lightning as L
 from configuration import Configuration
 import constants as cst
 from constants import LearningHyperParameter, GANHyperParameters
-import time
-import matplotlib.pyplot as plt
-import torch.nn.functional as F
+
 import wandb
-from models.diffusers.GaussianDiffusion import GaussianDiffusion
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.gans.wgan import Generator, Discriminator
-
 
 class GANEngine(L.LightningModule):
     
@@ -154,8 +148,8 @@ class GANEngine(L.LightningModule):
         y, market_orders = batch
         # Validation: with EMA
         with self.ema.average_parameters():
-            x = torch.randn(y.shape[0], 1, self.hparams.order_feature_dim).type_as(y)
-            generated = self(x, y)
+            noise = torch.randn(y.shape[0], 1, self.hparams.order_feature_dim).type_as(y)
+            generated = self(noise, y)
             batch_loss = self.discriminator(generated, market_orders)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
