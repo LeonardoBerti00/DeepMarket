@@ -9,7 +9,7 @@ class Configuration:
 
         self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
         self.IS_EVALUATION = True
 
@@ -17,10 +17,10 @@ class Configuration:
 
         self.IS_AUGMENTATION = True
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_MODEL = cst.Models.CGAN
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         self.USE_ENGINE = cst.Engine.GAN_ENGINE

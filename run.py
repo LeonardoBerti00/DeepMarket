@@ -5,6 +5,7 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 from configuration import Configuration
 import constants as cst
+from models.gans.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
 from models.gans.GANEngine import GANEngine
 from preprocessing.DataModule import DataModule
 from preprocessing.LOBDataset import LOBDataset
@@ -19,7 +20,8 @@ from models.diffusers.CSDI.CSDI_hparam import HP_CSDI, HP_CSDI_FIXED
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
     cst.Models.CDT: HP_SEARCH_TYPES(HP_CDT, HP_CDT_FIXED),
-    cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED)
+    cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED),
+    cst.Models.CGAN: HP_SEARCH_TYPES(HP_CGAN, HP_CGAN_FIXED)
 }
 
 def train(config: Configuration, trainer: L.Trainer):
@@ -66,6 +68,7 @@ def train(config: Configuration, trainer: L.Trainer):
 
 
 def run(config: Configuration, accelerator, model=None):
+    print("BELLA")
     wandb_instance_name = ""
     model_params = HP_DICT_MODEL[config.CHOSEN_MODEL].fixed
     for param in cst.LearningHyperParameter:

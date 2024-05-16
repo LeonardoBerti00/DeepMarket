@@ -29,7 +29,6 @@ class GANEngine(L.LightningModule):
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.training = config.IS_TRAINING
-        self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
@@ -41,7 +40,7 @@ class GANEngine(L.LightningModule):
         self.seq_len = config.HYPER_PARAMETERS[GANHyperParameters.SEQ_LEN]
         self.order_feature_dim=config.HYPER_PARAMETERS[GANHyperParameters.ORDER_FEATURES_DIM],
         # generator's hyperparameters
-        self.generator_lstm_input_dim = config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_LSTM_INPUT_DIM]
+        self.generator_lstm_input_dim = config.HYPER_PARAMETERS[GANHyperParameters.ORDER_FEATURES_DIM]
         self.generator_lstm_hidden_state_dim=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_LSTM_HIDDEN_STATE_DIM]
         self.generator_hidden_fc_dim=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_FC_HIDDEN_DIM]
         self.generator_kernel_conv=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_KERNEL_SIZE]
@@ -56,7 +55,8 @@ class GANEngine(L.LightningModule):
         self.discriminator_num_fc_layers=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_FC_LAYERS]
         self.discriminator_num_conv_layers=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_CONV_LAYERS]
         self.discriminator_stride=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_STRIDE]
-        
+        # wasserstein gan c parameter as in Arjovsky et al. “Wasserstein generative adversarial networks.” ICML 2017
+        self.c = 1e-2
         self.save_hyperparameters()
         self.num_violations_price = 0
         self.num_violations_size = 0
@@ -88,77 +88,72 @@ class GANEngine(L.LightningModule):
         self.ema.to(cst.DEVICE)
         
 
-    def forward(self, x):
-        return self.generator(x)
-    
-    def adversarial_loss(self, y_hat, y):
-        return F.binary_cross_entropy(y_hat, y)        
+    def forward(self, x: torch.Tensor, cond_orders: torch.Tensor):
+        return self.generator(x, cond_orders)     
         
     def training_step(self, batch):
-        input, _ = batch
+        # orders.shape -> (batch,  seq_len, num_features)
+        # market_history.shape -> (batch, seq_len, market_history_features)
+        orders, market_history = batch
 
         optimizer_g, optimizer_d = self.optimizers()
-
-        # sample noise
-        z = torch.randn(input.shape[0], self.hparams.generator_lstm_hidden_state_dim)
-        z = z.type_as(input)
-
-        # train generator
-        # generate images
-        self.toggle_optimizer(optimizer_g)
-        self.generated_input = self(z)
-
-        # ground truth result (ie: all fake)
-        # put on GPU because we created this tensor inside training_loop
-        valid = torch.ones(input.size(0), 1)
-        valid = valid.type_as(input)
-
-        # adversarial loss is binary cross-entropy
-        g_loss = self.adversarial_loss(self.discriminator(self(z)), valid)
-        self.log("g_loss", g_loss, prog_bar=True)
-        self.manual_backward(g_loss)
-        optimizer_g.step()
-        optimizer_g.zero_grad()
-        self.untoggle_optimizer(optimizer_g)
-
-        # train discriminator
-        # Measure discriminator's ability to classify real from generated samples
-        self.toggle_optimizer(optimizer_d)
-
-        # how well can it label as real?
-        valid = torch.ones(input.size(0), 1)
-        valid = valid.type_as(input)
-
-        real_loss = self.adversarial_loss(self.discriminator(input), valid)
-
-        # how well can it label as fake?
-        fake = torch.zeros(input.size(0), 1)
-        fake = fake.type_as(input)
-
-        fake_loss = self.adversarial_loss(self.discriminator(self(z).detach()), fake)
-
-        # discriminator loss is the average of these
-        d_loss = (real_loss + fake_loss) / 2
-        self.log("d_loss", d_loss, prog_bar=True)
-        self.manual_backward(d_loss)
-        optimizer_d.step()
-        optimizer_d.zero_grad()
-        self.untoggle_optimizer(optimizer_d)
+        # critic step
+        d_loss = self.__critic_step(orders, market_history, optimizer_d)
+        g_loss = self.__generator_step(orders, market_history, optimizer_g)
         
         self.ema.update()
         return g_loss + d_loss
 
+    def __generator_step(self, orders: torch.Tensor, market_history: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
+        noise = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
+        
+        self.toggle_optimizer(optimizer)
+
+        fake_order = self(noise, orders)
+        fake_logits = self.discriminator(fake_order, market_history)
+       
+        # * min E_{x~P_X}[C(x)] - E_{Z~P_Z}[C(g(z))]
+        loss = -fake_logits.mean().view(-1)
+
+        self.log("g_loss", loss, prog_bar=True)
+        self.manual_backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()
+        self.untoggle_optimizer(optimizer)
+        
+        return loss
+        
+    def __critic_step(self, orders: torch.Tensor, market_history: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
+        noise = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
+        generated_order = self(noise, orders)
+
+        real_logits = self.discriminator(market_history)
+        fake_logits = self.discriminator(generated_order)
+        # * max E_{x~P_X}[C(x)] - E_{Z~P_Z}[C(g(z))]
+        loss = -(real_logits.mean() - fake_logits.mean())
+
+        self.log("d_loss", loss, prog_bar=True)
+        self.manual_backward(loss)
+        optimizer.step()
+        optimizer.zero_grad()
+        # * Gradient clippling
+        for p in self.discriminator.parameters():
+            p.data.clamp_(-self.hparams.c, self.hparams.c)
+            
+        self.untoggle_optimizer(optimizer)
+        
+        return loss
+        
     def on_train_epoch_start(self) -> None:
         print(f'learning rate: {self.optimizer.param_groups[0]["lr"]}')  
 
-    def validation_step(self, input, batch_idx):
+    def validation_step(self, batch):
+        orders, market_history = batch
         # Validation: with EMA
         with self.ema.average_parameters():
-            generated = self.forward(input)
-            fake = torch.zeros(generated.size(0), 1)
-            fake = fake.type_as(generated)
-            y_hat = self.discriminator(generated)
-            batch_loss = self.adversarial_loss(y_hat, fake)
+            x = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
+            generated = self(x, orders)
+            batch_loss = self.discriminator(generated, market_history)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
         return batch_loss_mean
@@ -200,9 +195,6 @@ class GANEngine(L.LightningModule):
         elif self.optimizer == 'LION':
             self.optimizer = Lion(self.parameters(), lr=self.lr)
         return self.optimizer
-
-    #def on_before_zero_grad(self, *args, **kwargs):
-    #    self.ema.update()
 
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")

@@ -46,16 +46,15 @@ class Generator(nn.Module):
                                                             device=self.device))
         self.tanh = nn.Tanh()
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x.shape = (batch_size, seq_len - 1, num_features)
-        # generate a noise that contains a single order
-        noise = torch.randn(x.shape[0], 1, self.lstm_hidden_state_dim, device=self.device)
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        # cond.shape = (batch_size, seq_len - 1, history_features)
         # concatenate the market history with the noise in the time dimension
-        x = torch.cat([x, noise], dim=1)
+        cond = torch.cat([cond, x], dim=1)
         # run through the lstm and take the hidden state
-        _, h_x = self.lstm(x)
+        _, h_cond = self.lstm(cond)
         # run through the fc layers
-        out_fc = self.fc_layers(h_x)
+        h_cond = torch.cat([h_cond, cond])
+        out_fc = self.fc_layers(h_cond)
         # run through batch norm, relu and convtrans1d
         out_conv = self.conv_layers(out_fc)
         # apply tanh
@@ -102,9 +101,7 @@ class Discriminator(nn.Module):
                                                             device=self.device))
         
         self.last_fc_layer = nn.Linear(in_features=self.fc_out_dim, out_features=1, device=self.device)
-        
-        self.sigmoid = nn.Sigmoid()
-        
+                
     def forwad(self, y: torch.Tensor, gen: torch.Tensor) -> torch.Tensor:
         # concatenate on the feature dimension
         x = torch.cat([y, gen], dim=-1)
@@ -115,4 +112,4 @@ class Discriminator(nn.Module):
         # run the convolution
         conv_out = self.conv_layers(fc_out)
         # run last layer to map to 1
-        return self.sigmoid(self.last_fc_layer(conv_out))
+        return self.last_fc_layer(conv_out)
