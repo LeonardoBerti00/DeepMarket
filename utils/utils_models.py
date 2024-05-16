@@ -18,3 +18,4 @@ def pick_augmenter(augmenter_name, input_size, augment_dim, cond_size, cond_type
         return MLPAugmenter(input_size, augment_dim, cond_size, cond_type, cond_augmenter, cond_method, chosen_model).to(cst.DEVICE, non_blocking=True)
     else:
         raise ValueError("Augmenter not found")
+

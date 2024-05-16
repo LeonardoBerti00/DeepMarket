@@ -32,6 +32,25 @@ class LearningHyperParameter(str, Enum):
     P_NORM = "p_norm"
 
 
+class GANHyperParameters(str, Enum):
+    SEQ_LEN = "sequence_length"
+    MARKET_FEATURES_DIM = "market_features_dim"
+    ORDER_FEATURES_DIM = "order_features_dim"
+    GENERATOR_LSTM_INPUT_DIM = "LSTM_input_dimensions"
+    GENERATOR_LSTM_HIDDEN_STATE_DIM = "LSTM_hidden_state_dim"
+    GENERATOR_NUM_FC_LAYERS = "num_fc_layers"
+    GENERATOR_FC_HIDDEN_DIM = "fc_hidden_dim"
+    GENERATOR_NUM_CONV_LAYERS = "num_conv_layers"
+    GENERATOR_KERNEL_SIZE = "kernel_size"
+    GENERATOR_STRIDE = "stride"
+    DISCRIMINATOR_LSTM_INPUT_DIM = "LSTM_input_dimensions"
+    DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM = "LSTM_hidden_state_dim"
+    DISCRIMINATOR_NUM_FC_LAYERS = "num_fc_layers"
+    DISCRIMINATOR_FC_HIDDEN_DIM = "fc_hidden_dim"
+    DISCRIMINATOR_NUM_CONV_LAYERS = "num_conv_layers"
+    DISCRIMINATOR_KERNEL_SIZE = "kernel_size"
+    DISCRIMINATOR_STRIDE = "stride"
+
 class Optimizers(Enum):
     ADAM = "Adam"
     RMSPROP = "RMSprop"
@@ -100,6 +119,12 @@ class DatasetType(Enum):
     TRAIN = "train"
     TEST = "test"
     VALIDATION = "val"
+    
+
+class Engine(str, Enum):
+    
+    NN_ENGINE = "NNEngine"
+    GAN_ENGINE = "GANEngine"
 
     
 

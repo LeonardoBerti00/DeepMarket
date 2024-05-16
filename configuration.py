@@ -1,4 +1,4 @@
-from constants import LearningHyperParameter
+from constants import GANHyperParameters, LearningHyperParameter
 import constants as cst
 from utils.utils import noise_scheduler
 
@@ -23,6 +23,7 @@ class Configuration:
         self.CHOSEN_MODEL = cst.Models.CGAN
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
+        self.USE_ENGINE = cst.Engine.GAN_ENGINE
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -46,8 +47,8 @@ class Configuration:
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
-        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 512
+        self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 8
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
@@ -89,12 +90,21 @@ class Configuration:
             self.COND_SIZE = self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
 
         self.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM] = 64
-
-
-
-
-
-
-
-
-
+        
+        # generator's hyperparameters    
+        self.HYPER_PARAMETERS[GANHyperParameters.SEQ_LEN] = 256
+        self.HYPER_PARAMETERS[GANHyperParameters.MARKET_FEATURES_DIM] = 9
+        self.HYPER_PARAMETERS[GANHyperParameters.ORDER_FEATURES_DIM] = 7
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_LSTM_HIDDEN_STATE_DIM] = 128
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_FC_HIDDEN_DIM] = 96
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_KERNEL_SIZE] = 3
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_NUM_FC_LAYERS] = 2
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_NUM_CONV_LAYERS] = 2
+        self.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_STRIDE] = 1
+        # discriminator's hyperparameters
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM] = 128
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_FC_HIDDEN_DIM] = 96
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_FC_LAYERS] = 2
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_CONV_LAYERS] = 2
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_KERNEL_SIZE] = 3
+        self.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_STRIDE] = 1
