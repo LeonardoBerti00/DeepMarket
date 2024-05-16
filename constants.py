@@ -34,6 +34,7 @@ class LearningHyperParameter(str, Enum):
 
 class GANHyperParameters(str, Enum):
     SEQ_LEN = "sequence_length"
+    MARKET_FEATURES_DIM = "market_features_dim"
     ORDER_FEATURES_DIM = "order_features_dim"
     GENERATOR_LSTM_INPUT_DIM = "LSTM_input_dimensions"
     GENERATOR_LSTM_HIDDEN_STATE_DIM = "LSTM_hidden_state_dim"
