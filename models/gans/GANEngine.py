@@ -101,6 +101,10 @@ class GANEngine(L.LightningModule):
         
         self.ema.update()
         return g_loss + d_loss
+    
+    def sampling(self, noise: torch.Tensor, y: torch.Tensor):
+        generated_order = self(noise, y)
+        return self.__post_process_order(generated_order)
 
     def __generator_step(self, y: torch.Tensor, market_orders: torch.Tensor, optimizer: Union[torch.optim.Optimizer, Lion]):
         noise = torch.randn(y.shape[0], 1, self.generator_lstm_hidden_state_dim).type_as(y)
@@ -142,7 +146,25 @@ class GANEngine(L.LightningModule):
             
         self.untoggle_optimizer(optimizer)
         
-        return loss
+        return 
+    
+    def __post_process_order(self, generated_order):
+        if -0.3 < generated_order[:,:,0] < 0.3:
+            generated_order[:,:,0] = 0
+        elif generated_order[:,:,0] < -0.3:
+            generated_order[:,:,0] = -1
+        else:
+            generated_order[:,:,0] = 1
+            
+        if generated_order[:,:,2] > 0:
+            generated_order[:,:,2] = 1
+        else:
+            generated_order[:,:,2] = -1
+        
+        if generated_order[:,:,-1] > 0:
+            generated_order[:,:,-1] = 1
+        else:
+            generated_order[:,:,-1] = -1
         
     def on_train_epoch_start(self) -> None:
         print(f'gen_lr: {self.optimizer_g.param_groups[0]["lr"]} -- discr_lr = {self.optimizer_d.param_groups[0]["lr"]}')  
@@ -153,6 +175,7 @@ class GANEngine(L.LightningModule):
         with self.ema.average_parameters():
             noise = torch.randn(y.shape[0], 1, self.generator_lstm_hidden_state_dim).type_as(y)
             generated_order = self(noise, y)
+            generated_order = self.__post_process_order(generated_order)
             market_orders = torch.cat([market_orders[:, :-1, :], generated_order], dim=1)
             batch_loss = self.discriminator(y, market_orders)
             batch_loss_mean = torch.mean(batch_loss)
