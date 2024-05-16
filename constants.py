@@ -49,6 +49,7 @@ class Metrics(Enum):      #Quantitative evaluation
 class Models(str, Enum):
     CDT = "CDT"
     CSDI = "CSDI"
+    CGAN = "CGAN"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
 
@@ -133,12 +134,13 @@ INTC_EVENT_MEAN_DEPTH = 1.3685517399834501
 INTC_EVENT_STD_DEPTH = 2.333747222206966
 
 
-SEED = 40
+SEED = 30
 
 PRECISION = 32
 N_LOB_LEVELS = 10
 LEN_LEVEL = 4
-LEN_EVENT = 6
+LEN_ORDER = 6
+LEN_ORDER_CGAN = 7
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'

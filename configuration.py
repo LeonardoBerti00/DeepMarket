@@ -9,18 +9,18 @@ class Configuration:
 
         self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
-        self.IS_EVALUATION = True
+        self.IS_EVALUATION = False
 
         self.VALIDATE_EVERY = 1
 
         self.IS_AUGMENTATION = True
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_MODEL = cst.Models.CGAN
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         
@@ -28,6 +28,8 @@ class Configuration:
             cst.PROJECT_NAME = "CDTS"
         elif self.CHOSEN_MODEL == cst.Models.CSDI:
             cst.PROJECT_NAME = "CSDI"
+        elif self.CHOSEN_MODEL == cst.Models.CGAN:
+            cst.PROJECT_NAME = "CGAN"
 
         self.CHOSEN_STOCK = cst.Stocks.TSLA
 
@@ -38,9 +40,9 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
-        self.CDT_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_seed_40/processed_orders.csv"
-        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_20150129_120000/processed_orders.csv"
+        self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
+        self.CDT_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_12-00-00_30val_ema=0.837_epoch=10_TSLA_full_cond_aug_False_concatenation_MLP_seq_size_256_CDT_depth_8__diffsteps_100/processed_orders.csv"
+        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_20150130_120000/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -59,9 +61,9 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3
         self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
         if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
-            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
+            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
         else:
-            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_EVENT
+            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER
         
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.P_NORM] = 2 if self.CHOSEN_STOCK == cst.Stocks.INTC else 5

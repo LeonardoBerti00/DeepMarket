@@ -9,7 +9,7 @@ from realism.realism_utils import make_orderbook_for_analysis
 
 
 def create_orderbooks(exchange_path, ob_path):
-    MID_PRICE_CUTOFF = 10000
+    MID_PRICE_CUTOFF = 1000000
     processed_orderbook = make_orderbook_for_analysis(exchange_path, ob_path, num_levels=1,
                                                       hide_liquidity_collapse=False)
     cleaned_orderbook = processed_orderbook[(processed_orderbook['MID_PRICE'] > - MID_PRICE_CUTOFF) &

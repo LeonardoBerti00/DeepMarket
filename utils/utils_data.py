@@ -5,6 +5,86 @@ import os
 import torch
 
 import constants as cst
+def z_score_market_features(data, mean_spread=None, mean_returns=None, mean_vol_imb=None, mean_abs_vol=None, std_spread=None, std_returns=None, std_vol_imb=None, std_abs_vol=None):
+    data = data.reset_index(drop=True)
+    if (mean_spread is None) or (std_spread is None):
+        mean_spread = data["spread"].mean()
+        std_spread = data["spread"].std()
+    
+    if (mean_returns is None) or (std_returns is None):
+        #concatenates returns_1 and returns_5
+        mean_returns = data[["returns_1", "returns_50"]].mean()
+        std_returns = data[["returns_1", "returns_50"]].std()
+        
+    if (mean_vol_imb is None) or (std_vol_imb is None):
+        mean_vol_imb = data[["volume_imbalance_1", "volume_imbalance_5"]].mean()
+        std_vol_imb = data[["volume_imbalance_1", "volume_imbalance_5"]].std()
+        
+    if (mean_abs_vol is None) or (std_abs_vol is None):
+        mean_abs_vol = data[["absolute_volume_1", "absolute_volume_5"]].mean()
+        std_abs_vol = data[["absolute_volume_1", "absolute_volume_5"]].std()
+    
+    data["spread"] = (data["spread"] - mean_spread) / std_spread
+    data["returns_1"] = (data["returns_1"] - mean_returns) / std_returns
+    data["returns_50"] = (data["returns_50"] - mean_returns) / std_returns
+    data["volume_imbalance_1"] = (data["volume_imbalance_1"] - mean_vol_imb) / std_vol_imb
+    data["volume_imbalance_5"] = (data["volume_imbalance_5"] - mean_vol_imb) / std_vol_imb
+    data["absolute_volume_1"] = (data["absolute_volume_1"] - mean_abs_vol) / std_abs_vol
+    data["absolute_volume_5"] = (data["absolute_volume_5"] - mean_abs_vol) / std_abs_vol
+    print()
+    print("mean spread ", mean_spread)
+    print("std spread ", std_spread)
+    print("mean returns ", mean_returns)
+    print("std returns ", std_returns)
+    print("mean vol imb ", mean_vol_imb)
+    print("std vol imb ", std_vol_imb)
+    print("mean abs vol ", mean_abs_vol)
+    print("std abs vol ", std_abs_vol)
+    print(data[:5])
+    print()
+    return data, mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol
+
+def normalize_order_cgan(data, mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100):
+    data = data.reset_index(drop=True)
+    if (mean_size is None) or (std_size is None):
+        mean_size = data["size"].mean()
+        std_size = data["size"].std()
+    
+    if (mean_depth is None) or (std_depth is None):
+        mean_depth = data["depth"].mean()
+        std_depth = data["depth"].std()
+        
+    if (mean_cancel_depth is None) or (std_cancel_depth is None):
+        mean_cancel_depth = data["cancel_depth"].mean()
+        std_cancel_depth = data["cancel_depth"].std()
+        
+    if (mean_size_100 is None) or (std_size_100 is None):
+        mean_size_100 = data["quantity_100"].mean()
+        std_size_100 = data["quantity_100"].std()
+        
+    data["size"] = (data["size"] - mean_size) / std_size
+    data["depth"] = (data["depth"] - mean_depth) / std_depth
+    data["cancel_depth"] = (data["cancel_depth"] - mean_cancel_depth) / std_cancel_depth
+    data["quantity_100"] = (data["quantity_100"] - mean_size_100) / std_size_100
+    
+    data["event_type"] = data["event_type"]-1.0
+    data["event_type"] = data["event_type"].replace(2, 1)
+    data["event_type"] = data["event_type"].replace(3, 2)
+    data["event_type"] = data["event_type"]-1.0
+    # order_type = -1 -> limit order
+    # order_type = 0 -> cancel order
+    # order_type = 1 -> market order
+    print("mean size order cgan", mean_size)
+    print("std size order cgan", std_size)
+    print("mean depth order cgan", mean_depth)
+    print("std depth order cgan", std_depth)
+    print("mean cancel depth order cgan", mean_cancel_depth)
+    print("std cancel depth order cgan", std_cancel_depth)
+    print("mean size 100 order cgan", mean_size_100)
+    print("std size 100 order cgan", std_size_100)
+    print(data[:5])
+    
+    return data, mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100
 
 
 def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std_prices=None):
@@ -77,7 +157,7 @@ def reset_indexes(dataframes):
     return dataframes
 
 
-def preprocess_data(dataframes, n_lob_levels):
+def preprocess_data(dataframes, n_lob_levels, chosen_model):
     dataframes = reset_indexes(dataframes)
 
     # take only the first n_lob_levels levels of the orderbook and drop the others
@@ -137,6 +217,61 @@ def preprocess_data(dataframes, n_lob_levels):
         dataframes[i][0] = dataframes[i][0].iloc[1:, :]
         dataframes[i][1] = dataframes[i][1].iloc[1:, :]
 
+
+    dataframes = reset_indexes(dataframes)
+    if chosen_model == cst.Models.CGAN:
+        for i in range(len(dataframes)):
+            dataframes[i][0]["cancel_depth"] = 0
+            dataframes[i][0]["quantity_100"] = 0
+            dataframes[i][0]["quantity_type"] = 0
+            
+        for i in range(len(dataframes)):
+            dataframes[i][0]["quantity_100"] = dataframes[i][0]["size"].apply(lambda x: x // 100 if x % 100 == 0 else 0)
+            dataframes[i][0]["quantity_type"] = dataframes[i][0]["size"].apply(lambda x: -1 if x % 100 == 0 else 1)
+            for j in range(1, dataframes[i][0].shape[0]):
+                if dataframes[i][0].loc[j, "event_type"] == 3:
+                    dataframes[i][0].loc[j, "cancel_depth"] = dataframes[i][1].iloc[j-1, 0::2].tolist().index(dataframes[i][0].loc[j, "price"]) // 2
+        #eliminate columns price and time from messages
+        for i in range(len(dataframes)):
+            dataframes[i][0] = dataframes[i][0].drop(columns=["price", "time"])
+        
+        for i in range(len(dataframes)):
+            dataframes[i][1] = dataframes[i][1].shift(1).fillna(0)
+        
+        for i in range(len(dataframes)):
+            lob_sizes = dataframes[i][1].iloc[:, 1::2]
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            dataframes[i][1]["volume_imbalance_1"] = lob_sizes.iloc[:, 1] / (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0])
+            dataframes[i][1]["volume_imbalance_5"] = (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 3] + lob_sizes.iloc[:, 5] + lob_sizes.iloc[:, 7] + lob_sizes.iloc[:, 9]) / (lob_sizes.iloc[:, :10].sum(axis=1))
+            dataframes[i][1]["absolute_volume_1"] = lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0]
+            dataframes[i][1]["absolute_volume_5"] = lob_sizes.iloc[:, :10].sum(axis=1)
+            dataframes[i][1]["spread"] = lob_prices.iloc[:, 0] - lob_prices.iloc[:, 1]
+
+        for i in range(len(dataframes)):
+            order_sign_imbalance_256 = pd.Series(0, index=dataframes[i][1].index)
+            order_sign_imbalance_128 = pd.Series(0, index=dataframes[i][1].index)
+            returns_50 = pd.Series(0, index=dataframes[i][1].index)
+            returns_1 = pd.Series(0, index=dataframes[i][1].index)
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            mid_prices = (lob_prices.iloc[:, 0] + lob_prices.iloc[:, 1]) / 2
+            for j in range(len(dataframes[i][1])-256):
+                order_sign_imbalance_256.iloc[j] = dataframes[i][0]["direction"].iloc[j:j+256].sum()
+                order_sign_imbalance_128.iloc[j] = dataframes[i][0]["direction"].iloc[j+128:j+256].sum()
+                returns_1.iloc[j] = mid_prices[j+255] / mid_prices[j+254] - 1
+                returns_50.iloc[j] = mid_prices[j+255] / mid_prices[j+205] - 1
+            dataframes[i][1] = dataframes[i][1].iloc[255:]
+            dataframes[i][0] = dataframes[i][0].iloc[255:]
+            dataframes[i][1]["order_sign_imbalance_256"] = order_sign_imbalance_256[:-255]
+            dataframes[i][1]["order_sign_imbalance_128"] = order_sign_imbalance_128[:-255]
+            dataframes[i][1]["returns_1"] = returns_1[:-255]
+            dataframes[i][1]["returns_50"] = returns_50[:-255]
+            dataframes[i][1] = dataframes[i][1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
+        
+        dataframes = reset_indexes(dataframes)
+        for i in range(len(dataframes)):
+            #transform nan values in 0
+            dataframes[i][1] = dataframes[i][1].fillna(0)
+            dataframes[i][0] = dataframes[i][0].fillna(0)
     # we transform the execution of a sell limit order in a buy market order and viceversa
     for i in range(len(dataframes)):
         dataframes[i][0]["direction"] = dataframes[i][0]["direction"] * dataframes[i][0]["event_type"].apply(
@@ -185,9 +320,10 @@ def to_sparse_representation(lob, n_levels):
                 sparse_lob[2*int(depth)+1] = lob[j*2+1]
     return sparse_lob
 
+
 '''
 def to_original_lob(event_and_lob, seq_size):
-    lob = event_and_lob[:, cst.LEN_EVENT:]
+    lob = event_and_lob[:, cst.LEN_ORDER:]
 
     lob[:, 0::2] = unnormalize(lob[:, 0::2], cst.TSLA_LOB_MEAN_PRICE_10, cst.TSLA_LOB_STD_PRICE_10)
     lob[:, 1::2] = unnormalize(lob[:, 1::2], cst.TSLA_LOB_MEAN_SIZE_10, cst.TSLA_LOB_STD_SIZE_10)

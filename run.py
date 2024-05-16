@@ -12,12 +12,13 @@ from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
 from models.diffusers.CSDI.CSDI_hparam import HP_CSDI, HP_CSDI_FIXED
-
+from models.gans.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
     cst.Models.CDT: HP_SEARCH_TYPES(HP_CDT, HP_CDT_FIXED),
-    cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED)
+    cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED),
+    cst.Models.CGAN: HP_SEARCH_TYPES(HP_CGAN, HP_CGAN_FIXED)
 }
 
 def train(config, trainer):
@@ -27,6 +28,8 @@ def train(config, trainer):
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+        chosen_model=config.CHOSEN_MODEL,
+        chosen_stock=config.CHOSEN_STOCK,
     )
 
     val_set = LOBDataset(
@@ -34,6 +37,8 @@ def train(config, trainer):
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+        chosen_model=config.CHOSEN_MODEL,
+        chosen_stock=config.CHOSEN_STOCK,
     )
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
