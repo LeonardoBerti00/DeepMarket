@@ -3,7 +3,9 @@ import torch
 from lightning.pytorch.loggers import WandbLogger
 
 import wandb
+from configuration import Configuration
 import constants as cst
+from models.gans.GANEngine import GANEngine
 from preprocessing.DataModule import DataModule
 from preprocessing.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -20,7 +22,7 @@ HP_DICT_MODEL = {
     cst.Models.CSDI: HP_SEARCH_TYPES(HP_CSDI, HP_CSDI_FIXED)
 }
 
-def train(config, trainer):
+def train(config: Configuration, trainer: L.Trainer):
     print_setup(config)
     train_set = LOBDataset(
         path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
@@ -51,13 +53,19 @@ def train(config, trainer):
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
         num_workers=4
     )
+    
+    if config.USE_ENGINE == cst.Engine.GAN_ENGINE:
+        model = GANEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
+    elif config.USE_ENGINE == cst.Engine.NN_ENGINE:
+        model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
+    else:
+        raise ValueError("Specify a valid Engine")
 
     train_dataloader, val_dataloader = data_module.train_dataloader(), data_module.val_dataloader()
-    model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
     trainer.fit(model, train_dataloader, val_dataloader)
 
 
-def run(config, accelerator, model=None):
+def run(config: Configuration, accelerator, model=None):
     wandb_instance_name = ""
     model_params = HP_DICT_MODEL[config.CHOSEN_MODEL].fixed
     for param in cst.LearningHyperParameter:
@@ -92,7 +100,7 @@ def run(config, accelerator, model=None):
     )
     train(config, trainer)
 
-def run_wandb(config, accelerator):
+def run_wandb(config: Configuration, accelerator):
     def wandb_sweep_callback():
         wandb_logger = WandbLogger(project=cst.PROJECT_NAME, log_model=False, save_dir=cst.DIR_SAVED_MODEL)
         run_name = None
@@ -162,7 +170,7 @@ def run_wandb(config, accelerator):
 
     return wandb_sweep_callback
 
-def sweep_init(config):
+def sweep_init(config: Configuration):
     #wandb.login("d29d51017f4231b5149d36ad242526b374c9c60a")
     sweep_config = {
         'method': 'grid',
@@ -180,7 +188,7 @@ def sweep_init(config):
     }
     return sweep_config
 
-def print_setup(config):
+def print_setup(config: Configuration):
     print("Chosen model is: ", config.CHOSEN_MODEL.name)
     print("Is augmented: ", config.IS_AUGMENTATION)
     if config.IS_AUGMENTATION:
