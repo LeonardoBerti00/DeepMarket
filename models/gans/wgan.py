@@ -46,15 +46,13 @@ class Generator(nn.Module):
                                                             device=self.device))
         self.tanh = nn.Tanh()
         
-    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+    def forward(self, noise: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         # cond.shape = (batch_size, seq_len - 1, history_features)
-        # concatenate the market history with the noise in the time dimension
-        cond = torch.cat([cond, x], dim=1)
+        _, h_T = self.lstm(y)
         # run through the lstm and take the hidden state
-        _, h_cond = self.lstm(cond)
+        input_to_fc = torch.cat([h_T, noise], dim=1)
         # run through the fc layers
-        h_cond = torch.cat([h_cond, cond])
-        out_fc = self.fc_layers(h_cond)
+        out_fc = self.fc_layers(input_to_fc)
         # run through batch norm, relu and convtrans1d
         out_conv = self.conv_layers(out_fc)
         # apply tanh
@@ -102,13 +100,13 @@ class Discriminator(nn.Module):
         
         self.last_fc_layer = nn.Linear(in_features=self.fc_out_dim, out_features=1, device=self.device)
                 
-    def forwad(self, y: torch.Tensor, gen: torch.Tensor) -> torch.Tensor:
-        # concatenate on the feature dimension
-        x = torch.cat([y, gen], dim=-1)
+    def forwad(self, y: torch.Tensor, market_orders: torch.Tensor) -> torch.Tensor:
         # run the lstm
-        _, h_x = self.lstm(x)
+        market_orders = torch.cat([y, market_orders], dim=-1)
+        # run through the LSTM
+        _, h_T_plus_1 = self.lstm(market_orders)
         # run the linear layers
-        fc_out = self.fc_layers(h_x)
+        fc_out = self.fc_layers(h_T_plus_1)
         # run the convolution
         conv_out = self.conv_layers(fc_out)
         # run last layer to map to 1

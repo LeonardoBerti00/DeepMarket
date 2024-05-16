@@ -88,29 +88,30 @@ class GANEngine(L.LightningModule):
         self.ema.to(cst.DEVICE)
         
 
-    def forward(self, x: torch.Tensor, cond_orders: torch.Tensor):
-        return self.generator(x, cond_orders)     
+    def forward(self, noise: torch.Tensor, y: torch.Tensor):
+        return self.generator(noise, y)     
         
     def training_step(self, batch):
-        # orders.shape -> (batch,  seq_len, num_features)
-        # market_history.shape -> (batch, seq_len, market_history_features)
-        orders, market_history = batch
+        # y.shape -> (batch,  seq_len, num_features)
+        # market_orders.shape -> (batch, seq_len, market_orders_features)
+        y, market_orders = batch
 
         optimizer_g, optimizer_d = self.optimizers()
         # critic step
-        d_loss = self.__critic_step(orders, market_history, optimizer_d)
-        g_loss = self.__generator_step(orders, market_history, optimizer_g)
+        d_loss = self.__critic_step(y, market_orders, optimizer_d)
+        g_loss = self.__generator_step(y, market_orders, optimizer_g)
         
         self.ema.update()
         return g_loss + d_loss
 
-    def __generator_step(self, orders: torch.Tensor, market_history: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
-        noise = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
+    def __generator_step(self, y: torch.Tensor, market_orders: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
+        noise = torch.randn(y.shape[0], 1, self.hparams.order_feature_dim).type_as(y)
         
         self.toggle_optimizer(optimizer)
-
-        fake_order = self(noise, orders)
-        fake_logits = self.discriminator(fake_order, market_history)
+        # generate a fake order from pure noise based on the conditioning of real y
+        fake_order = self(noise, y)
+        market_orders[:,-1,:] = fake_order
+        fake_logits = self.discriminator(y, market_orders)
        
         # * min E_{x~P_X}[C(x)] - E_{Z~P_Z}[C(g(z))]
         loss = -fake_logits.mean().view(-1)
@@ -123,15 +124,17 @@ class GANEngine(L.LightningModule):
         
         return loss
         
-    def __critic_step(self, orders: torch.Tensor, market_history: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
-        noise = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
-        generated_order = self(noise, orders)
-
-        real_logits = self.discriminator(market_history)
-        fake_logits = self.discriminator(generated_order)
+    def __critic_step(self, y: torch.Tensor, market_orders: torch.Tensor, optimizer: torch.optim.Optimizer | Lion):
+        noise = torch.randn(y.shape[0], 1, self.hparams.order_feature_dim).type_as(y)
+        generated_order = self(noise, y)
+        # get the critic score on the real market
+        real_logits = self.discriminator(y, market_orders)
+        # replace the last order in the market with the generated one
+        market_orders[:,-1,:] = generated_order
+        # get the critic score on the market with the last order as fake
+        fake_logits = self.discriminator(y, market_orders)
         # * max E_{x~P_X}[C(x)] - E_{Z~P_Z}[C(g(z))]
         loss = -(real_logits.mean() - fake_logits.mean())
-
         self.log("d_loss", loss, prog_bar=True)
         self.manual_backward(loss)
         optimizer.step()
@@ -148,12 +151,12 @@ class GANEngine(L.LightningModule):
         print(f'learning rate: {self.optimizer.param_groups[0]["lr"]}')  
 
     def validation_step(self, batch):
-        orders, market_history = batch
+        y, market_orders = batch
         # Validation: with EMA
         with self.ema.average_parameters():
-            x = torch.randn(orders.shape[0], 1, self.hparams.order_feature_dim).type_as(orders)
-            generated = self(x, orders)
-            batch_loss = self.discriminator(generated, market_history)
+            x = torch.randn(y.shape[0], 1, self.hparams.order_feature_dim).type_as(y)
+            generated = self(x, y)
+            batch_loss = self.discriminator(generated, market_orders)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
         return batch_loss_mean
