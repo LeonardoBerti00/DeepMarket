@@ -188,9 +188,10 @@ class Kernel:
         # Get the next message in timestamp order (delivery time) and extract it.
         self.currentTime, event = self.messages.get()
         msg_recipient, msg_type, msg = event
-        #print("msg_recipient: ", msg_recipient, "msg_type: ", msg_type, "msg: ", msg)
+        
         # Periodically print the simulation time and total messages, even if muted.
-        if ttl_messages % 1000000 == 0:
+        if ttl_messages % 100000 == 0:
+          print("msg_recipient: ", msg_recipient, "msg_type: ", msg_type, "msg: ", msg)
           print ("\n--- Simulation time: {}, messages processed: {}, wallclock elapsed: {} ---\n".format(
                          self.fmtTime(self.currentTime), ttl_messages, pd.Timestamp('now') - eventQueueWallClockStart))
 

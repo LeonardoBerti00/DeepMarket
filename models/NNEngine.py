@@ -81,7 +81,7 @@ class NNEngine(L.LightningModule):
         
 
     def forward(self, cond_orders, x_0, cond_lob, is_train, batch_idx=None):
-        # x_0 shape is (batch_size, seq_size=1, cst.LEN_EVENT_ONE_HOT=8)
+        # x_0 shape is (batch_size, seq_size=1, cst.LEN_ORDER_ONE_HOT=8)
         if not self.one_hot_encoding_type:
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         real_input, real_cond = x_0.detach().clone(), cond_orders.detach().clone()
@@ -179,7 +179,6 @@ class NNEngine(L.LightningModule):
             #print(f"simple loss: {L_simple.mean()}")
             #print(f"vlb loss: {L_vlb.mean()}")
             return L_hybrid, L_simple, L_vlb
-            #return L_hybrid, L_simple, L_vlb
         else:
             L_simple = self.diffuser.loss(real, recon, **kwargs)
             return L_simple, L_simple, L_simple

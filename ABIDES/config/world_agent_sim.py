@@ -284,12 +284,12 @@ if trade_pov:
     if args.diffusion:
         log_dir = "world_agent_{}_{}_{}_pov_{}_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume, cst.SEED) + checkpoint_reference.name[:-5] 
     else:
-        log_dir = "market_replay_{}_{}_{}_pov_{}".format(symbol, date, time_mkt_close, args.pov_proportion_of_volume)
+        log_dir = "market_replay_{}_{}_{}_pov_{}_{}".format(symbol, date, time_mkt_close, pov_proportion_of_volume, cst.SEED)
 else:
     if args.diffusion:
         log_dir = "world_agent_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, cst.SEED) + checkpoint_reference.name[:-5]
     else:
-        log_dir = "market_replay_{}_{}_{}".format(symbol, date, time_mkt_close)
+        log_dir = "market_replay_{}_{}_{}_{}".format(symbol, date, time_mkt_close, cst.SEED)
 
 defaultComputationDelay = 0  # 50 nanoseconds
 # time.sleep(3)

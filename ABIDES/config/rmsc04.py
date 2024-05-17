@@ -13,11 +13,11 @@ import sys
 import datetime as dt
 from dateutil.parser import parse
 
-from ABIDES.agent.WorldAgent import WorldAgent
 from Kernel import Kernel
+from util import util
 from util.order import LimitOrder
 from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
-from util import util
+
 from agent.ExchangeAgent import ExchangeAgent
 from agent.NoiseAgent import NoiseAgent
 from agent.ValueAgent import ValueAgent
@@ -25,7 +25,7 @@ from agent.market_makers.AdaptiveMarketMakerAgent import AdaptiveMarketMakerAgen
 from agent.examples.MomentumAgent import MomentumAgent
 from agent.execution.POVExecutionAgent import POVExecutionAgent
 from model.LatencyModel import LatencyModel
-import constants as cst
+
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
 
@@ -49,7 +49,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='11:00:00',
+                    default='12:00:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -73,7 +73,6 @@ parser.add_argument('--config_help',
 parser.add_argument('-e',
                     '--execution-agents',
                     action='store_true',
-                    default=False,
                     help='Flag to allow the execution agent to trade.')
 parser.add_argument('-p',
                     '--execution-pov',
@@ -131,7 +130,7 @@ if args.config_help:
 
 log_dir = args.log_dir  # Requested log directory.
 seed = args.seed  # Random seed specification on the command line.
-if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
+if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 10 - 1)
 np.random.seed(seed)
 
 util.silent_mode = not args.verbose
@@ -157,57 +156,12 @@ agent_count, agents, agent_types = 0, [], []
 symbol = args.ticker
 starting_cash = 10000000  # Cash in this simulator is always in CENTS.
 
-#r_bar = 1e5
-#sigma_n = r_bar / 10
+r_bar = 1e5
+sigma_n = r_bar / 10
 kappa = 1.67e-15
 lambda_a = 7e-11
 
 # Oracle
-
-if symbol == "TSLA":
-    normalization_terms = {
-        "lob": [
-            cst.TSLA_LOB_MEAN_SIZE_10,
-            cst.TSLA_LOB_STD_SIZE_10,
-            cst.TSLA_LOB_MEAN_PRICE_10,
-            cst.TSLA_LOB_STD_PRICE_10,
-        ],
-        "event": [
-            cst.TSLA_EVENT_MEAN_SIZE,
-            cst.TSLA_EVENT_STD_SIZE,
-            cst.TSLA_EVENT_MEAN_PRICE,
-            cst.TSLA_EVENT_STD_PRICE,
-            cst.TSLA_EVENT_MEAN_TIME,
-            cst.TSLA_EVENT_STD_TIME,
-            cst.TSLA_EVENT_MEAN_DEPTH,
-            cst.TSLA_EVENT_STD_DEPTH,
-        ]
-    }
-    r_bar = cst.TSLA_EVENT_MEAN_PRICE*100
-    sigma_n = cst.TSLA_EVENT_STD_PRICE*100
-
-elif symbol == "INTC":
-    normalization_terms = {
-        "lob": [
-            cst.INTC_LOB_MEAN_SIZE_10, 
-            cst.INTC_LOB_STD_SIZE_10, 
-            cst.INTC_LOB_MEAN_PRICE_10,
-            cst.INTC_LOB_STD_PRICE_10
-            ],
-        "event": [
-            cst.INTC_EVENT_MEAN_SIZE, 
-            cst.INTC_EVENT_STD_SIZE, 
-            cst.INTC_EVENT_MEAN_PRICE, 
-            cst.INTC_EVENT_STD_PRICE, 
-            cst.INTC_EVENT_MEAN_TIME, 
-            cst.INTC_EVENT_STD_TIME,
-            cst.INTC_EVENT_MEAN_DEPTH,
-            cst.INTC_EVENT_STD_DEPTH
-        ]
-    }
-    r_bar = cst.INTC_EVENT_MEAN_PRICE*100
-    sigma_n = cst.INTC_EVENT_STD_PRICE*100
-
 symbols = {symbol: {'r_bar': r_bar,
                     'kappa': 1.67e-16,
                     'sigma_s': 0,
@@ -215,7 +169,7 @@ symbols = {symbol: {'r_bar': r_bar,
                     'megashock_lambda_a': 2.77778e-18,
                     'megashock_mean': 1e3,
                     'megashock_var': 5e4,
-                    'random_state': np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64'))}}
+                    'random_state': np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10, dtype='uint64'))}}
 
 oracle = SparseMeanRevertingOracle(mkt_open, mkt_close, symbols)
 
@@ -223,7 +177,7 @@ oracle = SparseMeanRevertingOracle(mkt_open, mkt_close, symbols)
 
 #  How many orders in the past to store for transacted volume computation
 # stream_history_length = int(pd.to_timedelta(args.mm_wake_up_freq).total_seconds() * 100)
-stream_history_length = 2500000
+stream_history_length = 25000
 
 agents.extend([ExchangeAgent(id=0,
                              name="EXCHANGE_AGENT",
@@ -237,48 +191,23 @@ agents.extend([ExchangeAgent(id=0,
                              stream_history=stream_history_length,
                              book_freq=book_freq,
                              wide_book=True,
-                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
+                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10, dtype='uint64')))])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
 
-    
-agents.extend([WorldAgent(id=1,
-                          name="WORLD_AGENT",
-                          type="WorldAgent",
-                          symbol=symbol,
-                          date=str(historical_date.date()),
-                          date_trading_days=cst.DATE_TRADING_DAYS,
-                          diffusion_model=None,
-                          data_dir=cst.DATA_DIR,
-                          cond_type=None,
-                          cond_seq_size=None,
-                          size_type_emb=None,
-                          log_orders=log_orders,
-                          random_state=np.random.RandomState(
-                              seed=np.random.randint(low=0, high=2 ** 16, dtype='uint64')),
-                          normalization_terms=normalization_terms,
-                          using_diffusion=False
-                          )
-               ])
-
-agent_types.extend("WorldAgent")
-agent_count += 1
-
-
 # 2) Noise Agents
-wakeup_time = mkt_open + pd.to_timedelta("00:15:00")
 num_noise = 5000
-noise_mkt_open = historical_date + pd.to_timedelta("09:45:00")  # These times needed for distribution of arrival times
+noise_mkt_open = historical_date + pd.to_timedelta(args.start_time.strftime('%H:%M:%S'))  # These times needed for distribution of arrival times
                                                                 # of Noise Agents
-noise_mkt_close = historical_date + pd.to_timedelta("11:00:00")
+noise_mkt_close = historical_date + pd.to_timedelta(args.end_time.strftime('%H:%M:%S'))
 agents.extend([NoiseAgent(id=j,
                           name="NoiseAgent {}".format(j),
                           type="NoiseAgent",
                           symbol=symbol,
                           starting_cash=starting_cash,
-                          wakeup_time=util.get_wake_time(wakeup_time, noise_mkt_close),
+                          wakeup_time=util.get_wake_time(noise_mkt_open, noise_mkt_close),
                           log_orders=log_orders,
-                          random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))
+                          random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10, dtype='uint64')))
                for j in range(agent_count, agent_count + num_noise)])
 agent_count += num_noise
 agent_types.extend(['NoiseAgent'])
@@ -295,9 +224,7 @@ agents.extend([ValueAgent(id=j,
                           kappa=kappa,
                           lambda_a=lambda_a,
                           log_orders=log_orders,
-                          random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')),
-                          wakeup_time=wakeup_time
-                          )
+                          random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10, dtype='uint64')))
                for j in range(agent_count, agent_count + num_value)])
 agent_count += num_value
 agent_types.extend(['ValueAgent'])
@@ -337,10 +264,8 @@ agents.extend([AdaptiveMarketMakerAgent(id=j,
                                 spread_alpha=args.mm_spread_alpha,
                                 backstop_quantity=args.mm_backstop_quantity,
                                 log_orders=log_orders,
-                                random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                          dtype='uint64')),
-                                wakeup_time=wakeup_time
-                                )
+                                random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10,
+                                                                                          dtype='uint64')))
                for idx, j in enumerate(range(agent_count, agent_count + num_mm_agents))])
 agent_count += num_mm_agents
 agent_types.extend('POVMarketMakerAgent')
@@ -358,10 +283,8 @@ agents.extend([MomentumAgent(id=j,
                              max_size=10,
                              wake_up_freq='20s',
                              log_orders=log_orders,
-                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                       dtype='uint64')),
-                            wakeup_time=wakeup_time
-                            )
+                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10,
+                                                                                       dtype='uint64')))
                for j in range(agent_count, agent_count + num_momentum_agents)])
 agent_count += num_momentum_agents
 agent_types.extend("MomentumAgent")
@@ -393,7 +316,7 @@ pov_agent = POVExecutionAgent(id=agent_count,
                               quantity=pov_quantity,
                               trade=trade,
                               log_orders=True,  # needed for plots so conflicts with others
-                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+                              random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10,
                                                                                           dtype='uint64')))
 
 execution_agents = [pov_agent]
@@ -405,17 +328,17 @@ agent_count += 1
 ########################################################################################################################
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
-kernel = Kernel("RMSC03 Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+kernel = Kernel("RMSC03 Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 10,
                                                                                                   dtype='uint64')))
 
-kernelStartTime = historical_date + pd.to_timedelta('09:30:00')
+kernelStartTime = historical_date + pd.to_timedelta(args.start_time.strftime('%H:%M:%S'))
 kernelStopTime = mkt_close + pd.to_timedelta('00:01:00')
 
 defaultComputationDelay = 50  # 50 nanoseconds
 
 # LATENCY
 
-latency_rstate = np.random.RandomState(seed=np.random.randint(low=0, high=100000))
+latency_rstate = np.random.RandomState(seed=np.random.randint(low=0, high=2**10))
 pairwise = (agent_count, agent_count)
 
 # All agents sit on line from Seattle to NYC
@@ -433,12 +356,6 @@ latency_model = LatencyModel(latency_model='deterministic',
                              random_state=latency_rstate,
                              kwargs=model_args
                              )
-date = historical_date.strftime('%Y%m%d')
-closing = mkt_close.strftime('%H%M%S')
-if trade:
-    log_dir = "IABS_{}_{}_{}_pov_{}".format(symbol, date, closing, pov_proportion_of_volume)
-else:
-    log_dir = "IABS_{}_{}_{}".format(symbol, date, closing)
 # KERNEL
 
 kernel.runner(agents=agents,
@@ -447,7 +364,7 @@ kernel.runner(agents=agents,
               agentLatencyModel=latency_model,
               defaultComputationDelay=defaultComputationDelay,
               oracle=oracle,
-              log_dir=log_dir)
+              log_dir=args.log_dir)
 
 
 simulation_end_time = dt.datetime.now()
