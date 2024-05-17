@@ -1,5 +1,5 @@
 import os
-from utils.utils_data import z_score_orderbook, normalize_messages, preprocess_data
+from utils.utils_data import z_score_orderbook, normalize_messages, preprocess_data, z_score_market_features, normalize_order_cgan
 import pandas as pd
 import numpy as np
 import constants as cst
@@ -12,6 +12,7 @@ class LOBSTERDataBuilder:
         data_dir,
         date_trading_days,
         split_rates,
+        chosen_model
     ):
         self.n_lob_levels = cst.N_LOB_LEVELS
         self.data_dir = data_dir
@@ -19,6 +20,7 @@ class LOBSTERDataBuilder:
         self.stock_name = stock_name
         self.split_rates = split_rates
         self.dataframes = []
+        self.chosen_model = chosen_model
 
     def prepare_save_datasets(self):
         path = "{}/{}/{}_{}_{}".format(
@@ -60,7 +62,10 @@ class LOBSTERDataBuilder:
         split_days = [i * 2 for i in split_days]
         self._create_dataframes_splitted(path, split_days, COLUMNS_NAMES)
         # to conclude the preprocessing we normalize the dataframes
-        self._normalize_dataframes()
+        if (self.chosen_model == cst.Models.CGAN):
+            self._normalize_dataframes_gan()
+        else:
+            self._normalize_dataframes_cdt()
 
 
     def _create_dataframes_splitted(self, path, split_days, COLUMNS_NAMES):
@@ -81,12 +86,12 @@ class LOBSTERDataBuilder:
                     else:
                         if i == 1:
                             train_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            train_orderbooks, train_messages = preprocess_data([[train_messages, train_orderbooks]], self.n_lob_levels)
+                            train_orderbooks, train_messages = preprocess_data([[train_messages, train_orderbooks]], self.n_lob_levels, self.chosen_model)
                             if (len(train_orderbooks) != len(train_messages)):
                                 raise ValueError("train_orderbook length is different than train_messages")
                         else:
                             train_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            train_orderbook, train_message = preprocess_data([[train_message, train_orderbook]], self.n_lob_levels)
+                            train_orderbook, train_message = preprocess_data([[train_message, train_orderbook]], self.n_lob_levels, self.chosen_model)
                             train_messages = pd.concat([train_messages, train_message], axis=0)
                             train_orderbooks = pd.concat([train_orderbooks, train_orderbook], axis=0)
 
@@ -100,12 +105,12 @@ class LOBSTERDataBuilder:
                     else:
                         if i == split_days[0] + 1:
                             val_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            val_orderbooks, val_messages = preprocess_data([[val_messages, val_orderbooks]], self.n_lob_levels)
+                            val_orderbooks, val_messages = preprocess_data([[val_messages, val_orderbooks]], self.n_lob_levels, self.chosen_model)
                             if (len(val_orderbooks) != len(val_messages)):
                                 raise ValueError("val_orderbook length is different than val_messages")
                         else:
                             val_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            val_orderbooks, val_messages = preprocess_data([[val_message, val_orderbook]], self.n_lob_levels)
+                            val_orderbooks, val_messages = preprocess_data([[val_message, val_orderbook]], self.n_lob_levels, self.chosen_model)
                             val_messages = pd.concat([val_messages, val_message], axis=0)
                             val_orderbooks = pd.concat([val_orderbooks, val_orderbook], axis=0)
 
@@ -121,13 +126,13 @@ class LOBSTERDataBuilder:
                     else:
                         if i == split_days[1] + 1:
                             test_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            test_orderbooks, test_messages = preprocess_data([[test_messages, test_orderbooks]], self.n_lob_levels)
+                            test_orderbooks, test_messages = preprocess_data([[test_messages, test_orderbooks]], self.n_lob_levels, self.chosen_model)
 
                             if (len(test_orderbooks) != len(test_messages)):
                                 raise ValueError("test_orderbook length is different than test_messages")
                         else:
                             test_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                            test_orderbook, test_message = preprocess_data([[test_message, test_orderbook]], self.n_lob_levels)
+                            test_orderbook, test_message = preprocess_data([[test_message, test_orderbook]], self.n_lob_levels, self.chosen_model)
                             test_messages = pd.concat([test_messages, test_message], axis=0)
                             test_orderbooks = pd.concat([test_orderbooks, test_orderbook], axis=0)
 
@@ -137,7 +142,7 @@ class LOBSTERDataBuilder:
         self.dataframes.append([test_messages, test_orderbooks])
 
 
-    def _normalize_dataframes(self):
+    def _normalize_dataframes_cdt(self):
         # divide all the price, both of lob and messages, by 100
         for i in range(len(self.dataframes)):
             self.dataframes[i][0]["price"] = self.dataframes[i][0]["price"] / 100
@@ -157,11 +162,30 @@ class LOBSTERDataBuilder:
             else:
                 self.dataframes[i][0], _, _, _, _, _, _, _, _ = normalize_messages(self.dataframes[i][0], mean_size, mean_prices, std_size, std_prices, mean_time, std_time, mean_depth, std_depth)
 
+    def _normalize_dataframes_gan(self):
+        #apply z score to orderbooks
+        for i in range(len(self.dataframes)):
+            if (i == 0):
+                self.dataframes[i][1], mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol = z_score_market_features(self.dataframes[i][1])
+            else:
+                self.dataframes[i][1], _, _, _, _, _, _, _, _ = z_score_market_features(self.dataframes[i][1], mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol)
+
+        #apply z-score to size and prices of messages with the statistics of the train set
+        for i in range(len(self.dataframes)):
+            if (i == 0):
+                self.dataframes[i][0], mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100 = normalize_order_cgan(self.dataframes[i][0])
+            else:
+                self.dataframes[i][0], _, _, _, _, _, _ = normalize_order_cgan(self.dataframes[i][0], mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100)
 
     def _save(self, path_where_to_save):
-        np.save(path_where_to_save + "/train.npy", self.train_set)
-        np.save(path_where_to_save + "/val.npy", self.val_set)
-        np.save(path_where_to_save + "/test.npy", self.test_set)
+        if self.chosen_model == cst.Models.CGAN:
+            np.save(path_where_to_save + "/train_cgan.npy", self.train_set)
+            np.save(path_where_to_save + "/val_cgan.npy", self.val_set)
+            np.save(path_where_to_save + "/test_cgan.npy", self.test_set)
+        else:
+            np.save(path_where_to_save + "/train.npy", self.train_set)
+            np.save(path_where_to_save + "/val.npy", self.val_set)
+            np.save(path_where_to_save + "/test.npy", self.test_set)
 
 
     def _split_days(self):

@@ -41,21 +41,13 @@ def set_torch():
 def plot_graphs(real_data_path, cdt_data_path, iabs_data_path):
     warnings.filterwarnings("ignore")
     #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=True)
-    #comparison_depth.main(real_data_path, iabs_data_path, IS_REAL=False)
-    #comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path)
+    #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=False)
+    comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path)
     #comparison_distribution_volume_price.main(real_data_path, cdt_data_path)
     #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=True)
     #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=False)
-    #PCA_plots.main(real_data_path, iabs_data_path)
+    #PCA_plots.main(real_data_path, cdt_data_path)
     #comparison_midprice.main(real_data_path, cdt_data_path)
-    comparison_multiple_days_midprice.main(days_paths=[
-        real_data_path, 
-        cdt_data_path, 
-        "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_seed_20/processed_orders.csv",
-        "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_epoch=3_seed_30/processed_orders.csv",
-        "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.811_new/processed_orders.csv",
-        "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.957_epoch=0_TSLA_full_cond_aug_MLP_concatenation_MLP_seq_size_256/processed_orders.csv"
-        ])
     #comparison_volume_distribution.main(real_data_path, cdt_data_path, IS_REAL=True)
     #comparison_volume_distribution.main(real_data_path, cdt_data_path, IS_REAL=False)
     #comparison_distribution_log_interarrival_times.main(real_data_path, cdt_data_path)
@@ -94,6 +86,7 @@ if __name__ == "__main__":
             data_dir=cst.DATA_DIR,
             date_trading_days=cst.DATE_TRADING_DAYS,
             split_rates=config.SPLIT_RATES,
+            chosen_model=config.CHOSEN_MODEL
         )
         data_builder.prepare_save_datasets()
         exit()
@@ -111,8 +104,8 @@ if __name__ == "__main__":
         run(config, accelerator)
 
     elif config.IS_EVALUATION:
-        plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH)
-        predictive_discriminative_scores(config.REAL_DATA_PATH, config.IABS_DATA_PATH)
+        #plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH)
+        predictive_discriminative_scores(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
         
 
         

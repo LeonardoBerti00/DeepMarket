@@ -8,6 +8,9 @@ import os.path
 
 import sys
 sys.path.extend(['../util/formatting'])
+sys.path.append('..')
+sys.path.append(os.getcwd())
+print(os.getcwd())
 from util.formatting.convert_order_book import process_orderbook
 from util.formatting.convert_order_stream import convert_stream_to_format
 import itertools

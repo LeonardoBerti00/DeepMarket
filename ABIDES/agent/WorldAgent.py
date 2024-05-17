@@ -98,6 +98,13 @@ class WorldAgent(Agent):
                                       "levels": levels,
                                       "freq": 0})  # if freq is 0 all the LOB updates will be provided
                          )
+        
+    def cancelDataSubscription(self):
+        self.sendMessage(recipientID=self.exchangeID,
+                         msg=Message({"msg": "CANCEL_MARKET_DATA_SUBSCRIPTION",
+                                      "sender": self.id,
+                                      "symbol": self.symbol})
+                         )
 
     def wakeup(self, currentTime):
         super().wakeup(currentTime)
@@ -123,7 +130,7 @@ class WorldAgent(Agent):
             self.requestDataSubscription(self.symbol, levels=10)
             self.first_wakeup = False
 
-        # if current time is between 09:30 and 10:00, then we are in the pre-open phase
+        # if current time is between 09:30 and 09:45, then we are in the pre-open phase
         elif self.mkt_open <= currentTime <= self.mkt_open + pd.Timedelta(self.starting_time_diffusion):
             next_order = self.historical_orders[self.next_historical_orders_index]
             self.last_offset_time = next_order[0]
@@ -134,7 +141,10 @@ class WorldAgent(Agent):
                 self.setWakeup(currentTime + offset + datetime.timedelta(microseconds=1))
             else:
                 return
-
+        elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and not self.using_diffusion:
+            print("cancelling data subscription")
+            self.cancelDataSubscription()
+            
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and self.using_diffusion:
             self.state = 'GENERATING'
             # we generate the first order then the others will be generated everytime we receive the update of the lob
@@ -164,6 +174,9 @@ class WorldAgent(Agent):
 
 
     def receiveMessage(self, currentTime, msg):
+        if currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and not self.using_diffusion:
+            return
+        
         super().receiveMessage(currentTime, msg)
         if msg.body['msg'] == 'MARKET_DATA':
             self._update_lob_snapshot(msg)
@@ -253,7 +266,7 @@ class WorldAgent(Agent):
             else:
                 raise ValueError("cond_type not recognized")
             cond_orders = cond_orders.unsqueeze(0)   
-            x = torch.zeros(1, 1, cst.LEN_EVENT, device=cst.DEVICE, dtype=torch.float32)
+            x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
             generated = self.diffusion_model.sampling(cond_orders, x, cond_lob)
             generated = generated[0, 0, :]
             generated = self._postprocess_generated(generated)

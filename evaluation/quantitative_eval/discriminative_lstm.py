@@ -152,6 +152,15 @@ def main(real_path, generated_path):
     df_g["Time"] = df_g['Unnamed: 0'].str.slice(11, 19)
     df_g = df_g.query("Time >= '09:45:00'")
     df_g = df_g.drop(['Time'], axis=1)
+    
+    df_g = df_g.query("ask_price_1 < 9999999")
+    df_g = df_g.query("bid_price_1 < 9999999")
+    df_g = df_g.query("ask_price_1 > -9999999")
+    df_g = df_g.query("bid_price_1 > -9999999")
+    df_r = df_r.query("ask_price_1 < 9999999")
+    df_r = df_r.query("bid_price_1 < 9999999")
+    df_r = df_r.query("ask_price_1 > -9999999")
+    df_r = df_r.query("bid_price_1 > -9999999")
 
     if len(df_r) > len(df_g):
         n_remove = len(df_r) - len(df_g)

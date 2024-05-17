@@ -76,7 +76,7 @@ def main(real_path, generated_path, IS_REAL):
     plt.ylabel('Volume at 1st level')
     
     if IS_REAL:
-        plt.title('Real Data')
+        plt.title('Volume Market Replay')
     else:
         if "IABS" in generated_path:
             title = "Volume IABS simulation"
