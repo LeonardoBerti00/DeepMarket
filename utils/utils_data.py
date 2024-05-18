@@ -3,8 +3,9 @@ import numpy as np
 import os
 
 import torch
-
+import pandas
 import constants as cst
+
 def z_score_market_features(data, mean_spread=None, mean_returns=None, mean_vol_imb=None, mean_abs_vol=None, std_spread=None, std_returns=None, std_vol_imb=None, std_abs_vol=None):
     data = data.reset_index(drop=True)
     if (mean_spread is None) or (std_spread is None):
@@ -13,16 +14,16 @@ def z_score_market_features(data, mean_spread=None, mean_returns=None, mean_vol_
     
     if (mean_returns is None) or (std_returns is None):
         #concatenates returns_1 and returns_5
-        mean_returns = data[["returns_1", "returns_50"]].mean()
-        std_returns = data[["returns_1", "returns_50"]].std()
+        mean_returns = pd.concat([data["returns_1"], data["returns_50"]]).mean()
+        std_returns = pd.concat([data["returns_1"], data["returns_50"]]).std()
         
     if (mean_vol_imb is None) or (std_vol_imb is None):
-        mean_vol_imb = data[["volume_imbalance_1", "volume_imbalance_5"]].mean()
-        std_vol_imb = data[["volume_imbalance_1", "volume_imbalance_5"]].std()
+        mean_vol_imb = pd.concat([data["volume_imbalance_1"], data["volume_imbalance_5"]]).mean()
+        std_vol_imb = pd.concat([data["volume_imbalance_1"], data["volume_imbalance_5"]]).std()
         
     if (mean_abs_vol is None) or (std_abs_vol is None):
-        mean_abs_vol = data[["absolute_volume_1", "absolute_volume_5"]].mean()
-        std_abs_vol = data[["absolute_volume_1", "absolute_volume_5"]].std()
+        mean_abs_vol = pd.concat([data["absolute_volume_1"], data["absolute_volume_5"]]).mean()
+        std_abs_vol = pd.concat([data["absolute_volume_1"], data["absolute_volume_5"]]).std()
     
     data["spread"] = (data["spread"] - mean_spread) / std_spread
     data["returns_1"] = (data["returns_1"] - mean_returns) / std_returns
@@ -40,11 +41,13 @@ def z_score_market_features(data, mean_spread=None, mean_returns=None, mean_vol_
     print("std vol imb ", std_vol_imb)
     print("mean abs vol ", mean_abs_vol)
     print("std abs vol ", std_abs_vol)
-    print(data[:5])
+    print(data[:10])
     print()
     return data, mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol
 
-def normalize_order_cgan(data, mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100):
+
+
+def normalize_order_cgan(data, mean_size=None, mean_depth=None, mean_cancel_depth=None, mean_size_100=None, std_size=None, std_depth=None, std_cancel_depth=None, std_size_100=None):
     data = data.reset_index(drop=True)
     if (mean_size is None) or (std_size is None):
         mean_size = data["size"].mean()

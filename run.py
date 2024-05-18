@@ -26,8 +26,15 @@ HP_DICT_MODEL = {
 
 def train(config: Configuration, trainer: L.Trainer):
     print_setup(config)
+    if config.CHOSEN_MODEL == cst.Models.CGAN:
+        train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train_cgan.npy"
+        val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val_cgan.npy" 
+    else:
+        train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy"
+        val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy"
+        
     train_set = LOBDataset(
-        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy",
+        path=train_data_path,
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
@@ -36,13 +43,14 @@ def train(config: Configuration, trainer: L.Trainer):
     )
 
     val_set = LOBDataset(
-        path=cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy",
+        path=val_data_path,
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
         one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
         chosen_model=config.CHOSEN_MODEL,
         chosen_stock=config.CHOSEN_STOCK,
     )
+    
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
     #print("size of test set: ", test_set.data.size())
@@ -51,7 +59,7 @@ def train(config: Configuration, trainer: L.Trainer):
         val_set.data = val_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
         
-    val_set.data = val_set.data[:51200]
+    #val_set.data = val_set.data[:51200]
     data_module = DataModule(
         train_set=train_set,
         val_set=val_set,
@@ -72,32 +80,35 @@ def train(config: Configuration, trainer: L.Trainer):
 
 
 def run(config: Configuration, accelerator, model=None):
-    print("BELLA")
     wandb_instance_name = ""
     model_params = HP_DICT_MODEL[config.CHOSEN_MODEL].fixed
     for param in cst.LearningHyperParameter:
         if param.value in model_params:
             config.HYPER_PARAMETERS[param] = model_params[param.value]
             wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
-
-    cond_type = config.COND_TYPE
-    is_augmentation = config.IS_AUGMENTATION
-    stock_name = config.CHOSEN_STOCK.name
-    diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-    augmenter = config.CHOSEN_AUGMENTER
-    aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-    if is_augmentation:
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + str(aug_dim) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
-    else:
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
-    wandb_instance_name = config.FILENAME_CKPT
+    wandb_instance_name += f"seed_{cst.SEED}"
+    if config.CHOSEN_MODEL == cst.Models.CDT:
+        cond_type = config.COND_TYPE
+        is_augmentation = config.IS_AUGMENTATION
+        stock_name = config.CHOSEN_STOCK.name
+        diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+        augmenter = config.CHOSEN_AUGMENTER
+        aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
+        if is_augmentation:
+            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + str(aug_dim) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+        else:
+            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+        wandb_instance_name = config.FILENAME_CKPT
+    elif config.CHOSEN_MODEL == cst.Models.CGAN:
+        config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
+        wandb_instance_name = config.FILENAME_CKPT
 
     trainer = L.Trainer(
         accelerator=accelerator,
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=10, verbose=True, min_delta=0.005),
             TQDMProgressBar(refresh_rate=1000)
             ],
         num_sanity_val_steps=0,
@@ -127,23 +138,30 @@ def run_wandb(config: Configuration, accelerator):
             if param.value in model_params:
                 config.HYPER_PARAMETERS[param] = model_params[param.value]
                 wandb_instance_name += str(param.value) + "_" + str(model_params[param.value]) + "_"
+                
+        wandb_instance_name += f"seed_{cst.SEED}"
         
-        run.name = wandb_instance_name
-        aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-        config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = aug_dim // 64
-        cond_type = config.COND_TYPE
-        stock_name = config.CHOSEN_STOCK.name
-        diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-        augmenter = config.CHOSEN_AUGMENTER
-        cond_augmenter = config.CHOSEN_COND_AUGMENTER
-        config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_cond_aug_" + str(cond_augmenter) + "_" + config.COND_METHOD + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
-        wandb_instance_name = config.FILENAME_CKPT
+        if config.CHOSEN_MODEL == cst.Models.CGAN:
+            config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
+            wandb_instance_name = config.FILENAME_CKPT
+        elif config.CHOSEN_MODEL == cst.Models.CDT:
+            run.name = wandb_instance_name
+            aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
+            config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = aug_dim // 64
+            cond_type = config.COND_TYPE
+            stock_name = config.CHOSEN_STOCK.name
+            diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
+            augmenter = config.CHOSEN_AUGMENTER
+            cond_augmenter = config.CHOSEN_COND_AUGMENTER
+            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_cond_aug_" + str(cond_augmenter) + "_" + config.COND_METHOD + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+            wandb_instance_name = config.FILENAME_CKPT
+            
         trainer = L.Trainer(
             accelerator=accelerator,
             precision=cst.PRECISION,
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             callbacks=[
-                EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
+                EarlyStopping(monitor="val_ema_loss", mode="min", patience=10, verbose=True, min_delta=0.005),
                 TQDMProgressBar(refresh_rate=1000)
             ],
             num_sanity_val_steps=0,
@@ -156,29 +174,47 @@ def run_wandb(config: Configuration, accelerator):
         run.log({"model": config.CHOSEN_MODEL.name}, commit=False)
         run.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
         run.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
-        run.log({"cond type": config.COND_TYPE}, commit=False)
-        run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
-        run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
-        run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
-        run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
-        run.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
-        run.log({"cdt num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
-        run.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
-        run.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
-        run.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
-        run.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
-        run.log({"size type emb": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]}, commit=False)
-        run.log({"cond augmenter": config.CHOSEN_COND_AUGMENTER}, commit=False)
-        run.log({"cond method": config.COND_METHOD}, commit=False)
-        run.log({"seed": cst.SEED}, commit=False)
-        run.log({"lambda": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LAMBDA]}, commit=False)        
+        if config.CHOSEN_MODEL == cst.Models.CDT:
+            run.log({"cond type": config.COND_TYPE}, commit=False)
+            run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
+            run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
+            run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
+            run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
+            run.log({"cdt depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
+            run.log({"cdt num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
+            run.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
+            run.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
+            run.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
+            run.log({"augmenter": config.CHOSEN_AUGMENTER}, commit=False)
+            run.log({"size type emb": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB]}, commit=False)
+            run.log({"cond augmenter": config.CHOSEN_COND_AUGMENTER}, commit=False)
+            run.log({"cond method": config.COND_METHOD}, commit=False)
+            run.log({"seed": cst.SEED}, commit=False)
+            run.log({"lambda": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LAMBDA]}, commit=False)        
+        elif config.CHOSEN_MODEL == cst.Models.CGAN:
+            run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
+            run.log({"market features dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM]}, commit=False)
+            run.log({"order features dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM]}, commit=False)
+            run.log({"generator LSTM hidden state dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_LSTM_HIDDEN_STATE_DIM]}, commit=False)
+            run.log({"generator FC hidden dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM]}, commit=False)
+            run.log({"generator kernel size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_KERNEL_SIZE]}, commit=False)
+            run.log({"generator num FC layers": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_NUM_FC_LAYERS]}, commit=False)
+            run.log({"generator num conv layers": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_NUM_CONV_LAYERS]}, commit=False)
+            run.log({"generator stride": config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_STRIDE]}, commit=False)
+            run.log({"discriminator LSTM hidden state dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM]}, commit=False)
+            run.log({"discriminator FC hidden dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM]}, commit=False)
+            run.log({"discriminator num FC layers": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS]}, commit=False)
+            run.log({"discriminator num conv layers": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_NUM_CONV_LAYERS]}, commit=False)
+            run.log({"discriminator kernel size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE]}, commit=False)
+            run.log({"discriminator stride": config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_STRIDE]}, commit=False)
+            run.log({"seed": cst.SEED}, commit=False)
         train(config, trainer)
         run.finish()
 
     return wandb_sweep_callback
 
 def sweep_init(config: Configuration):
-    #wandb.login("d29d51017f4231b5149d36ad242526b374c9c60a")
+    #wandb.login()
     sweep_config = {
         'method': 'grid',
         'metric': {
@@ -197,18 +233,36 @@ def sweep_init(config: Configuration):
 
 def print_setup(config: Configuration):
     print("Chosen model is: ", config.CHOSEN_MODEL.name)
-    print("Is augmented: ", config.IS_AUGMENTATION)
-    if config.IS_AUGMENTATION:
-        print("Augmentation dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM])
-        print("Augmenter: ", config.CHOSEN_AUGMENTER)
-        print("CDT depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH])
-        print("CDT num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS])
-    print("Conditioning type: ", config.COND_TYPE)
-    print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
-    print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
-    print("Batch size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE])
-    print("Learning rate: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE])
-    print("Optimizer: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER])
-    print("One hot encoding type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE])
-    if not config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
-        print("Size order embedding: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB])  
+    if config.CHOSEN_MODEL == cst.Models.CDT:
+        print("Is augmented: ", config.IS_AUGMENTATION)
+        if config.IS_AUGMENTATION:
+            print("Augmentation dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM])
+            print("Augmenter: ", config.CHOSEN_AUGMENTER)
+            print("CDT depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH])
+            print("CDT num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS])
+        print("Conditioning type: ", config.COND_TYPE)
+        print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
+        print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
+        print("Batch size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE])
+        print("Learning rate: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE])
+        print("Optimizer: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER])
+        print("One hot encoding type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE])
+        if not config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
+            print("Size order embedding: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB])  
+    elif config.CHOSEN_MODEL == cst.Models.CGAN:
+        #self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_LEN] = 256
+        print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
+        print("Market features dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM])
+        print("Order features dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM])
+        print("Generator LSTM hidden state dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_LSTM_HIDDEN_STATE_DIM])
+        print("Generator FC hidden dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM])
+        print("Generator kernel size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_KERNEL_SIZE])
+        print("Generator num FC layers: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_NUM_FC_LAYERS])
+        print("Generator num conv layers: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_NUM_CONV_LAYERS])
+        print("Generator stride: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.GENERATOR_STRIDE])
+        print("Discriminator LSTM hidden state dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM]) 
+        print("Discriminator FC hidden dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM])
+        print("Discriminator num FC layers: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS])
+        print("Discriminator num conv layers: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_NUM_CONV_LAYERS])
+        print("Discriminator kernel size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE])
+        print("Discriminator stride: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.DISCRIMINATOR_STRIDE])        

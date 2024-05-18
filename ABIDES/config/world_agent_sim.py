@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import time
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -23,6 +24,7 @@ from pathlib import Path
 
 import configuration
 from models.NNEngine import NNEngine
+from models.gans.GANEngine import GANEngine
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -95,7 +97,7 @@ seed = cst.SEED  # Random seed specification on the command line.
 
 exchange_log_orders = True
 log_orders = True
-
+warnings.filterwarnings("ignore")
 simulation_start_time = dt.datetime.now()
 print("Simulation Start Time: {}".format(simulation_start_time))
 print("Configuration seed: {}\n".format(seed))
@@ -110,45 +112,90 @@ agent_count, agents, agent_types = 0, [], []
 
 # Hyperparameters
 symbol = args.ticker
-if symbol == "TSLA":
-    normalization_terms = {
-        "lob": [
-            cst.TSLA_LOB_MEAN_SIZE_10,
-            cst.TSLA_LOB_STD_SIZE_10,
-            cst.TSLA_LOB_MEAN_PRICE_10,
-            cst.TSLA_LOB_STD_PRICE_10,
-        ],
-        "event": [
-            cst.TSLA_EVENT_MEAN_SIZE,
-            cst.TSLA_EVENT_STD_SIZE,
-            cst.TSLA_EVENT_MEAN_PRICE,
-            cst.TSLA_EVENT_STD_PRICE,
-            cst.TSLA_EVENT_MEAN_TIME,
-            cst.TSLA_EVENT_STD_TIME,
-            cst.TSLA_EVENT_MEAN_DEPTH,
-            cst.TSLA_EVENT_STD_DEPTH,
-        ]
-    }
-
-elif symbol == "INTC":
-    normalization_terms = {
-        "lob": [
-            cst.INTC_LOB_MEAN_SIZE_10, 
-            cst.INTC_LOB_STD_SIZE_10, 
-            cst.INTC_LOB_MEAN_PRICE_10,
-            cst.INTC_LOB_STD_PRICE_10
+if args.chosen_model == "CDT":
+    if symbol == "TSLA":
+        normalization_terms = {
+            "lob": [
+                cst.TSLA_LOB_MEAN_SIZE_10,
+                cst.TSLA_LOB_STD_SIZE_10,
+                cst.TSLA_LOB_MEAN_PRICE_10,
+                cst.TSLA_LOB_STD_PRICE_10,
             ],
-        "event": [
-            cst.INTC_EVENT_MEAN_SIZE, 
-            cst.INTC_EVENT_STD_SIZE, 
-            cst.INTC_EVENT_MEAN_PRICE, 
-            cst.INTC_EVENT_STD_PRICE, 
-            cst.INTC_EVENT_MEAN_TIME, 
-            cst.INTC_EVENT_STD_TIME,
-            cst.INTC_EVENT_MEAN_DEPTH,
-            cst.INTC_EVENT_STD_DEPTH
-        ]
-    }
+            "event": [
+                cst.TSLA_EVENT_MEAN_SIZE,
+                cst.TSLA_EVENT_STD_SIZE,
+                cst.TSLA_EVENT_MEAN_PRICE,
+                cst.TSLA_EVENT_STD_PRICE,
+                cst.TSLA_EVENT_MEAN_TIME,
+                cst.TSLA_EVENT_STD_TIME,
+                cst.TSLA_EVENT_MEAN_DEPTH,
+                cst.TSLA_EVENT_STD_DEPTH,
+            ]
+        }
+
+    elif symbol == "INTC":
+        normalization_terms = {
+            "lob": [
+                cst.INTC_LOB_MEAN_SIZE_10, 
+                cst.INTC_LOB_STD_SIZE_10, 
+                cst.INTC_LOB_MEAN_PRICE_10,
+                cst.INTC_LOB_STD_PRICE_10
+                ],
+            "event": [
+                cst.INTC_EVENT_MEAN_SIZE, 
+                cst.INTC_EVENT_STD_SIZE, 
+                cst.INTC_EVENT_MEAN_PRICE, 
+                cst.INTC_EVENT_STD_PRICE, 
+                cst.INTC_EVENT_MEAN_TIME, 
+                cst.INTC_EVENT_STD_TIME,
+                cst.INTC_EVENT_MEAN_DEPTH,
+                cst.INTC_EVENT_STD_DEPTH
+            ]
+        }
+elif args.chosen_model == "CGAN":
+    if symbol == "TSLA":
+        normalization_terms = {
+            "lob": [
+                cst.TSLA_MEAN_SPREAD,
+                cst.TSLA_STD_SPREAD,
+                cst.TSLA_MEAN_RETURN,
+                cst.TSLA_STD_RETURN,
+                cst.TSLA_MEAN_VOL_IMB,
+                cst.TSLA_STD_VOL_IMB,
+                cst.TSLA_MEAN_ABS_VOL,
+                cst.TSLA_STD_ABS_VOL,
+                cst.TSLA_MEAN_CANCEL_DEPTH,
+                cst.TSLA_STD_CANCEL_DEPTH,
+                cst.TSLA_MEAN_SIZE_100,
+                cst.TSLA_STD_SIZE_100,
+                cst.TSLA_EVENT_MEAN_DEPTH,
+                cst.TSLA_EVENT_STD_DEPTH,
+                cst.TSLA_EVENT_MEAN_SIZE,
+                cst.TSLA_EVENT_STD_SIZE,
+            ]
+        }
+
+    elif symbol == "INTC":
+        normalization_terms = {
+            "lob": [
+                cst.INTC_MEAN_SPREAD,
+                cst.INTC_STD_SPREAD,
+                cst.INTC_MEAN_RETURN,
+                cst.INTC_STD_RETURN,
+                cst.INTC_MEAN_VOL_IMB,
+                cst.INTC_STD_VOL_IMB,
+                cst.INTC_MEAN_ABS_VOL,
+                cst.INTC_STD_ABS_VOL,
+                cst.INTC_MEAN_CANCEL_DEPTH,
+                cst.INTC_STD_CANCEL_DEPTH,
+                cst.INTC_MEAN_SIZE_100,
+                cst.INTC_STD_SIZE_100,
+                cst.INTC_EVENT_MEAN_DEPTH,
+                cst.INTC_EVENT_STD_DEPTH,
+                cst.INTC_EVENT_MEAN_SIZE,
+                cst.INTC_EVENT_STD_SIZE,
+            ]
+        }
 
 starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 
@@ -177,8 +224,6 @@ agent_types.extend("ExchangeAgent")
 agent_count += 1
 
 # 2) World Agent
-
-
 if args.diffusion:
     chosen_model = args.chosen_model
     dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
@@ -204,16 +249,10 @@ if args.diffusion:
     checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
     config = checkpoint["hyper_parameters"]["config"]
     config.IS_WANDB = False
-    # load checkpoint
-    model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
-    # we freeze the model
-    for param in model.parameters():
-        param.requires_grad = False
-else:
-    model = None
-
-
-agents.extend([WorldAgent(id=1,
+    if config.CHOSEN_MODEL == cst.Models.CDT:
+        # load checkpoint
+        model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+        agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
                           symbol=symbol,
@@ -228,9 +267,38 @@ agents.extend([WorldAgent(id=1,
                           random_state=np.random.RandomState(
                               seed=cst.SEED),
                           normalization_terms=normalization_terms,
-                          using_diffusion=args.diffusion
+                          using_diffusion=args.diffusion,
+                            chosen_model=args.chosen_model if args.diffusion else None,
                           )
                ])
+    elif config.CHOSEN_MODEL == cst.Models.CGAN:
+        model = GANEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+        agents.extend([WorldAgent(id=1,
+                          name="WORLD_AGENT",
+                          type="WorldAgent",
+                          symbol=symbol,
+                          date=str(historical_date.date()),
+                          date_trading_days=cst.DATE_TRADING_DAYS,
+                          diffusion_model=model,
+                          data_dir=cst.DATA_DIR,
+                          log_orders=log_orders,
+                          random_state=np.random.RandomState(
+                              seed=cst.SEED),
+                          normalization_terms=normalization_terms,
+                          using_diffusion=args.diffusion,
+                            chosen_model=args.chosen_model if args.diffusion else None,
+                            seq_len=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] if args.diffusion else None,
+                          )
+               ])
+            
+    # we freeze the model
+    for param in model.parameters():
+        param.requires_grad = False
+else:
+    model = None
+
+
+
 agent_types.extend("WorldAgent")
 agent_count += 1
 

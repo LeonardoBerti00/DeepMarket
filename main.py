@@ -26,6 +26,8 @@ import evaluation.visualizations.comparison_core_coef_lags as comparison_core_co
 import evaluation.visualizations.comparison_correlation_coefficient as comparison_correlation_coefficient
 import evaluation.visualizations.comparison_log_return_frequency as comparison_log_return_frequency
 import evaluation.visualizations.comparison_depth as comparison_depth
+import evaluation.visualizations.responsiveness as responsiveness
+
 
 def set_torch():
     torch.manual_seed(cst.SEED)
@@ -40,9 +42,15 @@ def set_torch():
 
 def plot_graphs(real_data_path, cdt_data_path, iabs_data_path):
     warnings.filterwarnings("ignore")
+    responsiveness.plot_avg_diff_and_std(["ABIDES/log/paper/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv",
+                                          "ABIDES/log/paper/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv", 
+                                          ], 
+                                         ["ABIDES/log/paper/market_replay_TSLA_2015-01-29_11-00-00_pov_0.1_30/processed_orders.csv", 
+                                            "ABIDES/log/paper/market_replay_TSLA_2015-01-30_11-00-00_pov_0.1_60/processed_orders.csv",
+                                         ])
     #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=True)
     #comparison_depth.main(real_data_path, cdt_data_path, IS_REAL=False)
-    comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path)
+    #comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path)
     #comparison_distribution_volume_price.main(real_data_path, cdt_data_path)
     #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=True)
     #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, IS_REAL=False)
@@ -104,8 +112,8 @@ if __name__ == "__main__":
         run(config, accelerator)
 
     elif config.IS_EVALUATION:
-        #plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH)
-        predictive_discriminative_scores(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
+        plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH)
+        #predictive_discriminative_scores(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
         
 
         

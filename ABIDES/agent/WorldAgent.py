@@ -1,6 +1,7 @@
 import os
 from copy import deepcopy
 
+from scipy import stats
 import torch
 from agent.Agent import Agent
 from agent.ExchangeAgent import ExchangeAgent
@@ -27,8 +28,8 @@ class WorldAgent(Agent):
     # and generates new orders for the next time step
 
 
-    def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, cond_type,
-                 cond_seq_size, size_type_emb, log_orders=True, random_state=None, normalization_terms=None, using_diffusion=False):
+    def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, log_orders=True, random_state=None, 
+                 normalization_terms=None, using_diffusion=False, chosen_model=None, seq_len=256, cond_seq_size=255, cond_type='full', size_type_emb=3):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
         self.count_neg_size = 0
@@ -43,7 +44,7 @@ class WorldAgent(Agent):
         self.state = 'AWAITING_WAKEUP'
         self.diffusion_model = diffusion_model
         self.historical_orders, self.historical_lob = self._load_orders_lob(self.symbol, data_dir, self.date, date_trading_days)
-        self.historical_order_ids = self.historical_orders[2]
+        self.historical_order_ids = self.historical_orders[:, 2]
         self.unused_order_ids = np.setdiff1d(np.arange(0, 99999999), self.historical_order_ids)
         self.next_order = None
         self.subscription_requested = False
@@ -55,6 +56,7 @@ class WorldAgent(Agent):
         self.count_modify = 0
         self.cond_type = cond_type
         self.cond_seq_size = cond_seq_size
+        self.seq_len = seq_len
         self.first_generation = True
         self.normalization_terms = normalization_terms
         self.ignored_cancel = 0
@@ -67,15 +69,15 @@ class WorldAgent(Agent):
         self.last_bid_price = 0
         self.last_ask_price = 0
         self.using_diffusion = using_diffusion
+        self.chosen_model = chosen_model
         if using_diffusion:
             self.starting_time_diffusion = '15min'
             #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            print(self.diffusion_model.type_embedder.weight.data)
+            #print(self.diffusion_model.type_embedder.weight.data)
             #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
             #exit()
         else:
-            self.starting_time_diffusion = '15min'
-        
+            self.starting_time_diffusion = '157780min'
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -110,7 +112,7 @@ class WorldAgent(Agent):
         super().wakeup(currentTime)
         #make a print every 5 minutes
         
-        if currentTime.minute % 5 == 0 and currentTime.second == 00:
+        if currentTime.minute % 1 == 0 and currentTime.second == 00:
             print("Current time: {}".format(currentTime))
             print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
             print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
@@ -141,6 +143,7 @@ class WorldAgent(Agent):
                 self.setWakeup(currentTime + offset + datetime.timedelta(microseconds=1))
             else:
                 return
+            
         elif currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and not self.using_diffusion:
             print("cancelling data subscription")
             self.cancelDataSubscription()
@@ -149,6 +152,13 @@ class WorldAgent(Agent):
             self.state = 'GENERATING'
             # we generate the first order then the others will be generated everytime we receive the update of the lob
             if self.first_generation:
+                if self.chosen_model == 'CGAN':        
+                    #we need to fit the temporal distance with a gamma distribution
+                    temporal_distance = self.historical_orders[:, 0]
+                    #remove all the zeros from the temporal distance
+                    temporal_distance = temporal_distance[temporal_distance != 0]
+                    self.shape_temp_distance, self.loc_temp_distance, self.scale_temp_distance = stats.gamma.fit(temporal_distance)
+        
                 generated = self._generate_order(currentTime)
                 self.next_order = generated
                 self.first_generation = False
@@ -247,29 +257,107 @@ class WorldAgent(Agent):
         else:
             log_print("Agent ignored order of quantity zero: {}", order)
 
+    def _preprocess_market_features_for_cgan(self, lob_snapshots):
+        lob_snapshots = np.array(lob_snapshots)
+        COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
+                                       "sell2", "vsell2", "buy2", "vbuy2",
+                                       "sell3", "vsell3", "buy3", "vbuy3",
+                                       "sell4", "vsell4", "buy4", "vbuy4",
+                                       "sell5", "vsell5", "buy5", "vbuy5",
+                                       "sell6", "vsell6", "buy6", "vbuy6",
+                                       "sell7", "vsell7", "buy7", "vbuy7",
+                                       "sell8", "vsell8", "buy8", "vbuy8",
+                                       "sell9", "vsell9", "buy9", "vbuy9",
+                                       "sell10", "vsell10", "buy10", "vbuy10"],
+                        }
+        lob_dataframe = pd.DataFrame(lob_snapshots, columns=COLUMNS_NAMES["orderbook"])
+        orders = np.array(self.placed_orders[-self.seq_len*2 +1:])
+        orders_dataframe = pd.DataFrame(orders, columns=["time", "type", "order_id", "quantity", "price", "direction"])
+        dataframes = [[orders_dataframe, lob_dataframe]]
+        mean_spread = self.normalization_terms["lob"][0]
+        std_spread = self.normalization_terms["lob"][1]
+        mean_return = self.normalization_terms["lob"][2]
+        std_return = self.normalization_terms["lob"][3]
+        mean_vol_imb = self.normalization_terms["lob"][4]
+        std_vol_imb = self.normalization_terms["lob"][5]
+        mean_abs_vol = self.normalization_terms["lob"][6]
+        std_abs_vol = self.normalization_terms["lob"][7]
+        for i in range(len(dataframes)):
+            lob_sizes = dataframes[i][1].iloc[:, 1::2]
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            dataframes[i][1]["volume_imbalance_1"] = lob_sizes.iloc[:, 1] / (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0])
+            dataframes[i][1]["volume_imbalance_5"] = (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 3] + lob_sizes.iloc[:, 5] + lob_sizes.iloc[:, 7] + lob_sizes.iloc[:, 9]) / (lob_sizes.iloc[:, :10].sum(axis=1))
+            dataframes[i][1]["absolute_volume_1"] = lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0]
+            dataframes[i][1]["absolute_volume_5"] = lob_sizes.iloc[:, :10].sum(axis=1)
+            dataframes[i][1]["spread"] = lob_prices.iloc[:, 0] - lob_prices.iloc[:, 1]
+
+        for i in range(len(dataframes)):
+            order_sign_imbalance_256 = pd.Series(0, index=dataframes[i][1].index)
+            order_sign_imbalance_128 = pd.Series(0, index=dataframes[i][1].index)
+            returns_50 = pd.Series(0, index=dataframes[i][1].index)
+            returns_1 = pd.Series(0, index=dataframes[i][1].index)
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            mid_prices = (lob_prices.iloc[:, 0] + lob_prices.iloc[:, 1]) / 2
+            for j in range(len(dataframes[i][1])-256):
+                order_sign_imbalance_256.iloc[j] = dataframes[i][0]["direction"].iloc[j:j+256].sum()
+                order_sign_imbalance_128.iloc[j] = dataframes[i][0]["direction"].iloc[j+128:j+256].sum()
+                returns_1.iloc[j] = mid_prices[j+255] / mid_prices[j+254] - 1
+                returns_50.iloc[j] = mid_prices[j+255] / mid_prices[j+205] - 1
+            dataframes[i][1] = dataframes[i][1].iloc[255:]
+            dataframes[i][1].loc[:, "order_sign_imbalance_256"] = order_sign_imbalance_256.iloc[:-255] / 256
+            dataframes[i][1].loc[:, "order_sign_imbalance_128"] = order_sign_imbalance_128.iloc[:-255] / 128
+            dataframes[i][1].loc[:, "returns_1"] = returns_1.iloc[:-255]
+            dataframes[i][1].loc[:, "returns_50"] = returns_50.iloc[:-255]
+            dataframes[i][1] = dataframes[i][1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
+        
+        dataframes = reset_indexes(dataframes)
+        
+        for i in range(len(dataframes)):
+            #transform nan values in 0
+            dataframes[i][1] = dataframes[i][1].fillna(0)
+
+        market_features = dataframes[0][1]
+        market_features["returns_1"] = (market_features["returns_1"] - mean_return) / std_return
+        market_features["returns_50"] = (market_features["returns_50"] - mean_return) / std_return
+        market_features["volume_imbalance_1"] = (market_features["volume_imbalance_1"] - mean_vol_imb) / std_vol_imb
+        market_features["volume_imbalance_5"] = (market_features["volume_imbalance_5"] - mean_vol_imb) / std_vol_imb
+        market_features["absolute_volume_1"] = (market_features["absolute_volume_1"] - mean_abs_vol) / std_abs_vol
+        market_features["absolute_volume_5"] = (market_features["absolute_volume_5"] - mean_abs_vol) / std_abs_vol
+        market_features["spread"] = (market_features["spread"] - mean_spread) / std_spread
+        market_features = market_features.to_numpy()
+        market_features = torch.from_numpy(market_features).to(cst.DEVICE, torch.float32)
+        market_features = market_features.unsqueeze(0)
+        return market_features
+        
 
     def _generate_order(self, currentTime):
         generated = None
         while generated is None:
-            if self.cond_type == 'full':
-                orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
-                lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size-1:])
-                cond_lob = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
-                cond_lob = cond_lob.unsqueeze(0)
-            elif self.cond_type == 'only_event':
-                orders = np.array(self.placed_orders[-self.cond_seq_size:])
-                cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
-                cond_lob = None
-                #cond = one_hot_encoding_type(orders_preprocessed).to(cst.DEVICE)
-                #cond = tanh_encoding_type(orders_preprocessed).to(cst.DEVICE)
-            else:
-                raise ValueError("cond_type not recognized")
-            cond_orders = cond_orders.unsqueeze(0)   
-            x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
-            generated = self.diffusion_model.sampling(cond_orders, x, cond_lob)
-            generated = generated[0, 0, :]
-            generated = self._postprocess_generated(generated)
+            if self.chosen_model == 'CDT':
+                if self.cond_type == 'full':
+                    orders = np.array(self.placed_orders[-self.cond_seq_size:])
+                    cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                    lob_snapshots = np.array(self.lob_snapshots[-self.cond_seq_size-1:])
+                    cond_lob = torch.from_numpy(self._z_score_orderbook(lob_snapshots)).to(cst.DEVICE, torch.float32)
+                    cond_lob = cond_lob.unsqueeze(0)
+                elif self.cond_type == 'only_event':
+                    orders = np.array(self.placed_orders[-self.cond_seq_size:])
+                    cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
+                    cond_lob = None
+                else:
+                    raise ValueError("cond_type not recognized")
+                cond_orders = cond_orders.unsqueeze(0)   
+                x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
+                generated = self.diffusion_model.sampling(cond_orders, x, cond_lob)
+                generated = generated[0, 0, :]
+                generated = self._postprocess_generated_cdt(generated)
+            elif self.chosen_model == 'CGAN':
+                cond_market_features = self._preprocess_market_features_for_cgan(np.array(self.lob_snapshots[-(self.seq_len)*2+1:]))
+                noise = torch.randn(1, 1, self.diffusion_model.generator_lstm_hidden_state_dim).to(cst.DEVICE, torch.float32)
+                generated = self.diffusion_model.sampling(noise, cond_market_features)
+                generated = self.diffusion_model.post_process_order(generated)
+                generated = generated[0, 0, :]
+                generated = self._postprocess_generated_gan(generated)
         return generated
 
 
@@ -307,8 +395,140 @@ class WorldAgent(Agent):
         # Log this activity.
         if self.log_orders: self.logEvent('MODIFY_ORDER', order.to_dict())
 
+    def _postprocess_generated_gan(self, generated):
+        ''' we need to go from the output of the cgan model to an actual order '''
+        generated = generated.cpu().detach().numpy()
+        # firstly we generate the offset 
+        offset = stats.gamma.rvs(self.shape_temp_distance, self.loc_temp_distance, self.scale_temp_distance)
+        
+        direction = generated[2]
+        quantity_type = generated[6]
+        order_type = generated[0]
+        # order type == -1 -> limit order
+        # order type == 0 -> cancel order
+        # order type == 1 -> market order
+        order_type += 2
+        if order_type == 3 or order_type == 2:
+            order_type += 1
+        # order type == 1 -> limit order
+        # order type == 3 -> cancel order
+        # order type == 4 -> market order
+        
+        # we return the depth, the cancel depth, the size and the quantity100 to the original scale
+        mean_depth = self.normalization_terms["lob"][12]
+        std_depth = self.normalization_terms["lob"][13]
+        mean_cancel_depth = self.normalization_terms["lob"][8]
+        std_cancel_depth = self.normalization_terms["lob"][9]
+        mean_size_100 = self.normalization_terms["lob"][10]
+        std_size_100 = self.normalization_terms["lob"][11]
+        mean_size = self.normalization_terms["lob"][14]
+        std_size = self.normalization_terms["lob"][15]
+        depth = int(generated[3] * std_depth + mean_depth)
+        cancel_depth = int(generated[4] * std_cancel_depth + mean_cancel_depth)
+        # we are considering only the first 10 levels of the order book so we need to check if the cancel depth is greater than 9
+        if cancel_depth > 9:
+            return None
+        size_100 = generated[5] * std_size_100 + mean_size_100
+        size = int(generated[1] * std_size + mean_size)
+        
+        if quantity_type == -1:
+            size = int(size_100)*100
+            
+        if order_type == 1:
+            order_id = self.unused_order_ids[0]
+            self.unused_order_ids = self.unused_order_ids[1:]
+            if direction == 1:
+                bid_side = self.lob_snapshots[-1][2::4]
+                bid_price = bid_side[0]
+                if bid_price == 0:
+                    bid_price = self.last_bid_price
+                else:
+                    self.last_bid_price = bid_price
+                last_price = bid_side[-1] 
+                price = bid_price - depth*100
+                # if the first 10 levels are full and the price is less than the last price we generate another order
+                # because we consider only the first 10 levels
+                if price < last_price and last_price > 0:
+                    self.generated_orders_out_of_depth += 1
+                    return None
+                self.diff_limit_order_placed += 1
+            else:
+                ask_side = self.lob_snapshots[-1][0::4]
+                ask_price = ask_side[0]
+                if ask_price == 0:
+                    ask_price = self.last_ask_price
+                else:
+                    self.last_ask_price = ask_price
+                last_price = ask_side[-1]
+                price = ask_price + depth*100
+                if price > last_price and last_price > 0:
+                    self.generated_orders_out_of_depth += 1
+                    return None
+                self.diff_limit_order_placed += 1
 
-    def _postprocess_generated(self, generated):
+        elif order_type == 3:
+            if direction == 1:
+                bid_side = self.lob_snapshots[-1][2::4]
+                bid_price = bid_side[0]
+                if bid_price == 0:
+                    return None
+                else:
+                    self.last_bid_price = bid_price
+                #select the price at depth = cancel_depth
+                price = bid_side[cancel_depth]
+                # search all the active limit orders with the same price
+                orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
+                # if there are no orders with the same price then we generate another order
+                if len(orders_with_same_price) == 0:
+                    self.generated_cancel_orders_empty_depth += 1
+                    #chech if there are buy limit orders active
+                    if len([order for order in self.active_limit_orders.values() if order.is_buy_order]) == 0:
+                        return None
+                    # find the order with the closest price and quantity
+                    order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
+                else:
+                    # we select the order with the quantity closer to the quantity generated
+                    order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    self.diff_cancel_order_placed += 1
+
+            else:
+                ask_side = self.lob_snapshots[-1][0::4]
+                ask_price = ask_side[0]
+                if ask_price == 0:
+                    return None
+                else:
+                    self.last_ask_price = ask_price
+                price = ask_side[cancel_depth]
+                # search all the active limit orders in the same level
+                orders_with_same_price = [order for order in self.active_limit_orders.values() if order.limit_price == price]
+                # if there are no orders with the same price then we generate another order
+                if len(orders_with_same_price) == 0:
+                    self.generated_cancel_orders_empty_depth += 1
+                    #chech if there are sell limit orders active
+                    if len([order for order in self.active_limit_orders.values() if not order.is_buy_order]) == 0:
+                        return None
+                    order_id = min(self.active_limit_orders.values(), key=lambda x: (abs(x.limit_price - price), abs(x.quantity - size))).order_id
+                else:
+                    # we select the order with the quantity near to the quantity generated
+                    order_id = min(orders_with_same_price, key=lambda x: abs(x.quantity - size)).order_id
+                    self.diff_cancel_order_placed += 1
+
+        elif order_type == 4:
+            self.diff_market_order_placed += 1
+            if direction == 1:
+                price = self.lob_snapshots[-1][0]
+            else:
+                price = self.lob_snapshots[-1][2]
+            order_id = 0
+            # the diffusion gives in output market order and not execution of limit order,
+            # so we transform market orders in execution orders of the opposite side as the original message files
+            direction = -direction
+        self.count_diff_placed_orders += 1
+        return np.array([offset, order_type, order_id, size, price, direction])
+        
+        
+
+    def _postprocess_generated_cdt(self, generated):
         ''' we need to go from the output of the diffusion model to an actual order '''
         direction = generated[self.size_type_emb+3]
         if direction < 0:

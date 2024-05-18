@@ -5,12 +5,12 @@ import torch
 import lightning as L
 from configuration import Configuration
 import constants as cst
-from constants import LearningHyperParameter, GANHyperParameters
+from constants import LearningHyperParameter, LearningHyperParameter
 
 import wandb
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-from models.gans.wgan import Generator, Discriminator
+from models.gans.cgan import Generator, Discriminator
 
 class GANEngine(L.LightningModule):
     
@@ -32,24 +32,24 @@ class GANEngine(L.LightningModule):
         self.min_loss_ema = 10000000
         self.filename_ckpt = config.FILENAME_CKPT
         # hyperparameters for the GAN
-        self.seq_len = config.HYPER_PARAMETERS[GANHyperParameters.SEQ_LEN]
-        self.order_feature_dim=config.HYPER_PARAMETERS[GANHyperParameters.ORDER_FEATURES_DIM]
-        self.market_feature_dim = config.HYPER_PARAMETERS[GANHyperParameters.MARKET_FEATURES_DIM]
+        self.seq_len = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
+        self.order_feature_dim=config.HYPER_PARAMETERS[LearningHyperParameter.ORDER_FEATURES_DIM]
+        self.market_feature_dim = config.HYPER_PARAMETERS[LearningHyperParameter.MARKET_FEATURES_DIM]
         # generator's hyperparameters
-        self.generator_lstm_hidden_state_dim=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_LSTM_HIDDEN_STATE_DIM]
-        self.generator_hidden_fc_dim=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_FC_HIDDEN_DIM]
-        self.generator_kernel_conv=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_KERNEL_SIZE]
-        self.generator_num_fc_layers=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_NUM_FC_LAYERS]
-        self.generator_num_conv_layers=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_NUM_CONV_LAYERS]
-        self.generator_stride=config.HYPER_PARAMETERS[GANHyperParameters.GENERATOR_STRIDE]
+        self.generator_lstm_hidden_state_dim=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_LSTM_HIDDEN_STATE_DIM]
+        self.generator_hidden_fc_dim=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM]
+        self.generator_kernel_conv=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_KERNEL_SIZE]
+        self.generator_num_fc_layers=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_FC_LAYERS]
+        self.generator_num_conv_layers=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_CONV_LAYERS]
+        self.generator_stride=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_STRIDE]
         # discriminator's hyperparameters
         self.discriminator_lstm_input_dim=self.market_feature_dim + self.order_feature_dim
-        self.discriminator_lstm_hidden_state_dim=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM]
-        self.discriminator_hidden_fc_dim=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_FC_HIDDEN_DIM]
-        self.discriminator_kernel_conv=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_KERNEL_SIZE]
-        self.discriminator_num_fc_layers=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_FC_LAYERS]
-        self.discriminator_num_conv_layers=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_NUM_CONV_LAYERS]
-        self.discriminator_stride=config.HYPER_PARAMETERS[GANHyperParameters.DISCRIMINATOR_STRIDE]
+        self.discriminator_lstm_hidden_state_dim=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM]
+        self.discriminator_hidden_fc_dim=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM]
+        self.discriminator_kernel_conv=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE]
+        self.discriminator_num_fc_layers=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS]
+        self.discriminator_num_conv_layers=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_CONV_LAYERS]
+        self.discriminator_stride=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_STRIDE]
         # wasserstein gan c parameter as in Arjovsky et al. “Wasserstein generative adversarial networks.” ICML 2017
         self.c = 1e-2
         self.save_hyperparameters()
@@ -104,7 +104,7 @@ class GANEngine(L.LightningModule):
     
     def sampling(self, noise: torch.Tensor, y: torch.Tensor):
         generated_order = self(noise, y)
-        return self.__post_process_order(generated_order)
+        return generated_order
 
     def __generator_step(self, y: torch.Tensor, market_orders: torch.Tensor, optimizer: Union[torch.optim.Optimizer, Lion]):
         noise = torch.randn(y.shape[0], 1, self.generator_lstm_hidden_state_dim).type_as(y)
@@ -146,12 +146,12 @@ class GANEngine(L.LightningModule):
             
         self.untoggle_optimizer(optimizer)
         
-        return 
+        return loss
     
-    def __post_process_order(self, generated_order):
-        if -0.3 < generated_order[:,:,0] < 0.3:
+    def post_process_order(self, generated_order):
+        if -0.25 < generated_order[:,:,0] < 0.2:
             generated_order[:,:,0] = 0
-        elif generated_order[:,:,0] < -0.3:
+        elif generated_order[:,:,0] < -0.25:
             generated_order[:,:,0] = -1
         else:
             generated_order[:,:,0] = 1
@@ -165,6 +165,7 @@ class GANEngine(L.LightningModule):
             generated_order[:,:,-1] = 1
         else:
             generated_order[:,:,-1] = -1
+        return generated_order
         
     def on_train_epoch_start(self) -> None:
         print(f'gen_lr: {self.optimizer_g.param_groups[0]["lr"]} -- discr_lr = {self.optimizer_d.param_groups[0]["lr"]}')  
@@ -175,8 +176,7 @@ class GANEngine(L.LightningModule):
         with self.ema.average_parameters():
             noise = torch.randn(y.shape[0], 1, self.generator_lstm_hidden_state_dim).type_as(y)
             generated_order = self(noise, y)
-            generated_order = self.__post_process_order(generated_order)
-            market_orders = torch.cat([market_orders[:, :-1, :], generated_order], dim=1)
+            market_orders = torch.cat([market_orders[:, 1:, :], generated_order], dim=1)
             batch_loss = self.discriminator(y, market_orders)
             batch_loss_mean = torch.mean(batch_loss)
             self.val_ema_losses.append(batch_loss_mean.item())
@@ -193,11 +193,11 @@ class GANEngine(L.LightningModule):
                 self.optimizer_g.param_groups[0]["lr"] /= 2 
                 self.optimizer_d.param_groups[0]["lr"] /= 2 
             self.min_loss_ema = loss_ema
-            self._model_checkpointing(loss_ema)
         else:
             self.optimizer_g.param_groups[0]["lr"] /= 2
             self.optimizer_d.param_groups[0]["lr"] /= 2
-
+            
+        self._model_checkpointing(loss_ema)
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
         

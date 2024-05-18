@@ -175,7 +175,7 @@ class LOBSTERDataBuilder:
             if (i == 0):
                 self.dataframes[i][0], mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100 = normalize_order_cgan(self.dataframes[i][0])
             else:
-                self.dataframes[i][0], _, _, _, _, _, _ = normalize_order_cgan(self.dataframes[i][0], mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100)
+                self.dataframes[i][0], _, _, _, _, _, _, _, _ = normalize_order_cgan(self.dataframes[i][0], mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100)
 
     def _save(self, path_where_to_save):
         if self.chosen_model == cst.Models.CGAN:
