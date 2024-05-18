@@ -114,7 +114,7 @@ class GANEngine(L.LightningModule):
         generated_order = self(noise, y)
         market_orders = torch.cat([market_orders[:, :-1, :], generated_order], dim=1)
         fake_logits = self.discriminator(y, market_orders)
-        # * min E_{x~P_X}[C(x)] - E_{Z~P_Z}[C(g(z))]
+        # * min - E_{Z~P_Z}[C(g(z))]
         loss = -fake_logits.mean().view(-1)
 
         self.log("g_loss", loss, prog_bar=True)
