@@ -3,7 +3,8 @@ data/reconstructions
 data/TSLA
 data/INTC
 data/plot
-data/checkpoints
+data/checkpoints/CDT
+data/checkpoints/CSDI
 ABIDES/log 
 lightning_logs/
 data/generated_orders.csv
