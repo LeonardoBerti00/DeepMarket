@@ -13,9 +13,10 @@ class Generator(nn.Module):
                  hidden_fc_dim: int = 50,
                  kernel_conv: int = 3,
                  num_fc_layers: int = 2,
-                 num_conv_layers: int = 2,
                  stride: int = 1,
-                 device: str = 'cuda'):
+                 device: str = 'cuda',
+                 channels: list = []
+                 ):
         super().__init__()
         
         self.lstm_input_dim: int = lstm_input_dim
@@ -23,11 +24,10 @@ class Generator(nn.Module):
         self.kernel_conv: int = kernel_conv
         self.stride: int = stride
         self.num_fc_layers: int = num_fc_layers
-        self.num_conv_layers: int = num_conv_layers
         self.seq_len: int = seq_len
         self.order_feature_dim: int = order_feature_dim
         self.device: str = device
-        
+        self.channels: list = channels
         self.lstm = nn.LSTM(input_size=lstm_input_dim,
                             hidden_size=lstm_hidden_state_dim,
                             batch_first=True,
@@ -35,15 +35,12 @@ class Generator(nn.Module):
         # initialize a number of linear layers without activation functions
         self.fc_layers = nn.Sequential()
         input_dim: int = self.lstm_hidden_state_dim
-        for i in range(self.num_fc_layers):
-            self.fc_layers.append(nn.Linear(in_features=input_dim, out_features=hidden_fc_dim, device=self.device))
-            input_dim = hidden_fc_dim
-            if i != self.num_fc_layers - 1:
-                hidden_fc_dim //= 2
+        self.fc_layers.append(nn.Linear(in_features=input_dim, out_features=hidden_fc_dim, device=self.device))
     
         self.fc_out_dim: int = hidden_fc_dim
         # initialize a number of conv1d layers with ReLU activation functions
-        self.conv_layers, _ = create_conv_layers(channels=[2, 16, 32, 16, 1],
+        self.conv_layers, _ = create_conv_layers(#channels=[2, 32, 16, 1],
+                                                channels=self.channels,
                                                  input_size=self.fc_out_dim,
                                                  kernel_size=self.kernel_conv,
                                                  target_size=self.order_feature_dim,
@@ -74,9 +71,9 @@ class Discriminator(nn.Module):
                  hidden_fc_dim: int = 50,
                  kernel_conv: int = 3,
                  num_fc_layers: int = 2,
-                 num_conv_layers: int = 2,
                  stride: int = 1,
-                 device: str = 'cuda'):
+                 device: str = 'cuda',
+                 channels: list = []):
         super().__init__()
         
         self.lstm_input_dim: int = lstm_input_dim
@@ -84,28 +81,24 @@ class Discriminator(nn.Module):
         self.kernel_conv: int = kernel_conv
         self.stride: int = stride
         self.num_fc_layers: int = num_fc_layers
-        self.num_conv_layers: int = num_conv_layers
         self.seq_len: int = seq_len
         self.order_feature_dim: int = order_feature_dim
         self.device: str = device
+        self.channels: list = channels
         
         self.lstm = nn.LSTM(input_size=lstm_input_dim, hidden_size=lstm_hidden_state_dim, batch_first=True, device=self.device)
         
         # initialize a number of linear layers without activation functions
         self.fc_layers = nn.Sequential()
-        input_dim: int = self.lstm_hidden_state_dim
-        for i in range(self.num_fc_layers):
-            self.fc_layers.append(nn.Linear(in_features=input_dim, out_features=hidden_fc_dim, device=self.device))
-            input_dim = hidden_fc_dim
-            if i != self.num_fc_layers - 1: 
-                hidden_fc_dim //= 2
+        self.fc_layers.append(nn.Linear(in_features=self.lstm_hidden_state_dim, out_features=hidden_fc_dim, device=self.device))
         self.fc_out_dim: int = hidden_fc_dim
         # initialize a number of conv1d layers with ReLU activation functions
-        self.conv_layers, _ = create_conv_layers(channels=[1, 16, 32, 16, 1],
+        self.conv_layers, current_size = create_conv_layers(channels=self.channels,
                                                  input_size=self.fc_out_dim,
                                                  kernel_size=self.kernel_conv,
                                                  target_size=1,
                                                  device=self.device)
+        self.final_layer = nn.Linear(in_features=current_size, out_features=1, device=self.device)
                         
     def forward(self, y: torch.Tensor, market_orders: torch.Tensor) -> torch.Tensor:
         # run the lstm
@@ -119,4 +112,4 @@ class Discriminator(nn.Module):
         # run the convolution
         conv_out = self.conv_layers(fc_out)
         # run last layer to map to 1
-        return conv_out
+        return self.final_layer(conv_out)

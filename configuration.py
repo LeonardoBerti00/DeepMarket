@@ -95,15 +95,16 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.MARKET_FEATURES_DIM] = 9
         self.HYPER_PARAMETERS[LearningHyperParameter.ORDER_FEATURES_DIM] = 7
         self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_LSTM_HIDDEN_STATE_DIM] = 128
-        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM] = 96
-        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_KERNEL_SIZE] = 3
-        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_FC_LAYERS] = 2
-        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_CONV_LAYERS] = 2
-        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_STRIDE] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM] = 64
+        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_KERNEL_SIZE] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_FC_LAYERS] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_STRIDE] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_CHANNELS] = [2, 32, 16, 1]
+        
         # discriminator's hyperparameters
         self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_LSTM_HIDDEN_STATE_DIM] = 128
-        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM] = 96
-        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS] = 2
-        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_CONV_LAYERS] = 2
-        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE] = 3
-        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_STRIDE] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM] = 64
+        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_STRIDE] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_CHANNELS] = [1, 32, 16, 1]

@@ -40,7 +40,6 @@ class GANEngine(L.LightningModule):
         self.generator_hidden_fc_dim=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_FC_HIDDEN_DIM]
         self.generator_kernel_conv=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_KERNEL_SIZE]
         self.generator_num_fc_layers=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_FC_LAYERS]
-        self.generator_num_conv_layers=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_NUM_CONV_LAYERS]
         self.generator_stride=config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_STRIDE]
         # discriminator's hyperparameters
         self.discriminator_lstm_input_dim=self.market_feature_dim + self.order_feature_dim
@@ -48,8 +47,9 @@ class GANEngine(L.LightningModule):
         self.discriminator_hidden_fc_dim=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_FC_HIDDEN_DIM]
         self.discriminator_kernel_conv=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_KERNEL_SIZE]
         self.discriminator_num_fc_layers=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_FC_LAYERS]
-        self.discriminator_num_conv_layers=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_NUM_CONV_LAYERS]
         self.discriminator_stride=config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_STRIDE]
+        self.disc_channels = config.HYPER_PARAMETERS[LearningHyperParameter.DISCRIMINATOR_CHANNELS]
+        self.gen_channels = config.HYPER_PARAMETERS[LearningHyperParameter.GENERATOR_CHANNELS]
         # wasserstein gan c parameter as in Arjovsky et al. “Wasserstein generative adversarial networks.” ICML 2017
         self.c = 1e-2
         self.save_hyperparameters()
@@ -68,9 +68,10 @@ class GANEngine(L.LightningModule):
                                               hidden_fc_dim=self.generator_hidden_fc_dim,
                                               kernel_conv=self.generator_kernel_conv,
                                               num_fc_layers=self.generator_num_fc_layers,
-                                              num_conv_layers=self.generator_num_conv_layers,
                                               stride=self.generator_stride,
-                                              device=cst.DEVICE)
+                                              device=cst.DEVICE,
+                                              channels = self.gen_channels
+                                              )
         
         self.discriminator: Discriminator = Discriminator(seq_len=self.seq_len,
                                                           lstm_input_dim=self.discriminator_lstm_input_dim,
@@ -78,9 +79,9 @@ class GANEngine(L.LightningModule):
                                                           hidden_fc_dim=self.discriminator_hidden_fc_dim,
                                                           kernel_conv=self.discriminator_kernel_conv,
                                                           num_fc_layers=self.discriminator_num_fc_layers,
-                                                          num_conv_layers=self.discriminator_num_conv_layers,
                                                           stride=self.discriminator_stride,
-                                                          device=cst.DEVICE)
+                                                          device=cst.DEVICE,
+                                                          channels = self.disc_channels)
             
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -189,13 +190,10 @@ class GANEngine(L.LightningModule):
         # model checkpointing
         if loss_ema < self.min_loss_ema:
             # if the improvement is less than 0.01, we halve the learning rate
-            if loss_ema - self.min_loss_ema > -0.005:
-                self.optimizer_g.param_groups[0]["lr"] /= 2 
-                self.optimizer_d.param_groups[0]["lr"] /= 2 
             self.min_loss_ema = loss_ema
         else:
-            self.optimizer_g.param_groups[0]["lr"] /= 2
-            self.optimizer_d.param_groups[0]["lr"] /= 2
+            self.optimizer_g.param_groups[0]["lr"] /= 1.5
+            self.optimizer_d.param_groups[0]["lr"] /= 1.5
             
         self._model_checkpointing(loss_ema)
         self.log('val_ema_loss', loss_ema)
