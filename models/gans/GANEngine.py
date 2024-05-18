@@ -100,6 +100,12 @@ class GANEngine(L.LightningModule):
         g_loss = self.__generator_step(y, market_orders, optimizer_g)
         
         self.ema.update()
+        #check if both discriminator and generator are trianing properly
+        #print(self.discriminator.lstm.weight_hh_l0.grad)
+        #print(self.discriminator.lstm.weight_hh_l0.data.sum())
+        #print(self.generator.lstm.weight_hh_l0.grad)
+        #print(self.generator.lstm.weight_hh_l0.data.sum())
+        
         return g_loss + d_loss
     
     def sampling(self, noise: torch.Tensor, y: torch.Tensor):
@@ -112,6 +118,7 @@ class GANEngine(L.LightningModule):
         self.toggle_optimizer(optimizer)
         # generate a fake order from pure noise based on the conditioning of real y
         generated_order = self(noise, y)
+        generated_order = self.post_process_order(generated_order)
         market_orders = torch.cat([market_orders[:, :-1, :], generated_order], dim=1)
         fake_logits = self.discriminator(y, market_orders)
         # * min - E_{Z~P_Z}[C(g(z))]
@@ -128,6 +135,7 @@ class GANEngine(L.LightningModule):
     def __critic_step(self, y: torch.Tensor, market_orders: torch.Tensor, optimizer: Union[torch.optim.Optimizer,Lion]):
         noise = torch.randn(y.shape[0], 1, self.generator_lstm_hidden_state_dim).type_as(y)
         generated_order = self(noise, y)
+        generated_order = self.post_process_order(generated_order)
         # get the critic score on the real market
         real_logits = self.discriminator(y, market_orders)
         # replace the last order in the market with the generated one
@@ -149,23 +157,15 @@ class GANEngine(L.LightningModule):
         return loss
     
     def post_process_order(self, generated_order):
-        if -0.25 < generated_order[:,:,0] < 0.2:
-            generated_order[:,:,0] = 0
-        elif generated_order[:,:,0] < -0.25:
-            generated_order[:,:,0] = -1
-        else:
-            generated_order[:,:,0] = 1
-            
-        if generated_order[:,:,2] > 0:
-            generated_order[:,:,2] = 1
-        else:
-            generated_order[:,:,2] = -1
-        
-        if generated_order[:,:,-1] > 0:
-            generated_order[:,:,-1] = 1
-        else:
-            generated_order[:,:,-1] = -1
-        return generated_order
+        # Create new tensors instead of modifying generated_order in-place
+        first_column = torch.where(generated_order[:, :, 0] < -0.25, -1, torch.where(generated_order[:, :, 0] < 0.2, 0, 1))
+        third_column = torch.where(generated_order[:, :, 2] > 0, 1, -1)
+        last_column = torch.where(generated_order[:, :, -1] > 0, 1, -1)
+
+        # Concatenate the new tensors with the unmodified columns of generated_order
+        new_order = torch.cat((first_column.unsqueeze(2), generated_order[:, :, 1].unsqueeze(2), third_column.unsqueeze(2), generated_order[:, :, 3:-1], last_column.unsqueeze(2)), dim=2)
+
+        return new_order
         
     def on_train_epoch_start(self) -> None:
         print(f'gen_lr: {self.optimizer_g.param_groups[0]["lr"]} -- discr_lr = {self.optimizer_d.param_groups[0]["lr"]}')  
@@ -199,7 +199,7 @@ class GANEngine(L.LightningModule):
             
         self._model_checkpointing(loss_ema)
         self.log('val_ema_loss', loss_ema)
-        print(f"\n val ema loss on epoch {self.current_epoch} is {round(loss_ema, 3)}")
+        print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}")
         
 
     def configure_optimizers(self):
@@ -218,9 +218,9 @@ class GANEngine(L.LightningModule):
         wandb.define_metric("val_ema_loss", summary="min")
 
     def _model_checkpointing(self, loss):
-        if self.last_path_ckpt_ema is not None:
-            os.remove(self.last_path_ckpt_ema)
-        filename_ckpt_ema = ("val_ema=" + str(round(loss, 3)) +
+        #if self.last_path_ckpt_ema is not None:
+        #    os.remove(self.last_path_ckpt_ema)
+        filename_ckpt_ema = ("val_ema=" + str(loss) +
                              "_epoch=" + str(self.current_epoch) +
                              "_" + self.filename_ckpt +
                              ".ckpt"

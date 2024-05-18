@@ -57,7 +57,7 @@ def plot_avg_diff_and_std(days_paths_wo_exp, days_paths_w_exp):
     print(std_diff)
     plt.figure(dpi=300, figsize=(6, 4))
     #plt set y lim
-    plt.ylim(-0.1, 0.1)
+    plt.ylim(-0.5, 0.5)
     # Plot the smoothed data
     plt.plot(time, avg_diff, color='blue')
     # Plot the average difference with error bars representing the standard deviation
@@ -65,9 +65,10 @@ def plot_avg_diff_and_std(days_paths_wo_exp, days_paths_w_exp):
     plt.fill_between(time, avg_diff - std_diff, avg_diff+std_diff, alpha=0.2)
     time_format = dates.DateFormatter('%H:%M')
     plt.gca().xaxis.set_major_formatter(time_format)
-    plt.xlabel('Index')
+    plt.xlabel('Time')
+    plt.tick_params(axis='x', labelsize=9)
     plt.ylabel('Average Difference in Mid Price')
-    plt.title('Average Difference in Mid Price with Standard Deviation')
+    plt.title('Market replay responsiveness')
     plt.grid(True)
     start_time = time[15] 
     end_time = time[60] 

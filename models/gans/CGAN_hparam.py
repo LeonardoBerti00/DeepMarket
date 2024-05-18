@@ -7,4 +7,5 @@ HP_CGAN = {
 
 HP_CGAN_FIXED = {
     cst.LearningHyperParameter.SEQ_SIZE.value: 256,
+    cst.LearningHyperParameter.LEARNING_RATE.value: 0.1,
 } 

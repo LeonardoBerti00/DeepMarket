@@ -48,7 +48,7 @@ class Configuration:
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
         self.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE] = 256
-        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE] = 512
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
