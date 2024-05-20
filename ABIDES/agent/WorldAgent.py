@@ -153,10 +153,10 @@ class WorldAgent(Agent):
             # we generate the first order then the others will be generated everytime we receive the update of the lob
             if self.first_generation:
                 if self.chosen_model == 'CGAN':        
-                    #we need to fit the temporal distance with a gamma distribution
+                    # we need to fit the temporal distance with a gamma distribution
                     temporal_distance = self.historical_orders[:, 0]
-                    #remove all the zeros from the temporal distance
-                    temporal_distance = temporal_distance[temporal_distance != 0]
+                    # remove all the zeros from the temporal distance
+                    temporal_distance = temporal_distance[temporal_distance > 1e-5]
                     self.shape_temp_distance, self.loc_temp_distance, self.scale_temp_distance = stats.gamma.fit(temporal_distance)
         
                 generated = self._generate_order(currentTime)
@@ -353,11 +353,25 @@ class WorldAgent(Agent):
                 generated = self._postprocess_generated_cdt(generated)
             elif self.chosen_model == 'CGAN':
                 cond_market_features = self._preprocess_market_features_for_cgan(np.array(self.lob_snapshots[-(self.seq_len)*2+1:]))
+                '''
+                 cond_market_features = 
+                    ['volume_imbalance_1',
+                    'volume_imbalance_5', 
+                    'absolute_volume_1', 
+                    'absolute_volume_5', 
+                    'spread', 
+                    'order_sign_imbalance_256', 
+                    'order_sign_imbalance_128', 
+                    'returns_1', 
+                    'returns_50']
+                '''
                 noise = torch.randn(1, 1, self.diffusion_model.generator_lstm_hidden_state_dim).to(cst.DEVICE, torch.float32)
                 generated = self.diffusion_model.sampling(noise, cond_market_features)
                 generated = self.diffusion_model.post_process_order(generated)
+                # generated = ['event_type', 'size', 'direction', 'depth', 'cancel_depth', 'quantity_100', 'quantity_type']
                 generated = generated[0, 0, :]
                 generated = self._postprocess_generated_gan(generated)
+                # generated = [offset, order_type, order_id, size, price, direction]
         return generated
 
 

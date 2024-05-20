@@ -39,12 +39,16 @@ class Generator(nn.Module):
     
         self.fc_out_dim: int = hidden_fc_dim
         # initialize a number of conv1d layers with ReLU activation functions
-        self.conv_layers, _ = create_conv_layers(#channels=[2, 32, 16, 1],
+        print("for generator")
+        self.conv_layers, final_size = create_conv_layers(#channels=[2, 32, 16, 1],
                                                 channels=self.channels,
                                                  input_size=self.fc_out_dim,
                                                  kernel_size=self.kernel_conv,
+                                                 stride=self.stride,
+                                                    padding = 0,
                                                  target_size=self.order_feature_dim,
                                                  device=self.device)
+        self.fc_out = nn.Linear(in_features=final_size, out_features=order_feature_dim, device=self.device)
         self.tanh = nn.Tanh()
         
     def forward(self, noise: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -92,10 +96,13 @@ class Discriminator(nn.Module):
         self.fc_layers = nn.Sequential()
         self.fc_layers.append(nn.Linear(in_features=self.lstm_hidden_state_dim, out_features=hidden_fc_dim, device=self.device))
         self.fc_out_dim: int = hidden_fc_dim
+        print("for discriminator")
         # initialize a number of conv1d layers with ReLU activation functions
         self.conv_layers, current_size = create_conv_layers(channels=self.channels,
                                                  input_size=self.fc_out_dim,
                                                  kernel_size=self.kernel_conv,
+                                                 stride=self.stride,
+                                                 padding = 0,
                                                  target_size=1,
                                                  device=self.device)
         self.final_layer = nn.Linear(in_features=current_size, out_features=1, device=self.device)

@@ -32,7 +32,7 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CGAN:
             cst.PROJECT_NAME = "CGAN"
 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.CHOSEN_STOCK = cst.Stocks.INTC
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None

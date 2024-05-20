@@ -108,7 +108,7 @@ def run(config: Configuration, accelerator, model=None):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.005),
             TQDMProgressBar(refresh_rate=1000)
             ],
         num_sanity_val_steps=0,
@@ -161,7 +161,7 @@ def run_wandb(config: Configuration, accelerator):
             precision=cst.PRECISION,
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             callbacks=[
-                EarlyStopping(monitor="val_ema_loss", mode="min", patience=2, verbose=True, min_delta=0.005),
+                EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.005),
                 TQDMProgressBar(refresh_rate=1000)
             ],
             num_sanity_val_steps=0,

@@ -90,7 +90,7 @@ class GANEngine(L.LightningModule):
     def forward(self, noise: torch.Tensor, y: torch.Tensor):
         return self.generator(noise, y)     
         
-    def training_step(self, batch):
+    def training_step(self, batch, batch_idx):
         # y.shape -> (batch,  seq_len, num_features)
         # market_orders.shape -> (batch, seq_len, market_orders_features)
         y, market_orders = batch
@@ -101,6 +101,9 @@ class GANEngine(L.LightningModule):
         g_loss = self.__generator_step(y, market_orders, optimizer_g)
         
         self.ema.update()
+        
+        if batch_idx == 8000:
+            self._model_checkpointing(d_loss.item())
         #check if both discriminator and generator are trianing properly
         #print(self.discriminator.lstm.weight_hh_l0.grad)
         #print(self.discriminator.lstm.weight_hh_l0.data.sum())
@@ -159,7 +162,11 @@ class GANEngine(L.LightningModule):
     
     def post_process_order(self, generated_order):
         # Create new tensors instead of modifying generated_order in-place
-        first_column = torch.where(generated_order[:, :, 0] < -0.25, -1, torch.where(generated_order[:, :, 0] < 0.2, 0, 1))
+        first_column = torch.where(
+            generated_order[:, :, 0] < 0.05, -1, 
+            torch.where(generated_order[:, :, 0] < 0.4, 0, 1
+                        )
+            )
         third_column = torch.where(generated_order[:, :, 2] > 0, 1, -1)
         last_column = torch.where(generated_order[:, :, -1] > 0, 1, -1)
 
