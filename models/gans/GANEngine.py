@@ -27,6 +27,7 @@ class GANEngine(L.LightningModule):
         self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.chosen_stock = config.CHOSEN_STOCK.name
+        self.chosen_stock = config.CHOSEN_STOCK.name
         #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
