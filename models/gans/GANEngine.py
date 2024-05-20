@@ -163,7 +163,7 @@ class GANEngine(L.LightningModule):
     def post_process_order(self, generated_order):
         # Create new tensors instead of modifying generated_order in-place
         first_column = torch.where(
-            generated_order[:, :, 0] < 0.05, -1, 
+            generated_order[:, :, 0] < 0.1, -1, 
             torch.where(generated_order[:, :, 0] < 0.4, 0, 1
                         )
             )
