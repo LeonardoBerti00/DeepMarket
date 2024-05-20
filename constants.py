@@ -122,10 +122,11 @@ class DatasetType(Enum):
     VALIDATION = "val"
     
 
-class Engine(str, Enum):
-    
-    NN_ENGINE = "NNEngine"
-    GAN_ENGINE = "GANEngine"
+class Engine(str, Enum):    
+    """NN_ENGINE = "NNEngine"
+    GAN_ENGINE = "GANEngine"""
+    DIFFUSION_ENGINE = "models.diffusers.engine.DiffusionEngine"
+    GAN_ENGINE = "models.gans.engine.GANEngine"
 
     
 

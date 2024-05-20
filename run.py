@@ -5,13 +5,13 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 from configuration import Configuration
 import constants as cst
+from models.NNEngine import NNEngine
 from models.gans.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
-from models.gans.GANEngine import GANEngine
 from preprocessing.DataModule import DataModule
+from preprocessing.GANDatasetDummy import GANDatasetDummy
 from preprocessing.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import TQDMProgressBar
-from models.NNEngine import NNEngine
 from collections import namedtuple
 from models.diffusers.CDT.CDT_hparam import HP_CDT, HP_CDT_FIXED
 from models.diffusers.CSDI.CSDI_hparam import HP_CSDI, HP_CSDI_FIXED
@@ -26,7 +26,7 @@ HP_DICT_MODEL = {
 
 def train(config: Configuration, trainer: L.Trainer):
     print_setup(config)
-    if config.CHOSEN_MODEL == cst.Models.CGAN:
+    """if config.CHOSEN_MODEL == cst.Models.CGAN:
         train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train_cgan.npy"
         val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val_cgan.npy" 
     else:
@@ -49,6 +49,17 @@ def train(config: Configuration, trainer: L.Trainer):
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
         chosen_model=config.CHOSEN_MODEL,
         chosen_stock=config.CHOSEN_STOCK,
+    )"""
+    train_set = GANDatasetDummy(
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        market_feature_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM],
+        market_orders_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM]
+    )
+    
+    val_set = GANDatasetDummy(
+        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
+        market_feature_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM],
+        market_orders_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM]
     )
     
     #print("size of train set: ", train_set.data.size())
@@ -67,13 +78,14 @@ def train(config: Configuration, trainer: L.Trainer):
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
         num_workers=4
     )
+    model = NNEngine.factory(class_path=config.USE_ENGINE, config=config)
     
-    if config.USE_ENGINE == cst.Engine.GAN_ENGINE:
+    """if config.USE_ENGINE == cst.Engine.GAN_ENGINE:
         model = GANEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
     elif config.USE_ENGINE == cst.Engine.NN_ENGINE:
         model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
     else:
-        raise ValueError("Specify a valid Engine")
+        raise ValueError("Specify a valid Engine")"""
 
     train_dataloader, val_dataloader = data_module.train_dataloader(), data_module.val_dataloader()
     trainer.fit(model, train_dataloader, val_dataloader)
