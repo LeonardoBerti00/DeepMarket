@@ -26,6 +26,7 @@ class GANEngine(L.LightningModule):
         self.training = config.IS_TRAINING
         self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
+        self.chosen_stock = config.CHOSEN_STOCK.name
         #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
@@ -162,11 +163,18 @@ class GANEngine(L.LightningModule):
     
     def post_process_order(self, generated_order):
         # Create new tensors instead of modifying generated_order in-place
-        first_column = torch.where(
-            generated_order[:, :, 0] < 0.1, -1, 
-            torch.where(generated_order[:, :, 0] < 0.4, 0, 1
-                        )
-            )
+        if self.chosen_stock == cst.Stocks.TSLA.name:
+            first_column = torch.where(
+                generated_order[:, :, 0] < 0.1, -1, 
+                torch.where(generated_order[:, :, 0] < 0.40, 0, 1
+                            )
+                )
+        else:
+            first_column = torch.where(
+                generated_order[:, :, 0] < 0.15, -1, 
+                torch.where(generated_order[:, :, 0] < 0.95, 0, 1
+                            )
+                )
         third_column = torch.where(generated_order[:, :, 2] > 0, 1, -1)
         last_column = torch.where(generated_order[:, :, -1] > 0, 1, -1)
 
