@@ -1,3 +1,4 @@
+import math
 import os
 import pandas as pd
 import torch
@@ -10,6 +11,8 @@ from tqdm import tqdm
 
 from utils.utils import calculate_ftsd, plot, compute_prd_from_embedding, compute_prdc, IPR
 
+def clamp(value, min_value, max_value):
+    return max(min_value, min(value, max_value))
 # given real data and generated data
 # train a lstm with real data, train a lstm with generated data
 # test the two lstm on real data test set
@@ -39,7 +42,7 @@ class Preprocessor:
     def zscore(self):
         self.df['PRICE'] = (self.df['PRICE'] - self.df['PRICE'].mean()) / self.df['PRICE'].std()
         self.df['SIZE'] = (self.df['SIZE'] - self.df['SIZE'].mean()) / self.df['SIZE'].std()
-        self.df['ask_price_1'] = (self.df['ask_price_1'] - self.df['ask_price_1'].mean()) / self.df['ask_price_1'].std()
+        self.df['ask_price_1'] = (self.df['ask_price_1'] - self.df['ask_price_1'].mean()) / clamp(self.df['ask_price_1'].std(), 0.00001, 9999999)
         self.df['ask_size_1'] = (self.df['ask_size_1'] - self.df['ask_size_1'].mean()) / self.df['ask_size_1'].std()
         self.df['bid_price_1'] = (self.df['bid_price_1'] - self.df['bid_price_1'].mean()) / self.df['bid_price_1'].std()
         self.df['bid_size_1'] = (self.df['bid_size_1'] - self.df['bid_size_1'].mean()) / self.df['bid_size_1'].std()
@@ -105,7 +108,7 @@ class Trainer:
                 self.optimizer.step()
                 losses.append(loss.item())
             print(f'Epoch {epoch+1}, Loss: {np.mean(losses)}')
-            if np.mean(losses) > last_loss:
+            if np.mean(losses) + 0.0001 > last_loss:
                 break
             last_loss = np.mean(losses)
 
@@ -121,8 +124,8 @@ class Trainer:
                 test_labels = torch.cat((test_labels, labels), dim=0)
                 self.hidden_states.append(h.cpu().numpy())
                 #print("Predicted Values:", output)
-        mse = nn.functional.mse_loss(test_preds, test_labels.unsqueeze(1)).item()
-        print(f'Test MSE: {mse}')
+        mae = nn.functional.l1_loss(test_preds, test_labels.unsqueeze(1)).item()
+        print(f'Test MSE: {mae}')
         #mae = nn.functional.l1_loss(test_preds, test_labels.unsqueeze(1)).item()
         #print(f'Test MAE: {mae}')
 
@@ -161,7 +164,9 @@ def main(real_data_path, generated_data_path):
     print("size of generated data after undersampling: ", len(df_g))
     df_r = Preprocessor(df_r).preprocess()
     df_g = Preprocessor(df_g).preprocess()
-
+    #eliminate rows with nan values
+    df_r = df_r.dropna()
+    df_g = df_g.dropna()
     ############ TEST "real" lstm on "real" test set ############
 
     # Assuming df is already preprocessed

@@ -7,11 +7,11 @@ class Configuration:
 
     def __init__(self):
 
-        self.IS_WANDB = True
+        self.IS_WANDB = False
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
-        self.IS_EVALUATION = False
+        self.IS_EVALUATION = True
 
         self.VALIDATE_EVERY = 1
 
@@ -41,9 +41,10 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv"
-        self.CDT_DATA_PATH = "ABIDES/log/world_agent_TSLA_2015-01-30_12-00-00_30val_ema=0.837_epoch=10_TSLA_full_cond_aug_False_concatenation_MLP_seq_size_256_CDT_depth_8__diffsteps_100/processed_orders.csv"
-        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_20150130_120000/processed_orders.csv"
+        self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_INTC_2015-01-30_16-00-00/processed_orders.csv"
+        #self.CDT_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-30_12-00-00_val_ema=0.811_epoch=3_seed_30/processed_orders.csv"
+        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_INTC_20150130_110000/processed_orders.csv"
+        #self.CGAN_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_20_val_ema=-1.0419_epoch=0_CGAN_lr_0.001_seq_size_256_seed_20/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 

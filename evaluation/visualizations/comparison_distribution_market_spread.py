@@ -15,27 +15,20 @@ def ci(row, n, alpha):
 
     return pd.Series(margin, index=['LOWER', 'UPPER'])
 
-def main(real_path, generated_path, IS_REAL):
-    if IS_REAL:
-        df = pd.read_csv(real_path, header=0)
-    else:
-        df = pd.read_csv(generated_path, header=0)
-
+def process_df(df):
     df = df.query("ask_price_1 < 9999999")
     df = df.query("bid_price_1 < 9999999")
     df = df.query("ask_price_1 > -9999999")
     df = df.query("bid_price_1 > -9999999")
-
     # rename 'Unnamed: 0' con TIME
     df.rename(columns={'Unnamed: 0': 'TIME'}, inplace=True)
-
-    # new df with only SPREAD and TIME
-    df_ = df[['TIME', 'SPREAD']]
+        
+    df_ = df[["TIME", "SPREAD"]]
 
     df_['TIME'] = pd.to_datetime(df_['TIME'])
     df_['TIME'] = df_['TIME'].dt.strftime('%d-%m-%Y %H:%M:%S')
-
-    df_grouped = df.groupby(df.index // 500).agg({'TIME': 'first', 'SPREAD': ['mean','std']})
+    dividend = df.shape[0] // 100
+    df_grouped = df.groupby(df.index // dividend).agg({'TIME': 'first', 'SPREAD': ['mean','std']})
 
     df_grouped.columns = ['TIME', 'SPREAD_mean', 'SPREAD_std']
 
@@ -59,32 +52,40 @@ def main(real_path, generated_path, IS_REAL):
 
     df_f['TIME'] = mdates.date2num(df_f['TIME'])
 
-    plt.plot(df_f['TIME'], df_f['SPREAD_mean'], label='mean spread', color='green', marker='o', linestyle='', markersize=3)
-    plt.fill_between(df_f['TIME'], df_f['LOWER'], df_f['UPPER'], color='green', alpha=0.3, label='ptc5-95 enveloppe spread')
+    
+    return df_f
+
+def main(real_path=None, cdt_path=None, iabs_path=None, cgan_path=None):
+    
+    df_real = pd.read_csv(real_path, header=0)
+    df_cdt = pd.read_csv(cdt_path, header=0)
+    df_iabs = pd.read_csv(iabs_path, header=0)
+    df_cgan = pd.read_csv(cgan_path, header=0)
+    
+    df_real = process_df(df_real)
+    df_cdt = process_df(df_cdt)
+    df_iabs = process_df(df_iabs)
+    df_cgan = process_df(df_cgan)
+
+    plt.plot(df_real['TIME'], df_real['spread_mean'], label='mean spread real', color='blue', marker='o', linestyle='', markersize=3)
+    plt.plot(df_cdt['TIME'], df_cdt['spread_mean'], label='mean spread CDT', color='red', marker='o', linestyle='', markersize=3)
+    plt.plot(df_iabs['TIME'], df_iabs['spread_mean'], label='mean spread IABS', color='orange', marker='o', linestyle='', markersize=3)
+    plt.plot(df_cgan['TIME'], df_cgan['spread_mean'], label='mean spread CGAN', color='purple', marker='o', linestyle='', markersize=3)
+    plt.fill_between(df_real['TIME'], df_real['LOWER'], df_real['UPPER'], color='blue', alpha=0.3, label='ptc5-95')
+    plt.fill_between(df_cdt['TIME'], df_cdt['LOWER'], df_cdt['UPPER'], color='red', alpha=0.3, label='ptc5-95')
+    plt.fill_between(df_iabs['TIME'], df_iabs['LOWER'], df_iabs['UPPER'], color='orange', alpha=0.3, label='ptc5-95')
+    plt.fill_between(df_cgan['TIME'], df_cgan['LOWER'], df_cgan['UPPER'], color='purple', alpha=0.3, label='ptc5-95')    
 
     plt.xlabel('Time')
     plt.ylabel('Spread')
-    if IS_REAL:
-        plt.title('Spread market replay')
-    else:
-        if "IABS" in generated_path:
-            title = "Spread IABS simulation"
-        elif "CDT" in generated_path:
-            title = "Spread CDT simulation"
-        elif "GAN" in generated_path:
-            title = "Spread CGAN simulation"
-        else:
-            title = "Spread CDT simulation"
-        plt.title(title)
+    
+    plt.title('Market spread')
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
     file_name = "market_spread.pdf"
-    if IS_REAL:
-        dir_path = os.path.dirname(real_path)
-    else:
-        dir_path = os.path.dirname(generated_path)
+    dir_path = os.path.dirname(cdt_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     #plt.show()

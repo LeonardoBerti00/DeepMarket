@@ -3,6 +3,8 @@ data/reconstructions
 data/TSLA
 data/INTC
 data/plot
+trash
+data/checkpoints 
 data/checkpoints/CDT
 data/checkpoints/CSDI
 ABIDES/log 
