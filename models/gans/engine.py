@@ -1,8 +1,6 @@
-import os
 from typing import Union
 
 import torch
-import lightning as L
 from configuration import Configuration
 import constants as cst
 from constants import LearningHyperParameter, LearningHyperParameter
@@ -10,29 +8,13 @@ from constants import LearningHyperParameter, LearningHyperParameter
 import wandb
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
+from models.NNEngine import NNEngine
 from models.gans.cgan import Generator, Discriminator
 
-class GANEngine(L.LightningModule):
+class GANEngine(NNEngine):
     
     def __init__(self, config: Configuration):
-        super().__init__()
-        """
-        This is the skeleton of the gan models.
-        """
-        self.IS_WANDB = config.IS_WANDB
-        self.IS_DEBUG = config.IS_DEBUG
-        self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
-        self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
-        self.training = config.IS_TRAINING
-        self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
-        self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
-        self.chosen_stock = config.CHOSEN_STOCK.name
-        self.chosen_stock = config.CHOSEN_STOCK.name
-        #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
-        self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
-        self.val_ema_losses, self.test_ema_losses = [], []
-        self.min_loss_ema = 10000000
-        self.filename_ckpt = config.FILENAME_CKPT
+        super().__init__(config)
         # hyperparameters for the GAN
         self.seq_len = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.order_feature_dim=config.HYPER_PARAMETERS[LearningHyperParameter.ORDER_FEATURES_DIM]
@@ -55,10 +37,6 @@ class GANEngine(L.LightningModule):
         # wasserstein gan c parameter as in Arjovsky et al. “Wasserstein generative adversarial networks.” ICML 2017
         self.c = 1e-2
         self.save_hyperparameters()
-        self.num_violations_price = 0
-        self.num_violations_size = 0
-        self.chosen_model = config.CHOSEN_MODEL.name
-        self.last_path_ckpt_ema = None
         # need to suppress automatic optimization since
         # there are two optimizers here
         self.automatic_optimization = False
@@ -105,7 +83,7 @@ class GANEngine(L.LightningModule):
         self.ema.update()
         
         if batch_idx == 8000:
-            self._model_checkpointing(d_loss.item())
+            self.model_checkpointing(d_loss.item())
         #check if both discriminator and generator are trianing properly
         #print(self.discriminator.lstm.weight_hh_l0.grad)
         #print(self.discriminator.lstm.weight_hh_l0.data.sum())
@@ -114,7 +92,9 @@ class GANEngine(L.LightningModule):
         
         return g_loss + d_loss
     
-    def sampling(self, noise: torch.Tensor, y: torch.Tensor):
+    def sample(self, **kwargs):
+        noise: torch.Tensor = kwargs['noise']
+        y: torch.Tensor = kwargs['y']
         generated_order = self(noise, y)
         return generated_order
 
@@ -211,7 +191,7 @@ class GANEngine(L.LightningModule):
             self.optimizer_g.param_groups[0]["lr"] /= 1.5
             self.optimizer_d.param_groups[0]["lr"] /= 1.5
             
-        self._model_checkpointing(loss_ema)
+        self.model_checkpointing(loss_ema)
         self.log('val_ema_loss', loss_ema)
         print(f"\n val ema loss on epoch {self.current_epoch} is {loss_ema}")
         
@@ -231,7 +211,7 @@ class GANEngine(L.LightningModule):
         wandb.define_metric("val_loss", summary="min")
         wandb.define_metric("val_ema_loss", summary="min")
 
-    def _model_checkpointing(self, loss):
+    def model_checkpointing(self, loss):
         #if self.last_path_ckpt_ema is not None:
         #    os.remove(self.last_path_ckpt_ema)
         filename_ckpt_ema = ("val_ema=" + str(loss) +

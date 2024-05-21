@@ -28,7 +28,7 @@ class WorldAgent(Agent):
     # and generates new orders for the next time step
 
 
-    def __init__(self, id, name, type, symbol, date, date_trading_days, diffusion_model, data_dir, log_orders=True, random_state=None, 
+    def __init__(self, id, name, type, symbol, date, date_trading_days, model, data_dir, log_orders=True, random_state=None, 
                  normalization_terms=None, using_diffusion=False, chosen_model=None, seq_len=256, cond_seq_size=255, cond_type='full', size_type_emb=3):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
@@ -42,7 +42,7 @@ class WorldAgent(Agent):
         self.log_orders = log_orders
         self.executed_trades = dict()
         self.state = 'AWAITING_WAKEUP'
-        self.diffusion_model = diffusion_model
+        self.model = model
         self.historical_orders, self.historical_lob = self._load_orders_lob(self.symbol, data_dir, self.date, date_trading_days)
         self.historical_order_ids = self.historical_orders[:, 2]
         self.unused_order_ids = np.setdiff1d(np.arange(0, 99999999), self.historical_order_ids)
@@ -72,9 +72,9 @@ class WorldAgent(Agent):
         self.chosen_model = chosen_model
         if using_diffusion:
             self.starting_time_diffusion = '15min'
-            #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            #print(self.diffusion_model.type_embedder.weight.data)
-            #self.diffusion_model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            #print(self.model.type_embedder.weight.data)
+            #self.model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
             #exit()
         else:
             self.starting_time_diffusion = '157780min'
@@ -348,7 +348,7 @@ class WorldAgent(Agent):
                     raise ValueError("cond_type not recognized")
                 cond_orders = cond_orders.unsqueeze(0)   
                 x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
-                generated = self.diffusion_model.sampling(cond_orders, x, cond_lob)
+                generated = self.model.sample(cond_orders=cond_orders, x=x, cond_lob=cond_lob)
                 generated = generated[0, 0, :]
                 generated = self._postprocess_generated_cdt(generated)
             elif self.chosen_model == 'CGAN':
@@ -365,9 +365,9 @@ class WorldAgent(Agent):
                     'returns_1', 
                     'returns_50']
                 '''
-                noise = torch.randn(1, 1, self.diffusion_model.generator_lstm_hidden_state_dim).to(cst.DEVICE, torch.float32)
-                generated = self.diffusion_model.sampling(noise, cond_market_features)
-                generated = self.diffusion_model.post_process_order(generated)
+                noise = torch.randn(1, 1, self.model.generator_lstm_hidden_state_dim).to(cst.DEVICE, torch.float32)
+                generated = self.model.sample(noise=noise, cond_market_features=cond_market_features)
+                generated = self.model.post_process_order(generated)
                 # generated = ['event_type', 'size', 'direction', 'depth', 'cancel_depth', 'quantity_100', 'quantity_type']
                 generated = generated[0, 0, :]
                 generated = self._postprocess_generated_gan(generated)
@@ -551,7 +551,7 @@ class WorldAgent(Agent):
             direction = 1
         
         #order_type = torch.argmax(generated[1:self.size_type_emb+1]).item() + 1
-        order_type = torch.argmin(torch.sum(torch.abs(self.diffusion_model.type_embedder.weight.data - generated[1:self.size_type_emb+1]), dim=1)).item()+1
+        order_type = torch.argmin(torch.sum(torch.abs(self.model.type_embedder.weight.data - generated[1:self.size_type_emb+1]), dim=1)).item()+1
         #print(order_type)
 
         if order_type == 3 or order_type == 2:

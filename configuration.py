@@ -8,10 +8,11 @@ class Configuration:
     def __init__(self):
 
         self.IS_WANDB = False
+        self.IS_WANDB = False
         self.IS_SWEEP = False
         self.IS_TRAINING = False
         self.IS_DEBUG = False
-        self.IS_EVALUATION = True
+        self.IS_EVALUATION = False
 
         self.VALIDATE_EVERY = 1
 
@@ -23,7 +24,7 @@ class Configuration:
         self.CHOSEN_MODEL = cst.Models.CGAN
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
-        self.USE_ENGINE = cst.Engine.GAN_ENGINE
+        self.USE_ENGINE = cst.Engine.DIFFUSION_ENGINE
         
         if self.CHOSEN_MODEL == cst.Models.CDT:
             cst.PROJECT_NAME = "CDTS"
@@ -32,7 +33,7 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CGAN:
             cst.PROJECT_NAME = "CGAN"
 
-        self.CHOSEN_STOCK = cst.Stocks.INTC
+        self.CHOSEN_STOCK = cst.Stocks.TSLA
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
