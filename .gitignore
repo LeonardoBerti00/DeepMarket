@@ -3,11 +3,12 @@ data/reconstructions
 data/TSLA
 data/INTC
 data/plot
+ABIDEs/log/paper/IABS*
+*.pdf
 trash
 data/checkpoints 
 data/checkpoints/CDT
-data/checkpoints/CSDI
-ABIDES/log 
+data/checkpoints/CSDI 
 lightning_logs/
 data/generated_orders.csv
 data/real_orders.csv
@@ -16,5 +17,3 @@ output
 launch.sh
 launch_sim.sh
 evaluation/visualizations/prova.ipynb
-ABIDES/log/IABS_1/
-ABIDES/log/IABS*
