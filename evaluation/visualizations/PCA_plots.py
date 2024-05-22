@@ -7,6 +7,8 @@ from sklearn.decomposition import PCA
 from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
 import os
+import matplotlib.pyplot as plt
+
 
 class pca(torch.nn.Module):
     def __init__(self, n_components=2):
@@ -18,8 +20,29 @@ class pca(torch.nn.Module):
         x = x.values
         x = torch.from_numpy(x)
         pca = self.pca.fit_transform(x)
+        pca = self.remove_outliers(pca)
         hull = ConvexHull(pca)
         return pca, hull
+    
+    def remove_outliers(self, points):
+        # Ensure points is a 2D array
+        if points.ndim != 2 or points.shape[1] != 2:
+            raise ValueError("Input points array must be of shape (n, 2)")
+
+        # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+        Q1 = np.percentile(points, 5, axis=0)
+        Q3 = np.percentile(points, 95, axis=0)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+
+        # Filter points that are within the lower and upper bounds
+        filtered_points = points[
+            (points[:, 0] >= lower_bound[0]) & (points[:, 0] <= upper_bound[0]) &
+            (points[:, 1] >= lower_bound[1]) & (points[:, 1] <= upper_bound[1])
+        ]
+        return filtered_points
+
     
 def preprocess_data(df):
 
@@ -78,10 +101,6 @@ def plot_data(pca, pca2, generated_path):
     # Show the plot
     #plt.show()
     plt.close()
-    
-    
-
-
 
 def main(real_path, generated_path):
     df_real = pd.read_csv(real_path,header=0)
@@ -96,6 +115,7 @@ def main(real_path, generated_path):
     plot_data(real_pca, gen_pca, generated_path)
     real_polygon = Polygon(real_pca[real_hull.vertices])
     gen_polygon = Polygon(gen_pca[gen_hull.vertices])
+    
     inters_area = real_polygon.intersection(gen_polygon).area
     real_area = real_polygon.area
     coverage_percentage = inters_area/real_area * 100
