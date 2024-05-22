@@ -67,14 +67,10 @@ def main(real_path=None, cdt_path=None, iabs_path=None, cgan_path=None):
     df_iabs = process_df(df_iabs)
     df_cgan = process_df(df_cgan)
 
-    plt.plot(df_real['TIME'], df_real['spread_mean'], label='mean spread real', color='blue', marker='o', linestyle='', markersize=3)
-    plt.plot(df_cdt['TIME'], df_cdt['spread_mean'], label='mean spread CDT', color='red', marker='o', linestyle='', markersize=3)
-    plt.plot(df_iabs['TIME'], df_iabs['spread_mean'], label='mean spread IABS', color='orange', marker='o', linestyle='', markersize=3)
-    plt.plot(df_cgan['TIME'], df_cgan['spread_mean'], label='mean spread CGAN', color='purple', marker='o', linestyle='', markersize=3)
-    plt.fill_between(df_real['TIME'], df_real['LOWER'], df_real['UPPER'], color='blue', alpha=0.3, label='ptc5-95')
-    plt.fill_between(df_cdt['TIME'], df_cdt['LOWER'], df_cdt['UPPER'], color='red', alpha=0.3, label='ptc5-95')
-    plt.fill_between(df_iabs['TIME'], df_iabs['LOWER'], df_iabs['UPPER'], color='orange', alpha=0.3, label='ptc5-95')
-    plt.fill_between(df_cgan['TIME'], df_cgan['LOWER'], df_cgan['UPPER'], color='purple', alpha=0.3, label='ptc5-95')    
+    plt.plot(df_real['TIME'], df_real['SPREAD_mean'], label='Real', color='blue')#, marker='o', linestyle='', markersize=3)
+    plt.plot(df_cdt['TIME'], df_cdt['SPREAD_mean'], label='CDT', color='red')#, marker='o', linestyle='', markersize=3)
+    plt.plot(df_iabs['TIME'], df_iabs['SPREAD_mean'], label='IABS', color='orange')#, marker='o', linestyle='', markersize=3)
+    plt.plot(df_cgan['TIME'], df_cgan['SPREAD_mean'], label='CGAN', color='green')#, marker='o', linestyle='', markersize=3)
 
     plt.xlabel('Time')
     plt.ylabel('Spread')

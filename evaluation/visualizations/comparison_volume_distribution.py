@@ -22,11 +22,8 @@ def ci_(row, n, alpha):
 
     return pd.Series(margin, index=['LOWER_', 'UPPER_'])
 
-def main(real_path, generated_path, IS_REAL):
-    if IS_REAL:
-        df = pd.read_csv(real_path, header=0)
-    else:
-        df = pd.read_csv(generated_path, header=0)
+def main(path):
+    df = pd.read_csv(path, header=0)
     df = df.query("ask_price_1 < 9999999")
     df = df.query("bid_price_1 < 9999999")
     df = df.query("ask_price_1 > -9999999")
@@ -67,35 +64,36 @@ def main(real_path, generated_path, IS_REAL):
     df_f['TIME'] = mdates.date2num(df_f['TIME'])
 
     plt.plot(df_f['TIME'], df_f['asksize1_mean'], label='ask_size mean', color='green', marker='o', linestyle='', markersize=3)
-    plt.fill_between(df_f['TIME'], df_f['LOWER'], df_f['UPPER'], color='green', alpha=0.3, label='ptc5-95 enveloppe ask')
+    plt.fill_between(df_f['TIME'], df_f['LOWER'], df_f['UPPER'], color='green', alpha=0.3, label='ptc5-95 ask')
 
     plt.plot(df_f['TIME'], df_f['bidsize1_mean'], label='bid_size mean', color='red', marker='o', linestyle='', markersize=3)
-    plt.fill_between(df_f['TIME'], df_f['LOWER_'], df_f['UPPER_'], color='red', alpha=0.3, label='ptc5-95 enveloppe bid')
+    plt.fill_between(df_f['TIME'], df_f['LOWER_'], df_f['UPPER_'], color='red', alpha=0.3, label='ptc5-95 bid')
 
     plt.xlabel('Time')
     plt.ylabel('Volume at 1st level')
     
-    if IS_REAL:
-        plt.title('Volume Market Replay')
+    
+    
+    if "replay" in path:
+        plt.ylim(50, 600)
+        title = "Volume Market Replay"
+    if "IABS" in path:
+        title = "Volume IABS simulation"
+    elif "CDT" in path:
+        plt.ylim(50, 600)
+        title = "Volume CDT simulation"
+    elif "GAN" in path:
+        title = "Volume CGAN simulation"
     else:
-        if "IABS" in generated_path:
-            title = "Volume IABS simulation"
-        elif "CDT" in generated_path:
-            title = "Volume CDT simulation"
-        elif "GAN" in generated_path:
-            title = "Volume CGAN simulation"
-        else:
-            title = "Volume CDT simulation"
-        plt.title(title)
+        title = "Volume CDT simulation"
+        plt.ylim(50, 600)
+    plt.title(title)
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
     plt.legend()
     file_name = "comp_vol_distr.pdf"
-    if IS_REAL:
-        dir_path = os.path.dirname(real_path)
-    else:
-        dir_path = os.path.dirname(generated_path)
+    dir_path = os.path.dirname(path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     #plt.show()

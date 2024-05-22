@@ -194,9 +194,9 @@ def main(real_data_path, generated_data_path):
     model_r.to(device)
     print("Predictive Score Real data:")
     trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
-    trainer_r.train(epochs=100)
+    #trainer_r.train(epochs=100)
     
-    trainer_r.test()
+    #trainer_r.test()
     print("\n Predictive Score Generated data:")
     ############ TEST "generated" lstm on "real" test set ############
 

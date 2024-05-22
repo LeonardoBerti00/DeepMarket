@@ -25,16 +25,16 @@ import evaluation.visualizations.comparison_log_return_frequency as comparison_l
 import trash.comparison_depth as comparison_depth
 import evaluation.visualizations.responsiveness as responsiveness
 
-
-def set_torch():
+def set_repoducibility():
     torch.manual_seed(cst.SEED)
     np.random.seed(cst.SEED)
     random.seed(cst.SEED)
+
+def set_torch():
     torch.set_default_dtype(torch.float32)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.autograd.set_detect_anomaly(False)
-    #print("REMEMBER TO PUT DETECT ANOMALY TO FALSE")
     torch.set_float32_matmul_precision('high')
 
 def plot_graphs(real_data_path=None, cdt_data_path=None, iabs_data_path=None, cgan_data_path=None):
@@ -49,29 +49,23 @@ def plot_graphs(real_data_path=None, cdt_data_path=None, iabs_data_path=None, cg
     '''
     
     #comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    comparison_distribution_market_spread.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    '''
-    PCA_plots.main(real_data_path, cgan_data_path)
+    #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    
+    #PCA_plots.main(real_data_path, cdt_data_path)
     #comparison_midprice.main(real_data_path, cdt_data_path)
-    comparison_volume_distribution.main(cgan_data_path)
+    #comparison_volume_distribution.main(cdt_data_path)
     
     #join:
-    comparison_core_coef_lags.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    comparison_correlation_coefficient.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    comparison_log_return_frequency.main(real_data_path, cgan_data_path)
-    '''
+    #comparison_core_coef_lags.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    #comparison_correlation_coefficient.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    #comparison_log_return_frequency.main(real_data_path, cdt_data_path, cgan_data_path)
+    
 
 
 if __name__ == "__main__":
     set_torch()
-    '''
-    print("Device:", cst.DEVICE)
-    num_gpus = torch.cuda.device_count()
-    print(f'Number of GPUs Available: {num_gpus}')
-    for i in range(num_gpus):
-        print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
-    exit()
-    '''
+    set_repoducibility()
+    
     config = configuration.Configuration()
     if (cst.DEVICE == "cpu"):
         accelerator = "cpu"
@@ -79,6 +73,7 @@ if __name__ == "__main__":
         accelerator = "gpu"
 
     if (not config.IS_DATA_PREPROCESSED):
+        # prepare the datasets, this will save train.npy, val.npy and test.npy in the data directory
         data_builder = LOBSTERDataBuilder(
             stock_name=config.CHOSEN_STOCK.name,
             data_dir=cst.DATA_DIR,
@@ -87,7 +82,7 @@ if __name__ == "__main__":
             chosen_model=config.CHOSEN_MODEL
         )
         data_builder.prepare_save_datasets()
-        exit()
+
     if config.IS_WANDB:
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)
@@ -103,7 +98,7 @@ if __name__ == "__main__":
 
     elif config.IS_EVALUATION:
         #plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH, config.CGAN_DATA_PATH)
-        predictive_lstm.main(config.REAL_DATA_PATH, config.IABS_DATA_PATH)
+        predictive_lstm.main(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
         
 
         

@@ -227,7 +227,7 @@ agent_count += 1
 if args.diffusion:
     chosen_model = args.chosen_model
     dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
-    best_val_loss = 1000000
+    best_val_loss = np.inf
     if args.id is None:
         for file in dir_path.iterdir():
             try:

@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def main(real_path, generated_path):
+def main(real_path, cdt_path, cgan_path):
     def load_and_compute_log_returns(file_path):
         df = pd.read_csv(file_path)
         df.rename(columns={'Unnamed: 0': 'time'}, inplace=True)
@@ -19,20 +19,16 @@ def main(real_path, generated_path):
         df.dropna(inplace=True)
         return df['log_return']
     
-    if "IABS" in generated_path:
-        label = "IABS"
-    elif "CDT" in generated_path:
-        label = "CDT"
-    elif "GAN" in generated_path:
-        label = "CGAN"
-    else:
-        label = "CDT"
+    
     log_returns_real = load_and_compute_log_returns(real_path)
-    log_returns_cdt = load_and_compute_log_returns(generated_path)
+    log_returns_cdt = load_and_compute_log_returns(cdt_path)
+    log_returns_cgan = load_and_compute_log_returns(cgan_path)
+    
     sns.set(style="whitegrid")
 
-    sns.kdeplot(log_returns_real, shade=True, color="blue", label='Real')
-    sns.kdeplot(log_returns_cdt, shade=True, color="red", label=label)
+    sns.kdeplot(log_returns_real, shade=True, color="blue", label='Real', alpha=0.15)
+    sns.kdeplot(log_returns_cdt, shade=True, color="red", label='CDT', alpha=0.15)
+    sns.kdeplot(log_returns_cgan, shade=True, color="green", label='CGAN', alpha=0.15)
 
     plt.yscale('log')
 
@@ -41,8 +37,8 @@ def main(real_path, generated_path):
     plt.title('Minutely Log Returns Comparison')
 
     plt.legend()
-    file_name = "log_return.pdf"
-    dir_path = os.path.dirname(generated_path)
+    file_name = "log_return_join.pdf"
+    dir_path = os.path.dirname(cdt_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.close()

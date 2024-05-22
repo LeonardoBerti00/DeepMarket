@@ -99,6 +99,7 @@ def run(config: Configuration, accelerator, model=None):
             config.HYPER_PARAMETERS[param] = model_params[param.value]
             wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
     wandb_instance_name += f"seed_{cst.SEED}"
+    
     if config.CHOSEN_MODEL == cst.Models.CDT:
         cond_type = config.COND_TYPE
         is_augmentation = config.IS_AUGMENTATION
@@ -107,10 +108,11 @@ def run(config: Configuration, accelerator, model=None):
         augmenter = config.CHOSEN_AUGMENTER
         aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
         if is_augmentation:
-            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + str(augmenter) + "_" + str(aug_dim) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+            config.FILENAME_CKPT = f"{stock_name}_{cond_type}_aug_{augmenter}_dim_{aug_dim}_{wandb_instance_name}_diffsteps_{diffsteps}"
         else:
-            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+            config.FILENAME_CKPT = f"{stock_name}_{cond_type}_{wandb_instance_name}_diffsteps_{diffsteps}"
         wandb_instance_name = config.FILENAME_CKPT
+        
     elif config.CHOSEN_MODEL == cst.Models.CGAN:
         config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
         wandb_instance_name = config.FILENAME_CKPT

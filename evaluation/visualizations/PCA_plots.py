@@ -4,19 +4,22 @@ import numpy as np
 import seaborn as sns
 import torch
 from sklearn.decomposition import PCA
+from scipy.spatial import ConvexHull
+from shapely.geometry import Polygon
 import os
 
-class PCA2D(torch.nn.Module):
+class pca(torch.nn.Module):
     def __init__(self, n_components=2):
-        super(PCA2D, self).__init__()
+        super(pca, self).__init__()
         self.n_components = n_components
         self.pca = PCA(n_components=n_components)
 
     def forward(self, x):
         x = x.values
         x = torch.from_numpy(x)
-        x = self.pca.fit_transform(x)
-        return x
+        pca = self.pca.fit_transform(x)
+        hull = ConvexHull(pca)
+        return pca, hull
     
 def preprocess_data(df):
 
@@ -41,7 +44,7 @@ def preprocess_data(df):
     df['SPREAD'] = (df['SPREAD'] - df['SPREAD'].mean())/df['SPREAD'].std()
     return df
 
-def plot_data(pca2d, pca2d_, generated_path):
+def plot_data(pca, pca2, generated_path):
     if "IABS" in generated_path:
         label = "IABS"
     elif "CDT" in generated_path:
@@ -50,18 +53,18 @@ def plot_data(pca2d, pca2d_, generated_path):
         label = "CGAN"
     else:
         label = "CDT"
-    # Plot pca2d in red
-    plt.scatter(pca2d[:, 0], pca2d[:, 1], color='tab:red', label='Real', alpha=0.1, s=10)
+    # Plot pca in red
+    plt.scatter(pca[:, 0], pca[:, 1], color='tab:red', label='Real', alpha=0.1, s=10)
 
-    # Plot pca2d_ in blue
-    plt.scatter(pca2d_[:, 0], pca2d_[:, 1], color='tab:blue', label=label, alpha=0.1, s=10)
+    # Plot pca2 in blue
+    plt.scatter(pca2[:, 0], pca2[:, 1], color='tab:blue', label=label, alpha=0.1, s=10)
 
     # Limit x and y axes
     #compute the limit depending on max and min of the data
-    x_min = min(np.min(pca2d[:, 0])-1, np.min(pca2d_[:, 0])-1)
-    x_max = max(np.max(pca2d[:, 0])+1, np.max(pca2d_[:, 0])+1)
-    y_min = min(np.min(pca2d[:, 1])-1, np.min(pca2d_[:, 1])-1)
-    y_max = max(np.max(pca2d[:, 1])+1, np.max(pca2d_[:, 1])+1)
+    x_min = min(np.min(pca[:, 0])-1, np.min(pca2[:, 0])-1)
+    x_max = max(np.max(pca[:, 0])+1, np.max(pca2[:, 0])+1)
+    y_min = min(np.min(pca[:, 1])-1, np.min(pca2[:, 1])-1)
+    y_max = max(np.max(pca[:, 1])+1, np.max(pca2[:, 1])+1)
     plt.xlim(x_min-1, x_max+1)
     plt.ylim(y_min-1, y_max+1)
 
@@ -87,10 +90,16 @@ def main(real_path, generated_path):
     df_real = preprocess_data(df_real)
     df_gen = preprocess_data(df_gen)
 
-    real_pca2d = PCA2D(n_components=2).forward(df_real)
-    gen_pca2d = PCA2D(n_components=2).forward(df_gen)
+    real_pca, real_hull = pca(n_components=2).forward(df_real)
+    gen_pca, gen_hull = pca(n_components=2).forward(df_gen)
 
-    plot_data(real_pca2d, gen_pca2d, generated_path)
+    plot_data(real_pca, gen_pca, generated_path)
+    real_polygon = Polygon(real_pca[real_hull.vertices])
+    gen_polygon = Polygon(gen_pca[gen_hull.vertices])
+    inters_area = real_polygon.intersection(gen_polygon).area
+    real_area = real_polygon.area
+    coverage_percentage = inters_area/real_area * 100
+    print(f"Coverage percentage: {coverage_percentage}")
 
 
 if __name__ == '__main__':

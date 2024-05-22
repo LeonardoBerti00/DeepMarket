@@ -28,8 +28,6 @@ class DiffusionEngine(NNEngine):
         self.cond_type = config.COND_TYPE
         self.cond_method = config.COND_METHOD
         self.cond_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
-        #self.p_norm = config.HYPER_PARAMETERS[LearningHyperParameter.P_NORM]
-        self.save_hyperparameters()
         self.reg_term_weight = config.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT]
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
@@ -45,11 +43,7 @@ class DiffusionEngine(NNEngine):
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
             self.type_embedder.requires_grad_(False)
-            #print(self.type_embedder.weight.data)
             self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 2.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888],  [ 0.8249,  0.5847,  0.1448],  [ 1.7600, -1.3847,  1.1294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -58,6 +52,7 @@ class DiffusionEngine(NNEngine):
         self.sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.vlb_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
         self.simple_sampler = LossSecondMomentResampler(self.num_diffusionsteps)
+        self.save_hyperparameters()
         
 
     def forward(self, cond_orders, x_0, cond_lob, is_train, batch_idx=None):
