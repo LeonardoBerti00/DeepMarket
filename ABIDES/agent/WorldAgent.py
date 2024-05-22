@@ -156,7 +156,7 @@ class WorldAgent(Agent):
                     # we need to fit the temporal distance with a gamma distribution
                     temporal_distance = self.historical_orders[:, 0]
                     # remove all the zeros from the temporal distance
-                    temporal_distance = temporal_distance[temporal_distance > 1e-5]
+                    temporal_distance = temporal_distance[temporal_distance > 0]
                     self.shape_temp_distance, self.loc_temp_distance, self.scale_temp_distance = stats.gamma.fit(temporal_distance)
         
                 generated = self._generate_order(currentTime)

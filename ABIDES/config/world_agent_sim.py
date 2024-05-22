@@ -23,8 +23,8 @@ from agent.execution.POVExecutionAgent import POVExecutionAgent
 from pathlib import Path
 
 import configuration
-from models.diffusers.engine import NNEngine
-from models.gans.engine import GANEngine
+from models.diffusers.diffusion_engine import NNEngine
+from models.gans.gan_engine import GANEngine
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################

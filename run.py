@@ -8,7 +8,6 @@ import constants as cst
 from models.NNEngine import NNEngine
 from models.gans.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
 from preprocessing.DataModule import DataModule
-from preprocessing.GANDatasetDummy import GANDatasetDummy
 from preprocessing.LOBDataset import LOBDataset
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks import TQDMProgressBar
@@ -26,7 +25,9 @@ HP_DICT_MODEL = {
 
 def train(config: Configuration, trainer: L.Trainer):
     print_setup(config)
-    """if config.CHOSEN_MODEL == cst.Models.CGAN:
+    
+    # due to the fact that CGAN uses a different dataset, we need to create different numpy files
+    if config.CHOSEN_MODEL == cst.Models.CGAN:
         train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train_cgan.npy"
         val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val_cgan.npy" 
     else:
@@ -49,28 +50,16 @@ def train(config: Configuration, trainer: L.Trainer):
         x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
         chosen_model=config.CHOSEN_MODEL,
         chosen_stock=config.CHOSEN_STOCK,
-    )"""
-    train_set = GANDatasetDummy(
-        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        market_feature_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM],
-        market_orders_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM]
-    )
-    
-    val_set = GANDatasetDummy(
-        seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        market_feature_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MARKET_FEATURES_DIM],
-        market_orders_dim=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ORDER_FEATURES_DIM]
     )
     
     #print("size of train set: ", train_set.data.size())
     #print("size of val set: ", val_set.data.size())
-    #print("size of test set: ", test_set.data.size())
+    
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
         config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
         
-    #val_set.data = val_set.data[:51200]
     data_module = DataModule(
         train_set=train_set,
         val_set=val_set,
@@ -79,14 +68,6 @@ def train(config: Configuration, trainer: L.Trainer):
         num_workers=4
     )
     model = NNEngine.factory(class_path=config.USE_ENGINE, config=config)
-    
-    """if config.USE_ENGINE == cst.Engine.GAN_ENGINE:
-        model = GANEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
-    elif config.USE_ENGINE == cst.Engine.NN_ENGINE:
-        model = NNEngine(config=config).to(cst.DEVICE, torch.float32, non_blocking=True)
-    else:
-        raise ValueError("Specify a valid Engine")"""
-
     train_dataloader, val_dataloader = data_module.train_dataloader(), data_module.val_dataloader()
     trainer.fit(model, train_dataloader, val_dataloader)
 
@@ -100,7 +81,10 @@ def run(config: Configuration, accelerator, model=None):
             wandb_instance_name += str(param.value[:2]) + "_" + str(model_params[param.value]) + "_"
     wandb_instance_name += f"seed_{cst.SEED}"
     
-    if config.CHOSEN_MODEL == cst.Models.CDT:
+    if config.CHOSEN_MODEL == cst.Models.CGAN:
+        config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
+        wandb_instance_name = config.FILENAME_CKPT
+    else:
         cond_type = config.COND_TYPE
         is_augmentation = config.IS_AUGMENTATION
         stock_name = config.CHOSEN_STOCK.name
@@ -112,10 +96,6 @@ def run(config: Configuration, accelerator, model=None):
         else:
             config.FILENAME_CKPT = f"{stock_name}_{cond_type}_{wandb_instance_name}_diffsteps_{diffsteps}"
         wandb_instance_name = config.FILENAME_CKPT
-        
-    elif config.CHOSEN_MODEL == cst.Models.CGAN:
-        config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
-        wandb_instance_name = config.FILENAME_CKPT
 
     trainer = L.Trainer(
         accelerator=accelerator,
@@ -123,7 +103,7 @@ def run(config: Configuration, accelerator, model=None):
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
             EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.005),
-            TQDMProgressBar(refresh_rate=1000)
+            TQDMProgressBar(refresh_rate=100)
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
@@ -228,7 +208,8 @@ def run_wandb(config: Configuration, accelerator):
     return wandb_sweep_callback
 
 def sweep_init(config: Configuration):
-    #wandb.login()
+    # put your wandb key here
+    wandb.login()
     sweep_config = {
         'method': 'grid',
         'metric': {

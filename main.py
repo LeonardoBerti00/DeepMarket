@@ -36,31 +36,22 @@ def set_torch():
     torch.backends.cudnn.allow_tf32 = True
     torch.autograd.set_detect_anomaly(False)
     torch.set_float32_matmul_precision('high')
+    # this is done for tensorflow
+    import os
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 def plot_graphs(real_data_path=None, cdt_data_path=None, iabs_data_path=None, cgan_data_path=None):
     warnings.filterwarnings("ignore")
-    '''
-    responsiveness.plot_avg_diff_and_std(["ABIDES/log/paper/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv",
-                                          "ABIDES/log/paper/market_replay_TSLA_2015-01-30_12-00-00/processed_orders.csv", 
-                                          ], 
-                                         ["ABIDES/log/paper/market_replay_TSLA_2015-01-29_11-00-00_pov_0.1_30/processed_orders.csv", 
-                                            "ABIDES/log/paper/market_replay_TSLA_2015-01-30_11-00-00_pov_0.1_60/processed_orders.csv",
-                                         ])
-    '''
+    comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    comparison_distribution_market_spread.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    PCA_plots.main(real_data_path, cdt_data_path)
+    comparison_midprice.main(real_data_path, cdt_data_path)
+    comparison_volume_distribution.main(cdt_data_path)
+    # these last plots are slow, they will take a couple of minutes to run
+    comparison_core_coef_lags.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    comparison_correlation_coefficient.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
+    comparison_log_return_frequency.main(real_data_path, cdt_data_path, cgan_data_path)
     
-    #comparison_distribution_order_type.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    #comparison_distribution_market_spread.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    
-    #PCA_plots.main(real_data_path, cdt_data_path)
-    #comparison_midprice.main(real_data_path, cdt_data_path)
-    #comparison_volume_distribution.main(cdt_data_path)
-    
-    #join:
-    #comparison_core_coef_lags.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    #comparison_correlation_coefficient.main(real_data_path, cdt_data_path, iabs_data_path, cgan_data_path)
-    #comparison_log_return_frequency.main(real_data_path, cdt_data_path, cgan_data_path)
-    
-
 
 if __name__ == "__main__":
     set_torch()
@@ -97,7 +88,7 @@ if __name__ == "__main__":
         run(config, accelerator)
 
     elif config.IS_EVALUATION:
-        #plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH, config.CGAN_DATA_PATH)
+        plot_graphs(config.REAL_DATA_PATH, config.CDT_DATA_PATH, config.IABS_DATA_PATH, config.CGAN_DATA_PATH)
         predictive_lstm.main(config.REAL_DATA_PATH, config.CDT_DATA_PATH)
         
 

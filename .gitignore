@@ -16,4 +16,3 @@ wandb/
 output
 launch.sh
 launch_sim.sh
-evaluation/visualizations/prova.ipynb

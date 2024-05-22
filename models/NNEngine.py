@@ -4,7 +4,7 @@ from os.path import isfile, basename
 import sys
 from lightning import LightningModule
 import torch
-
+import numpy as np
 from configuration import Configuration
 from constants import LearningHyperParameter
 
@@ -26,7 +26,7 @@ class NNEngine(LightningModule, ABC):
         self.chosen_stock = config.CHOSEN_STOCK.name
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
-        self.min_loss_ema = 10000000
+        self.min_loss_ema = np.inf
         self.filename_ckpt = config.FILENAME_CKPT
         self.num_violations_price = 0
         self.num_violations_size = 0

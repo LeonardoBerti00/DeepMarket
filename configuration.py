@@ -9,9 +9,9 @@ class Configuration:
 
         self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
-        self.IS_EVALUATION = True
+        self.IS_EVALUATION = False
 
         self.VALIDATE_EVERY = 1
 
@@ -32,7 +32,8 @@ class Configuration:
         elif self.CHOSEN_MODEL == cst.Models.CGAN:
             cst.PROJECT_NAME = "CGAN"
 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        # select a stock 
+        self.CHOSEN_STOCK = cst.Stocks.INTC
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -41,10 +42,10 @@ class Configuration:
         self.IS_SHUFFLE_TRAIN_SET = True
 
         # insert the path of the generated and real orders with a relative path
-        self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_TSLA_2015-01-29_12-00-00/processed_orders.csv"
-        self.CDT_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-29_12-00-00_val_ema=0.834_epoch=1_TSLA_only_event_cond_aug_MLP_concatenation/processed_orders.csv"
-        self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_TSLA_20150130_120000/processed_orders.csv"
-        self.CGAN_DATA_PATH = "ABIDES/log/paper/world_agent_TSLA_2015-01-30_12-00-00_20_val_ema=-1.0419_epoch=0_CGAN_lr_0.001_seq_size_256_seed_20/processed_orders.csv"
+        self.REAL_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
+        self.CDT_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
+        self.IABS_DATA_PATH = "ABIDES/log/IABS_TSLA_20150129_120000/processed_orders.csv"
+        self.CGAN_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
 
         self.HYPER_PARAMETERS = {lp: None for lp in LearningHyperParameter}
 
@@ -83,8 +84,8 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
-        self.COND_METHOD = "concatenation"
-        self.COND_TYPE = "only_event"  # it can be full or only_event or only_lob
+        self.COND_METHOD = "concatenation" #it can be concatenation or crossattention
+        self.COND_TYPE = "full"  # it can be full or only_event
         if self.COND_TYPE == "full":
             self.COND_SIZE = cst.LEN_LEVEL * cst.N_LOB_LEVELS
         elif self.COND_TYPE == "only_event":
