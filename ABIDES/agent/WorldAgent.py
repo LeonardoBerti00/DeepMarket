@@ -333,7 +333,7 @@ class WorldAgent(Agent):
     def _generate_order(self, currentTime):
         generated = None
         while generated is None:
-            if self.chosen_model == 'CDT':
+            if self.chosen_model == 'TRADES':
                 if self.cond_type == 'full':
                     orders = np.array(self.placed_orders[-self.cond_seq_size:])
                     cond_orders = self._preprocess_orders_for_diff_cond(orders, np.array(self.lob_snapshots[-self.cond_seq_size -1:]))
@@ -350,7 +350,7 @@ class WorldAgent(Agent):
                 x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
                 generated = self.model.sample(cond_orders=cond_orders, x=x, cond_lob=cond_lob)
                 generated = generated[0, 0, :]
-                generated = self._postprocess_generated_cdt(generated)
+                generated = self._postprocess_generated_TRADES(generated)
             elif self.chosen_model == 'CGAN':
                 cond_market_features = self._preprocess_market_features_for_cgan(np.array(self.lob_snapshots[-(self.seq_len)*2+1:]))
                 '''
@@ -542,7 +542,7 @@ class WorldAgent(Agent):
         
         
 
-    def _postprocess_generated_cdt(self, generated):
+    def _postprocess_generated_TRADES(self, generated):
         ''' we need to go from the output of the diffusion model to an actual order '''
         direction = generated[self.size_type_emb+3]
         if direction < 0:

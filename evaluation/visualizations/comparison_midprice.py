@@ -56,12 +56,12 @@ def main(real_path, generated_path):
     '''
     if "IABS" in generated_path:
         label = "IABS"
-    elif "CDT" in generated_path:
-        label = "CDT"
+    elif "TRADES" in generated_path:
+        label = "TRADES"
     elif "GAN" in generated_path:
         label = "CGAN"
     else:
-        label = "CDT"
+        label = "TRADES"
     plt.plot(time1, mid_price1, label='Real', color='blue')
     #get the min and max of the mid price
     #xmin = min(mid_price1.min(), mid_price2.min())-100

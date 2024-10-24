@@ -4,7 +4,7 @@ import torch.nn as nn
 import constants as cst
 import torch
 
-from models.diffusers.CDT.Transformer import TransformerEncoder
+from models.diffusers.TRADES.Transformer import TransformerEncoder
 from models.feature_augmenters.AbstractAugmenter import AugmenterAB
 
 
@@ -28,7 +28,7 @@ class MLPAugmenter(AugmenterAB, nn.Module):
                 self.fwd_cond_lob = nn.Sequential(
                     nn.Linear(cond_size, augment_dim, dtype=torch.float32),
                     TransformerEncoder(2, augment_dim, 4, 0.1, "only_event", ""))
-        if cond_type == "full" and cond_method == "concatenation" and chosen_model == cst.Models.CDT.value:
+        if cond_type == "full" and cond_method == "concatenation" and chosen_model == cst.Models.TRADES.value:
             augment_dim = augment_dim*2
         self.bck_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),

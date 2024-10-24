@@ -79,13 +79,13 @@ def main(path):
         title = "Volume Market Replay"
     if "IABS" in path:
         title = "Volume IABS simulation"
-    elif "CDT" in path:
+    elif "TRADES" in path:
         plt.ylim(50, 600)
-        title = "Volume CDT simulation"
+        title = "Volume TRADES simulation"
     elif "GAN" in path:
         title = "Volume CGAN simulation"
     else:
-        title = "Volume CDT simulation"
+        title = "Volume TRADES simulation"
         plt.ylim(50, 600)
     plt.title(title)
 

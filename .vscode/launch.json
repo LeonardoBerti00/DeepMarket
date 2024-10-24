@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["-u", "ABIDES/abides.py", "-c", "rmsc03", "-t", "TSLA", "-d", "20150130", "-s", "1234"]
+            "args": ["-u", "ABIDES/abides.py", "-m", "TRADES", "-c", "world_agent_sim", "-t", "TSLA", "-date", "20150130", "-s", "1234"]
         },
         {
             "name": "Python: Current File",

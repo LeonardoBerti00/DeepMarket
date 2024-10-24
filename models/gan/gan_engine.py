@@ -9,7 +9,7 @@ import wandb
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.NNEngine import NNEngine
-from models.gans.cgan import Generator, Discriminator
+from models.gan.cgan import Generator, Discriminator
 
 class GANEngine(NNEngine):
     

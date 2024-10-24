@@ -1,17 +1,22 @@
 # DeepMarket: Conditioned Diffusion Models for Realistic Market Simulation
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
-This is the official repository for the paper Conditioned Diffusion Models for Realistic Market Simulation.
+This is the official repository for the paper ...
 
 
 ## Introduction 
-We present DeepMarket, an open-source Python framework  developed for LOB market simulation with deep learning. DeepMarket offers the following features: (1) pre-processing for high-frequency market data; (2) a training environment implemented with PyTorch Lightning; (3) hyperparameter search facilitated with WANDB; (4) CDT and CGAN implementations and checkpoints to directly generate a market simulation without training; (5) a comprehensive qualitative (via the plots in this paper) and quantitative (via the predictive score) evaluation. 
+DeepMarket offers the following features: 
+1. Pre-processing for high-frequency market data.
+2. Training environment implemented with PyTorch Lightning. 
+3. Hyperparameter search facilitated with WANDB. 
+4. Implementations and checkpoints for TRADES and CGAN to directly generate market simulations without training.
+5. comprehensive qualitative (via the plots in the paper) and quantitative (via the predictive score) evaluation. 
 To perform the simulation with our world agent and historical data, we extend ABIDES, an open-source agent-based interactive Python tool.
 
 # Getting Started 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
 ## Prerequisities
-This project requires Python and Conda. If you don't have them installed, please do so first. It is possible to do it using only pip but in that case you are on you own.   
+This project requires Python and Conda. If you don't have them installed, please do so first. It is possible to do it using pip, but in that case you are on you own.   
 
 ## Installing
 To set up the environment for this project, follow these steps:
@@ -31,45 +36,71 @@ conda activate deepmarket
 ```
 
 # Training
-If your objective is to train a CDT model or implement your model you should follow those steps. If your objective is to simply execute a market simulation skip this section.
+If your objective is to train a TRADES model or implement your model you should follow those steps. If your objective is to simply execute a market simulation skip this section.
 
 ## Data 
-1. Firstly you need to have some LOBSTER data otherwise would be impossible to train a new model. The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". Type can be or message or orderbook.
+1. Firstly you need to have some LOBSTER data otherwise it would be impossible to train a new model. The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". Type can be or message or orderbook.
 2. You need to add the new stock to the constants and to the config file.
-3. You need to start the preprocessing setting the config.IS_DATA_PREPROCESSED = False
+3. You need to start the preprocessing setting, to do so set config.IS_DATA_PREPROCESSED to False and run python main.py
 
 ## Implementing and Training a new model 
-To train a new model, you need to have some data follow these steps:
+To train a new model, follow these steps:
  
 ### Model
 1. Implement your model class in the models/ directory. Your model class should inherit from the NNEngine class and should be a Pytorch Lightning engine. 
 2. Update the HP_DICT_MODEL dictionary in run.py to include your model and its hyperparameters.
-3. Create a file {model_name}_hparam and write the hyperparameters that you want to use for your model. You can also choose the ones for an hp search. Take inspiration form CDT. 
-4. Now choose a configuration, modying hte file configuration.py.
-5. Now you can run the main.py with:
+3. Create a file {model_name}_hparam and write the hyperparameters that you want to use for your model. You can also specify hyperparameters for a hyperparameter search. Use the TRADES model as an example.
+4. Choose a configuration by modifying the `configuration.py` file.
+5. Run the training script:
 ```sh
 python main.py
 ```
+6. A checkpoint will be saved in data/checkpoints/ that later you can use to perform a market simulation
 
-## Training a CDT Model 
-To train a CDT model, you need to follow these steps:
-1. Set the CHOSEN_MODEL in configuration.py to cst.Models.CDT
-2. Choose different parameters simulation if you want in configuraion.py
+## Training a TRADES Model 
+To train a TRADES model, you need to follow these steps:
+1. Set the CHOSEN_MODEL in configuration.py to cst.Models.TRADES
+2. Optionally, adjust the simulation parameters in `configuration.py`.
 2. Now you can run the main.py with:
 ```sh
 python main.py
 ```
 
-# Running a Market Simulation
-If your objective is to execute a market simulation you need to run this command:
+# Generate a Market Simulation with TRADES checkpoint
+To execute a market simulation with a TRADES checkpoint, there are two options:
+1. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC in the following point. Then you need to simply run the following command, inserting the stock symbol and the date that you want to simulate:
 ```sh
-python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -d True -m CDT -st '09:30:00' -et '12:00:00' 
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
+```
+2. The second possibility is that you do not have LOBSTER data. In this case you can go to [LOBSTER](https://lobsterdata.com/info/DataSamples.php), download one day of INTC with 10 level, to unzip the dir and places the two XLS file in data/INTC/INTC_2012-06-21_2012-06-21. Finally you can run the following command:
+```sh
+python -u ABIDES/abides.py -c world_agent_sim -t INTC -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' 
 ```
 
+If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
 
-If you want to run the same IABS configuration:
+# Running a Market Simulation with IABS configuration
+If you want to run the IABS configuration:
 ```sh
 python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 
 ```
 
-Checkpoints will be released upon acceptance.
+# Evaluate the simulation
+When the simulation ends a log file will be saved in ABIDES/log. The first step to evaluate the simulation is to do:
+```sh
+cd ABIDES/util/plotting 
+```
+
+and then:
+```sh
+python -u liquidity_telemetry.py ../../log/${LOG_NAME}/EXCHANGE_AGENT.bz2 ../../log/${LOG_NAME}/ORDERBOOK_${STOCK_NAME}_FULL.bz2 -o ../../log/${LOG_NAME}/world_agent_sim.png -c configs/plot_09.30_12.00.json -stream ../../log/${LOG_NAME}
+```
+
+you need to change `${LOG_NAME}`, `${STOCK_NAME}`, with the proper values. The log name is the name of the file that it was saved in ABIDES/log. Now you can find a plot of your simulation in the log dir.
+
+In order to compute the predictive score, you first need to perform the market replay of the day you are trying to simulate. Then you need to change config.TRADES_DATA_PATH with your log path, and config.REAL_DATA_PATH with the market replay log path, and finally config.EVALUATION to true. 
+
+The last step is to run:
+```sh
+python main.py
+```

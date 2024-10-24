@@ -4,10 +4,11 @@ data/TSLA
 data/INTC
 data/plot
 ABIDEs/log/paper/IABS*
+ABIDES/log
 *.pdf
 trash
 data/checkpoints 
-data/checkpoints/CDT
+data/checkpoints/TRADES
 data/checkpoints/CSDI 
 lightning_logs/
 data/generated_orders.csv

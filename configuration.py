@@ -20,20 +20,18 @@ class Configuration:
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CDT
+        self.CHOSEN_MODEL = cst.Models.TRADES
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         self.USE_ENGINE = cst.Engine.DIFFUSION_ENGINE
         
-        if self.CHOSEN_MODEL == cst.Models.CDT:
-            cst.PROJECT_NAME = "CDTS"
-        elif self.CHOSEN_MODEL == cst.Models.CSDI:
-            cst.PROJECT_NAME = "CSDI"
+        if self.CHOSEN_MODEL == cst.Models.TRADES:
+            cst.PROJECT_NAME = "TRADESS"
         elif self.CHOSEN_MODEL == cst.Models.CGAN:
             cst.PROJECT_NAME = "CGAN"
 
         # select a stock 
-        self.CHOSEN_STOCK = cst.Stocks.INTC
+        self.CHOSEN_STOCK = cst.Stocks.TSLA
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -43,7 +41,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
-        self.CDT_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
+        self.TRADES_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
         self.IABS_DATA_PATH = "ABIDES/log/IABS_TSLA_20150129_120000/processed_orders.csv"
         self.CGAN_DATA_PATH = "ABIDES/log/{insertpath}/processed_orders.csv"
 
@@ -71,17 +69,10 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.P_NORM] = 2 if self.CHOSEN_STOCK == cst.Stocks.INTC else 5
         self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 2
+        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS] = 2
 
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_SIDE_DIM] = 10
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_CHANNELS] = 2
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_DIFFUSION_STEP_EMB_DIM] = 64
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_EMBEDDING_TIME_DIM] = 64
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_EMBEDDING_FEATURE_DIM] = 16
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_LAYERS] = 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.CSDI_N_HEADS] = 2
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 
         self.COND_METHOD = "concatenation" #it can be concatenation or crossattention

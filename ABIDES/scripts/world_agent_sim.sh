@@ -5,9 +5,9 @@ python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -st
 # market replay with pov agent
 python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -p 0.1 -e True -st '09:30:00' -et '12:00:00'
 # world agent with diffusion simulation
-python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -d True -m CDT -st '09:30:00' -et '12:00:00'
+python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -d True -m TRADES -st '09:30:00' -et '12:00:00'
 # world agent with diffusion with POV agent
-python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -p 0.1 -d True -m CDT -e True -st '09:30:00' -et '12:00:00'
+python -u ABIDES/abides.py -c world_agent_sim -t TSLA -date 20150130 -s 1234 -p 0.1 -d True -m TRADES -e True -st '09:30:00' -et '12:00:00'
 LOG_NAME=market_replay_TSLA_2015-01-30_12-00-00
 CONFIG_NAME=plot_09.30_11.30.json
 cd ABIDES/util/plotting

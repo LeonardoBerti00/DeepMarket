@@ -18,13 +18,16 @@ from Kernel import Kernel
 from agent.WorldAgent import WorldAgent
 from util.order import LimitOrder
 from util import util
+from utils.utils_data import load_compute_normalization_terms
 from agent.ExchangeAgent import ExchangeAgent
 from agent.execution.POVExecutionAgent import POVExecutionAgent
 from pathlib import Path
 
 import configuration
 from models.diffusers.diffusion_engine import NNEngine
-from models.gans.gan_engine import GANEngine
+from models.gan.gan_engine import GANEngine
+
+
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -68,7 +71,7 @@ parser.add_argument('-e',
 parser.add_argument('-m',
                     '--chosen-model',
                     type=str,
-                    default='CDT')
+                    default='TRADES')
 parser.add_argument('-p',
                     '--execution-pov',
                     type=float,
@@ -112,91 +115,11 @@ agent_count, agents, agent_types = 0, [], []
 
 # Hyperparameters
 symbol = args.ticker
-if args.chosen_model == "CDT":
-    if symbol == "TSLA":
-        normalization_terms = {
-            "lob": [
-                cst.TSLA_LOB_MEAN_SIZE_10,
-                cst.TSLA_LOB_STD_SIZE_10,
-                cst.TSLA_LOB_MEAN_PRICE_10,
-                cst.TSLA_LOB_STD_PRICE_10,
-            ],
-            "event": [
-                cst.TSLA_EVENT_MEAN_SIZE,
-                cst.TSLA_EVENT_STD_SIZE,
-                cst.TSLA_EVENT_MEAN_PRICE,
-                cst.TSLA_EVENT_STD_PRICE,
-                cst.TSLA_EVENT_MEAN_TIME,
-                cst.TSLA_EVENT_STD_TIME,
-                cst.TSLA_EVENT_MEAN_DEPTH,
-                cst.TSLA_EVENT_STD_DEPTH,
-            ]
-        }
-
-    elif symbol == "INTC":
-        normalization_terms = {
-            "lob": [
-                cst.INTC_LOB_MEAN_SIZE_10, 
-                cst.INTC_LOB_STD_SIZE_10, 
-                cst.INTC_LOB_MEAN_PRICE_10,
-                cst.INTC_LOB_STD_PRICE_10
-                ],
-            "event": [
-                cst.INTC_EVENT_MEAN_SIZE, 
-                cst.INTC_EVENT_STD_SIZE, 
-                cst.INTC_EVENT_MEAN_PRICE, 
-                cst.INTC_EVENT_STD_PRICE, 
-                cst.INTC_EVENT_MEAN_TIME, 
-                cst.INTC_EVENT_STD_TIME,
-                cst.INTC_EVENT_MEAN_DEPTH,
-                cst.INTC_EVENT_STD_DEPTH
-            ]
-        }
+if args.chosen_model == "TRADES":
+    chosen_model = cst.Models.TRADES
 elif args.chosen_model == "CGAN":
-    if symbol == "TSLA":
-        normalization_terms = {
-            "lob": [
-                cst.TSLA_MEAN_SPREAD,
-                cst.TSLA_STD_SPREAD,
-                cst.TSLA_MEAN_RETURN,
-                cst.TSLA_STD_RETURN,
-                cst.TSLA_MEAN_VOL_IMB,
-                cst.TSLA_STD_VOL_IMB,
-                cst.TSLA_MEAN_ABS_VOL,
-                cst.TSLA_STD_ABS_VOL,
-                cst.TSLA_MEAN_CANCEL_DEPTH,
-                cst.TSLA_STD_CANCEL_DEPTH,
-                cst.TSLA_MEAN_SIZE_100,
-                cst.TSLA_STD_SIZE_100,
-                cst.TSLA_EVENT_MEAN_DEPTH,
-                cst.TSLA_EVENT_STD_DEPTH,
-                cst.TSLA_EVENT_MEAN_SIZE,
-                cst.TSLA_EVENT_STD_SIZE,
-            ]
-        }
-
-    elif symbol == "INTC":
-        normalization_terms = {
-            "lob": [
-                cst.INTC_MEAN_SPREAD,
-                cst.INTC_STD_SPREAD,
-                cst.INTC_MEAN_RETURN,
-                cst.INTC_STD_RETURN,
-                cst.INTC_MEAN_VOL_IMB,
-                cst.INTC_STD_VOL_IMB,
-                cst.INTC_MEAN_ABS_VOL,
-                cst.INTC_STD_ABS_VOL,
-                cst.INTC_MEAN_CANCEL_DEPTH,
-                cst.INTC_STD_CANCEL_DEPTH,
-                cst.INTC_MEAN_SIZE_100,
-                cst.INTC_STD_SIZE_100,
-                cst.INTC_EVENT_MEAN_DEPTH,
-                cst.INTC_EVENT_STD_DEPTH,
-                cst.INTC_EVENT_MEAN_SIZE,
-                cst.INTC_EVENT_STD_SIZE,
-            ]
-        }
-
+    chosen_model = cst.Models.CGAN
+normalization_terms = load_compute_normalization_terms(symbol, cst.DATA_DIR, str(historical_date.date()), chosen_model)
 starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 
 # 1) Exchange Agent
@@ -230,13 +153,14 @@ if args.diffusion:
     best_val_loss = np.inf
     if args.id is None:
         for file in dir_path.iterdir():
-            try:
-                val_loss = float(file.name.split("=")[1].split("_")[0])
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    checkpoint_reference = file
-            except:
-                continue
+            if symbol in file.name:
+                try:
+                    val_loss = float(file.name.split("=")[1].split("_")[0])
+                    if val_loss < best_val_loss:
+                        best_val_loss = val_loss
+                        checkpoint_reference = file
+                except:
+                    continue
     else:
         for file in dir_path.iterdir():
             try:
@@ -249,7 +173,7 @@ if args.diffusion:
     checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
     config = checkpoint["hyper_parameters"]["config"]
     config.IS_WANDB = False
-    if config.CHOSEN_MODEL == cst.Models.CDT:
+    if config.CHOSEN_MODEL == cst.Models.TRADES:
         # load checkpoint
         model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
         agents.extend([WorldAgent(id=1,

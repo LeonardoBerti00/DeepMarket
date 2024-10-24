@@ -16,17 +16,10 @@ class LearningHyperParameter(str, Enum):
     SIZE_TYPE_EMB = "size_type_emb"
     SIZE_ORDER_EMB = "size_order_emb"
     LAMBDA = "lambda"
-    CDT_DEPTH = "CDT_depth"
-    CDT_MLP_RATIO = "CDT_mlp_ratio"
-    CDT_NUM_HEADS = "CDT_num_heads"
+    TRADES_DEPTH = "TRADES_depth"
+    TRADES_MLP_RATIO = "TRADES_mlp_ratio"
+    TRADES_NUM_HEADS = "TRADES_num_heads"
     TEST_BATCH_SIZE = "test_batch_size"
-    CSDI_SIDE_DIM = "CSDI_side_dim"
-    CSDI_CHANNELS = "CSDI_channels"
-    CSDI_DIFFUSION_STEP_EMB_DIM = "CSDI_diffusion_step_emb_dim"
-    CSDI_EMBEDDING_TIME_DIM = "CSDI_embedding_time_dim"
-    CSDI_EMBEDDING_FEATURE_DIM = "CSDI_embedding_feature_dim"
-    CSDI_LAYERS = "CSDI_layers"
-    CSDI_N_HEADS = "CSDI_n_heads"
     REG_TERM_WEIGHT = "reg_term_weight"
     ONE_HOT_ENCODING_TYPE = "one_hot_encoding_type"
     P_NORM = "p_norm"
@@ -67,8 +60,7 @@ class Metrics(Enum):      #Quantitative evaluation
     kolmogorov_smirnov = 'kolmogorov_smirnov'
 
 class Models(str, Enum):
-    CDT = "CDT"
-    CSDI = "CSDI"
+    TRADES = "TRADES"
     CGAN = "CGAN"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
@@ -126,7 +118,7 @@ class Engine(str, Enum):
     """NN_ENGINE = "NNEngine"
     GAN_ENGINE = "GANEngine"""
     DIFFUSION_ENGINE = "models.diffusers.engine.DiffusionEngine"
-    GAN_ENGINE = "models.gans.engine.GANEngine"
+    GAN_ENGINE = "models.gan.engine.GANEngine"
 
     
 
@@ -204,6 +196,6 @@ DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 DATA_DIR = "data"
 RECON_DIR = "data/reconstructions"
-PROJECT_NAME = "CDTS"
+PROJECT_NAME = "TRADESS"
 
 

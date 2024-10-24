@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def main(real_path, cdt_path, iabs_path, cgan_path):
+def main(real_path, TRADES_path, iabs_path, cgan_path):
     def load_and_compute_correlation(file_path, window=30, lag=1):
         df = pd.read_csv(file_path)
         df.rename(columns={'Unnamed: 0': 'time'}, inplace=True)
@@ -20,7 +20,7 @@ def main(real_path, cdt_path, iabs_path, cgan_path):
         return df['rolling_corr'].dropna()
 
     correlation_real = load_and_compute_correlation(real_path)
-    correlation_cdt = load_and_compute_correlation(cdt_path)
+    correlation_TRADES = load_and_compute_correlation(TRADES_path)
     correlation_iabs = load_and_compute_correlation(iabs_path)
     correlation_cgan = load_and_compute_correlation(cgan_path)
     
@@ -29,16 +29,16 @@ def main(real_path, cdt_path, iabs_path, cgan_path):
 
     sns.kdeplot(correlation_real, shade=True, color="blue", label='Real')
     sns.kdeplot(correlation_iabs, shade=True, color="green", label='IABS')
-    sns.kdeplot(correlation_cdt, shade=True, color="red", label='CDT')
+    sns.kdeplot(correlation_TRADES, shade=True, color="red", label='TRADES')
     sns.kdeplot(correlation_cgan, shade=True, color="purple", label='CGAN')
 
     plt.xlabel('Correlation Coefficient')
     plt.ylabel('Frequency')
     plt.title('Autocorrelation Log Returns Distribution')
-
+    
     plt.legend()
     file_name = f"corr_coef_join.pdf"
-    dir_path = os.path.dirname(cdt_path)
+    dir_path = os.path.dirname(TRADES_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.close()

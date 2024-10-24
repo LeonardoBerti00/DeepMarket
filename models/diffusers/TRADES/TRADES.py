@@ -4,9 +4,9 @@ from einops import rearrange
 from utils.utils import sinusoidal_positional_embedding
 import constants as cst
 import random
-from models.diffusers.CDT.Transformer import TransformerEncoder
+from models.diffusers.TRADES.Transformer import TransformerEncoder
 
-class CDT(nn.Module):
+class TRADES(nn.Module):
     def __init__(
         self,
         input_size,
@@ -46,7 +46,7 @@ class CDT(nn.Module):
 
     def forward(self, x, cond_orders, t, cond_lob=None):
         """
-        Forward pass of CDT.
+        Forward pass of TRADES.
         x: (N, K, F) tensor of time series
         t: (N,) tensor of diffusion timesteps
         cond_orders: (N, P, C) tensor of past history

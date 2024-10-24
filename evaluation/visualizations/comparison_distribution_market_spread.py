@@ -55,20 +55,20 @@ def process_df(df):
     
     return df_f
 
-def main(real_path=None, cdt_path=None, iabs_path=None, cgan_path=None):
+def main(real_path=None, TRADES_path=None, iabs_path=None, cgan_path=None):
     
     df_real = pd.read_csv(real_path, header=0)
-    df_cdt = pd.read_csv(cdt_path, header=0)
+    df_TRADES = pd.read_csv(TRADES_path, header=0)
     df_iabs = pd.read_csv(iabs_path, header=0)
     df_cgan = pd.read_csv(cgan_path, header=0)
     
     df_real = process_df(df_real)
-    df_cdt = process_df(df_cdt)
+    df_TRADES = process_df(df_TRADES)
     df_iabs = process_df(df_iabs)
     df_cgan = process_df(df_cgan)
 
     plt.plot(df_real['TIME'], df_real['SPREAD_mean'], label='Real', color='blue')#, marker='o', linestyle='', markersize=3)
-    plt.plot(df_cdt['TIME'], df_cdt['SPREAD_mean'], label='CDT', color='red')#, marker='o', linestyle='', markersize=3)
+    plt.plot(df_TRADES['TIME'], df_TRADES['SPREAD_mean'], label='TRADES', color='red')#, marker='o', linestyle='', markersize=3)
     plt.plot(df_iabs['TIME'], df_iabs['SPREAD_mean'], label='IABS', color='orange')#, marker='o', linestyle='', markersize=3)
     plt.plot(df_cgan['TIME'], df_cgan['SPREAD_mean'], label='CGAN', color='green')#, marker='o', linestyle='', markersize=3)
 
@@ -81,7 +81,7 @@ def main(real_path=None, cdt_path=None, iabs_path=None, cgan_path=None):
 
     plt.legend()
     file_name = "market_spread.pdf"
-    dir_path = os.path.dirname(cdt_path)
+    dir_path = os.path.dirname(TRADES_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     #plt.show()

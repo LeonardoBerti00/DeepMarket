@@ -9,12 +9,11 @@ import matplotlib.pyplot as plt
 
 import wandb
 from models.NNEngine import NNEngine
-from models.diffusers.GaussianDiffusion import GaussianDiffusion
-from models.diffusers.CSDI.CSDI import CSDIDiffuser
+from models.diffusers.gaussian_diffusion import GaussianDiffusion
 from utils.utils_models import pick_diffuser, pick_augmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-from models.diffusers.CDT.Sampler import LossSecondMomentResampler
+from models.diffusers.TRADES.Sampler import LossSecondMomentResampler
 
 
 class DiffusionEngine(NNEngine):
@@ -61,10 +60,7 @@ class DiffusionEngine(NNEngine):
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         real_input, real_cond = x_0.detach().clone(), cond_orders.detach().clone()
         if is_train:
-            if isinstance(self.diffuser, CSDIDiffuser) and is_train:
-                self.t = torch.randint(low=1, high=self.num_diffusionsteps, size=(x_0.shape[0],), device=cst.DEVICE, dtype=torch.int64)
-            elif isinstance(self.diffuser, GaussianDiffusion) and is_train:
-                self.t, _ = self.sampler.sample(x_0.shape[0])
+            self.t, _ = self.sampler.sample(x_0.shape[0])
             recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)

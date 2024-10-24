@@ -3,11 +3,11 @@ import numpy as np
 import torch
 from einops import rearrange, repeat, reduce
 
-from models.diffusers.DiffusionAB import DiffusionAB
+from models.diffusers.diffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
-from models.diffusers.CDT.CDT import CDT
+from models.diffusers.TRADES.TRADES import TRADES
 
 """
 Functions -> _vlb_loss, _p_mean, _q_posterior_mean_var, _normal_kl, _gaussian_log_likelihood, _approx_standard_normal_cdf 
@@ -24,9 +24,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
@@ -36,7 +36,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.feature_augmenter = feature_augmenter
         else:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
-        self.NN = CDT(
+        self.NN = TRADES(
             self.input_size,
             self.cond_seq_size,
             self.num_diffusionsteps,

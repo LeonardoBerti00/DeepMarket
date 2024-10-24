@@ -1,15 +1,12 @@
-from models.diffusers.GaussianDiffusion import GaussianDiffusion
-from models.diffusers.CSDI.CSDI import CSDIDiffuser
+from models.diffusers.gaussian_diffusion import GaussianDiffusion
 import constants as cst
 import torch.nn as nn
 
 from models.feature_augmenters.MLPAugmenter import MLPAugmenter
 
 def pick_diffuser(config, model_name, augmenter):
-    if model_name == "CDT":
+    if model_name == "TRADES":
         return GaussianDiffusion(config, augmenter).to(cst.DEVICE, non_blocking=True)
-    elif model_name == 'CSDI':
-        return CSDIDiffuser(config, augmenter).to(cst.DEVICE, non_blocking=True)
     else:
         raise ValueError("Diffuser not found")
 

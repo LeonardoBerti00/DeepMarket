@@ -70,12 +70,12 @@ def preprocess_data(df):
 def plot_data(pca, pca2, generated_path):
     if "IABS" in generated_path:
         label = "IABS"
-    elif "CDT" in generated_path:
-        label = "CDT"
+    elif "TRADES" in generated_path:
+        label = "TRADES"
     elif "GAN" in generated_path:
         label = "CGAN"
     else:
-        label = "CDT"
+        label = "TRADES"
     # Plot pca in red
     plt.scatter(pca[:, 0], pca[:, 1], color='tab:red', label='Real', alpha=0.1, s=10)
 
