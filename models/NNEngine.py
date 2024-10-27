@@ -30,10 +30,10 @@ class NNEngine(LightningModule, ABC):
         self.filename_ckpt = config.FILENAME_CKPT
         self.num_violations_price = 0
         self.num_violations_size = 0
-        self.chosen_model = config.CHOSEN_MODEL.name
+        self.chosen_model = config.CHOSEN_MODEL
         self.last_path_ckpt_ema = None
         
-        
+    '''        
     @abstractmethod
     def sample(self, **kwargs) -> torch.Tensor:
         pass
@@ -41,7 +41,7 @@ class NNEngine(LightningModule, ABC):
     @abstractmethod
     def model_checkpointing(self, loss) -> None:
         pass
-    
+    ''' 
     @classmethod
     def factory(cls, class_path: str, config: Configuration):
         # Split the class_path into the module path and class name

@@ -23,6 +23,7 @@ class Configuration:
         self.CHOSEN_MODEL = cst.Models.TRADES
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
+        self.SAMPLING_TYPE = "DDPM" #it can be DDPM or DDIM
         self.USE_ENGINE = cst.Engine.DIFFUSION_ENGINE
         
         if self.CHOSEN_MODEL == cst.Models.TRADES:
@@ -52,14 +53,16 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE] = 0.001
         self.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS] = 50
         self.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER] = cst.Optimizers.ADAM.value
-
+        self.HYPER_PARAMETERS[LearningHyperParameter.DDIM_ETA] = 0
+        self.HYPER_PARAMETERS[LearningHyperParameter.DDIM_NSTEPS] = 10
+        
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
         self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
         self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
-        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 1
         self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
         if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
             self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1

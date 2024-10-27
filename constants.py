@@ -19,10 +19,22 @@ class LearningHyperParameter(str, Enum):
     TRADES_DEPTH = "TRADES_depth"
     TRADES_MLP_RATIO = "TRADES_mlp_ratio"
     TRADES_NUM_HEADS = "TRADES_num_heads"
+    CDT_DEPTH = "CDT_depth"
+    CDT_MLP_RATIO = "CDT_mlp_ratio"
+    CDT_NUM_HEADS = "CDT_num_heads"
     TEST_BATCH_SIZE = "test_batch_size"
     REG_TERM_WEIGHT = "reg_term_weight"
     ONE_HOT_ENCODING_TYPE = "one_hot_encoding_type"
     P_NORM = "p_norm"
+    DDIM_ETA = "ddim_eta"
+    DDIM_NSTEPS = "ddim_nsteps"
+    CSDI_SIDE_DIM = "CSDI_side_dim"
+    CSDI_CHANNELS = "CSDI_channels"
+    CSDI_DIFFUSION_STEP_EMB_DIM = "CSDI_diffusion_step_emb_dim"
+    CSDI_EMBEDDING_TIME_DIM = "CSDI_embedding_time_dim"
+    CSDI_EMBEDDING_FEATURE_DIM = "CSDI_embedding_feature_dim"
+    CSDI_LAYERS = "CSDI_layers"
+    CSDI_N_HEADS = "CSDI_n_heads"
     MARKET_FEATURES_DIM = "market_features_dim"
     ORDER_FEATURES_DIM = "order_features_dim"
     GENERATOR_CHANNELS = "gen_channels"
@@ -62,6 +74,7 @@ class Metrics(Enum):      #Quantitative evaluation
 class Models(str, Enum):
     TRADES = "TRADES"
     CGAN = "CGAN"
+    CDT = "CDT"
 
 class LOB_Charts(Enum):      #Qualitative evaluation
 
@@ -191,11 +204,12 @@ LEN_ORDER = 6
 LEN_ORDER_CGAN = 7
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+#DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 DATA_DIR = "data"
 RECON_DIR = "data/reconstructions"
-PROJECT_NAME = "TRADESS"
+PROJECT_NAME = "TRADES"
 
 

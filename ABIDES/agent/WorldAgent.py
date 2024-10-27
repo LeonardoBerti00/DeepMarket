@@ -800,9 +800,9 @@ class WorldAgent(Agent):
         events["time"] = events["time"].diff()
         events["time"].iloc[0] = first - 34200
 
-        dataframes = reset_indexes([[events, lob]])
-        events = dataframes[0][0]
-        lob = dataframes[0][1]
+        dataframes = reset_indexes([events, lob])
+        events = dataframes[0]
+        lob = dataframes[1]
         # get the order ids of the rows with order_type=1
         order_ids = events.loc[events['event_type'] == 1, 'order_id']
 
@@ -811,8 +811,8 @@ class WorldAgent(Agent):
 
         events = events.drop(filtered_df)
         lob = lob.drop(filtered_df)
-        dataframes = reset_indexes([[events, lob]])
-        return dataframes[0][0], dataframes[0][1]
+        dataframes = reset_indexes([events, lob])
+        return dataframes[0], dataframes[1]
 
 
     def _update_lob_snapshot(self, msg):

@@ -19,15 +19,20 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     def __init__(self, config, feature_augmenter):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
+        self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
+        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
+        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
+        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
+        self.sampling_type = config.SAMPLING_TYPE
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         self.cond_method = config.COND_METHOD
@@ -53,8 +58,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
-        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE, non_blocking=True), self.alphas_cumprod[:-1]])
-
+        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]), self.alphas_cumprod[:-1]])
         # calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
         self.posterior_log_var_clipped = torch.log(self.posterior_var)
@@ -65,34 +69,91 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas)
             / (1.0 - self.alphas_cumprod)
         )
+            
+        if self.sampling_type == "DDIM":
+            self.ddim_eta = config.HYPER_PARAMETERS[LearningHyperParameter.DDIM_ETA]
+            self.ddim_nsteps = config.HYPER_PARAMETERS[LearningHyperParameter.DDIM_NSTEPS]
+            tmp = self.num_diffusionsteps / self.ddim_nsteps
+            self.t = torch.arange(0, self.num_diffusionsteps, tmp).long() + 1
+            self.ddim_alpha = self.alphas_cumprod[self.t].clone()
+            self.ddim_alpha_sqrt = torch.sqrt(self.ddim_alpha)
+            self.ddim_alpha_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]), self.alphas_cumprod[self.t[:-1]]])
+            self.ddim_sqrt_one_minus_alpha = (1. - self.ddim_alpha) ** .5
+            self.ddim_sigma = (self.ddim_eta *
+                               ((1 - self.ddim_alpha_prev) / (1 - self.ddim_alpha) *
+                                (1 - self.ddim_alpha / self.ddim_alpha_prev)) ** .5)
+            
         
+    def sample(self, x_0, real_cond_orders, real_cond_lob, weights):
+        if self.sampling_type == "DDIM":
+            return self.ddim_sample(x_0, real_cond_orders, real_cond_lob)
+        elif self.sampling_type == "DDPM":
+            return self.ddpm_sample(x_0, real_cond_orders, real_cond_lob, weights)
+        
+        
+    def ddim_sample(self, x_0, cond_orders, cond_lob):
+        orig_cond_orders = cond_orders.detach().clone()
+        if cond_lob is not None:
+            orig_cond_lob = cond_lob.detach().clone()
+        else:
+            orig_cond_lob = None
+        tmp = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
+        x_t, context = self.forward_reparametrized(x_0, tmp, **{"conditioning": cond_orders})
+        context.update({'x_t': x_t.detach().clone()})        
+        time_steps = torch.flip(self.t, dims=(0,))
+        for i, step in enumerate(time_steps):
+            # augment
+            x_t_aug, cond_orders, cond_lob = self.augment(x_t, orig_cond_orders, orig_cond_lob)
+            index = len(time_steps) - i - 1
+            ts = x_t.new_full((x_0.shape[0],), step, dtype=torch.long)
+            x_t = self.ddim_single_step(x_t_aug, cond_lob, cond_orders, ts, index, x_t)
+        return x_t
+        
+    def ddim_single_step(self, x_t_aug, cond_lob, cond_orders, ts, index, x_t):
+        noise_t, v = self.NN(x_t_aug, cond_orders, ts, cond_lob)
+        #check for nan in x_t_aug and cond and noise_t
+        if torch.isnan(x_t_aug).any():
+            print("x_t_aug:", x_t_aug)
+        if torch.isnan(noise_t).any():
+            print("noise_t:", noise_t)
+        if self.IS_AUGMENTATION:
+            e_t, v = self.deaugment(noise_t, v)
+        alpha = self.ddim_alpha[index]
+        alpha_prev = self.ddim_alpha_prev[index]
+        sigma = self.ddim_sigma[index]
+        sqrt_one_minus_alpha = self.ddim_sqrt_one_minus_alpha[index]
+        # Current prediction for x_0 
+        pred_x0 = (x_t - sqrt_one_minus_alpha * e_t) / (alpha ** 0.5)
+        dir_xt = (1. - alpha_prev - sigma ** 2).sqrt() * e_t
+        # no noise is added, when η=0
+        if sigma == 0.:
+            noise = 0.
+        else:
+            noise = torch.randn(x_t.shape, device=x_t.device)
+        x_prev = (alpha_prev ** 0.5) * pred_x0 + dir_xt + sigma * noise
+        return x_prev
+    
+    def ddpm_sample(self, x_0, cond_orders, cond_lob, weights):
+        orig_cond_orders = cond_orders.detach().clone()
+        if cond_lob is not None:
+            orig_cond_lob = cond_lob.detach().clone()
+        else:
+            orig_cond_lob = None
+        t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
+        x_t, noise = self.forward_reparametrized(x_0, t)
+        for i in range(self.num_diffusionsteps-1, -1, -1):
+            # augment
+            x_t_aug, cond_orders, cond_lob = self.augment(x_t, orig_cond_orders, orig_cond_lob)
+            x_t = self.ddpm_single_step(x_0, x_t_aug, x_t, t, cond_orders, noise, weights, cond_lob)
+            t -= 1
+        return x_t
 
 
-    def forward(self, x_t_aug: torch.Tensor, context: Dict):
-        assert 'x_t' in context
-        x_t = context['x_t']
-        assert 'noise_true' in context
-        noise_true = context['noise_true']
-        cond_orders = context['cond_orders_aug']
-        cond_lob = context['cond_lob_aug']
-        cond_type = context['cond_type']
-        assert 't' in context
-        t = context['t']
-        assert 'x_0' in context
-        x_0 = context['x_0']
-        assert 'weights' in context
-        weights = context['weights']
-
-        return self.reverse_reparametrized(x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob, cond_type)
-
-
-    def forward_reparametrized(self, x_0: torch.Tensor, t: int, **kwargs) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-        assert 'conditioning' in kwargs
-        cond: torch.Tensor = kwargs['conditioning']
+    def forward_reparametrized(self, x_0: torch.Tensor, t: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         x_t, noise = super().forward_reparametrized(x_0, t)
-        return x_t, {'noise_true': noise, 'conditioning': cond}
+        return x_t, noise
 
-    def reverse_reparametrized(self, x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob, cond_type):
+    def ddpm_single_step(self, x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob):
         '''
         Compute the reverse diffusion process for the current time step
         '''
@@ -151,7 +212,15 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             print("L_vlb:", L_vlb)
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
-        return x_recon, {}
+        return x_recon
+
+    def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
+        if self.IS_AUGMENTATION:
+            full_input = torch.cat([cond_orders, x_t], dim=1)
+            full_input_aug, cond_lob = self.feature_augmenter.augment(full_input, cond_lob)
+            cond_orders = full_input_aug[:, :self.cond_seq_size, :]
+            x_t = full_input_aug[:, self.cond_seq_size:, :]
+        return x_t, cond_orders, cond_lob
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
         noise, v = self.feature_augmenter.deaugment(noise, v)
@@ -160,8 +229,8 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     def _mse_loss(self, noise_t, noise_true):
         return torch.norm(noise_t - noise_true, p=2, dim=[1, 2])
 
-    def loss(self, true: torch.Tensor, recon: torch.Tensor, **kwargs):
-        """Computes the loss taken from IDDPM."""
+    def loss(self):
+        """Computes the loss taken from DDPM."""
         L_simple = torch.stack(self.mse_losses)
         L_vlb = torch.stack(self.vlb_losses)
         #print("L_simple:", torch.mean(L_simple).item(), "L_vlb:", torch.mean(L_vlb).item())

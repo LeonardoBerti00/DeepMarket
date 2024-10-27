@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import wandb
 from models.NNEngine import NNEngine
 from models.diffusers.gaussian_diffusion import GaussianDiffusion
-from utils.utils_models import pick_diffuser, pick_augmenter
+from utils.utils_models import pick_augmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.diffusers.TRADES.Sampler import LossSecondMomentResampler
@@ -35,14 +35,14 @@ class DiffusionEngine(NNEngine):
         self.cond_size = config.COND_SIZE
         if self.IS_AUGMENTATION:
             self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method, self.chosen_model)
-            self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, self.feature_augmenter)
+            self.diffuser = GaussianDiffusion(config, self.feature_augmenter).to(cst.DEVICE, non_blocking=True)
         else:
-            self.diffuser = pick_diffuser(config, config.CHOSEN_MODEL, None)
+            self.diffuser = GaussianDiffusion(config, None).to(cst.DEVICE, non_blocking=True)
             
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
-            self.type_embedder.requires_grad_(False)
-            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            #self.type_embedder.requires_grad_(False)
+            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -58,104 +58,59 @@ class DiffusionEngine(NNEngine):
         # x_0 shape is (batch_size, seq_size=1, cst.LEN_ORDER_ONE_HOT=8)
         if not self.one_hot_encoding_type:
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
-        real_input, real_cond = x_0.detach().clone(), cond_orders.detach().clone()
         if is_train:
             self.t, _ = self.sampler.sample(x_0.shape[0])
-            recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
+            recon = self.single_step(cond_orders, x_0, cond_lob)
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
             for i in range(self.num_diffusionsteps-1, -1, -1):
-                recon, context = self.single_step(cond_orders, x_0, cond_lob, is_train, real_cond)
+                recon = self.single_step(cond_orders, x_0, cond_lob)
                 self.t -= 1
-        return recon, context
+        return recon
 
     def sample(self, **kwargs) -> torch.Tensor:
         cond_orders: torch.Tensor = kwargs['cond_orders']
         x_0: torch.Tensor = kwargs['x']
         cond_lob: torch.Tensor = kwargs['cond_lob']
-        self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
         if not self.one_hot_encoding_type:
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         x_0 = torch.zeros_like(x_0)
-        real_cond_orders = cond_orders.detach().clone()
-        if cond_lob is not None:
-            real_cond_lob = cond_lob.detach().clone()
-        else:
-            real_cond_lob = None
-        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
-        context.update({'x_t': x_t.detach().clone()})
-        for i in range(self.num_diffusionsteps-1, -1, -1):
-            # augment
-            x_t, cond_orders, cond_lob = self.augment(x_t, real_cond_orders, real_cond_lob)
-
-            context.update({
-                'is_train': False,
-                't': self.t,
-                'x_0': x_0,
-                'cond_orders_aug': cond_orders,
-                'cond_lob_aug': cond_lob,
-                'weights': self.sampler.weights(),
-                'cond_type': self.cond_type,
-            })
-
-            x_t, reverse_context = self.diffuser(x_t, context)
-
-            reverse_context.update({'conditioning': real_cond_orders})
-            # return the deaugmented denoised input and the reverse context
-            self.t -= 1
+        weights = self.sampler.weights()
+        x_t = self.diffuser.sample(x_0, cond_orders, cond_lob, weights)
         return x_t
 
-    def single_step(self, cond_orders, x_0, cond_lob, is_train, real_cond):
+
+    def single_step(self, cond_orders, x_0, cond_lob):
         # forward process
-        x_t, context = self.diffuser.forward_reparametrized(x_0, self.t, **{"conditioning": cond_orders})
-        context.update({'x_t': x_t.detach().clone()})
+        x_t, noise = self.diffuser.forward_reparametrized(x_0, self.t)
         # augment
-        x_t, cond_orders, cond_lob = self.augment(x_t, context['conditioning'], cond_lob)
-        
-        context.update({
-            'is_train': is_train,
-            't': self.t,
-            'x_0': x_0,
-            'cond_orders_aug': cond_orders,
-            'cond_lob_aug': cond_lob,
-            'weights': self.sampler.weights(),
-            'cond_type': self.cond_type,
-        })
-
-        x_recon, reverse_context = self.diffuser(x_t, context)
-        
-        reverse_context.update({'conditioning': real_cond})
+        x_t_aug, cond_orders, cond_lob = self.diffuser.augment(x_t, cond_orders, cond_lob)
+        weights = self.sampler.weights()
+        x_recon = self.diffuser.ddpm_single_step(x_0, x_t_aug, x_t, self.t, cond_orders, noise, weights, cond_lob)
         # return the deaugmented denoised input and the reverse context
-        return x_recon, reverse_context
-
-    def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
-        if self.IS_AUGMENTATION:
-            full_input = torch.cat([cond_orders, x_t], dim=1)
-            full_input_aug, cond_lob = self.feature_augmenter.augment(full_input, cond_lob)
-            cond_orders = full_input_aug[:, :self.cond_seq_size, :]
-            x_t = full_input_aug[:, self.cond_seq_size:, :]
-        return x_t, cond_orders, cond_lob
+        return x_recon
+    
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
-        type_emb = self.type_embedder(order_type.long())
-        x_0 = torch.cat((x_0[:, :, :1], type_emb, x_0[:, :, 2:]), dim=2)
+        order_type_emb = self.type_embedder(order_type.long())
+        x_0 = torch.cat((x_0[:, :, :1], order_type_emb, x_0[:, :, 2:]), dim=2)
         cond_type = cond[:, :, 1]
         cond_depth_emb = self.type_embedder(cond_type.long())
         cond = torch.cat((cond[:, :, :1], cond_depth_emb, cond[:, :, 2:]), dim=2)
         return x_0, cond
     
     
-    def loss(self, real, recon, **kwargs):
+    def loss(self):
         # regularization term to avoid order with negative size
         if isinstance(self.diffuser, GaussianDiffusion):
-            L_hybrid, L_simple, L_vlb = self.diffuser.loss(real, recon, **kwargs)
+            L_hybrid, L_simple, L_vlb = self.diffuser.loss()
             #print(f"hybrid loss: {L_hybrid.mean()}")
             #print(f"simple loss: {L_simple.mean()}")
             #print(f"vlb loss: {L_vlb.mean()}")
             return L_hybrid, L_simple, L_vlb
         else:
-            L_simple = self.diffuser.loss(real, recon, **kwargs)
+            L_simple = self.diffuser.loss()
             return L_simple, L_simple, L_simple
 
     def training_step(self, input, batch_idx):
@@ -169,10 +124,8 @@ class DiffusionEngine(NNEngine):
         cond_lob.requires_grad_(True)
         if self.cond_type != 'full':
             cond_lob = None
-        recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=True, batch_idx=batch_idx)
-        reverse_context.update({'is_train': True})
-        
-        batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+        recon = self.forward(cond_orders, x_0, cond_lob, is_train=True, batch_idx=batch_idx)
+        batch_loss, L_simple, L_vlb = self.loss()
         self.simple_train_losses.append(torch.mean(L_simple).item())
         self.vlb_train_losses.append(torch.mean(L_vlb).item())
 
@@ -237,9 +190,8 @@ class DiffusionEngine(NNEngine):
             cond_lob = None
         # Validation: with EMA
         with self.ema.average_parameters():
-            recon, reverse_context = self.forward(cond_orders, x_0, cond_lob, is_train=False)
-            reverse_context.update({'is_train': False})
-            batch_loss, L_simple, L_vlb = self.loss(x_0, recon, **reverse_context)
+            recon = self.forward(cond_orders, x_0, cond_lob, is_train=False)
+            batch_loss, L_simple, L_vlb = self.loss()
             self.simple_val_losses.append(torch.mean(L_simple).item())
             self.vlb_val_losses.append(torch.mean(L_vlb).item())
             batch_loss_mean = torch.mean(batch_loss)

@@ -24,7 +24,7 @@ from agent.execution.POVExecutionAgent import POVExecutionAgent
 from pathlib import Path
 
 import configuration
-from models.diffusers.diffusion_engine import NNEngine
+from models.diffusers.diffusion_engine import DiffusionEngine
 from models.gan.gan_engine import GANEngine
 
 
@@ -89,6 +89,26 @@ parser.add_argument('-id',
                     type=float,
                     default=None,
                     help='diffusion-id-which-is-best-val-loss')
+parser.add_argument('-seed',
+                    '--seed',
+                    type=int,
+                    default=cst.SEED,
+                    help='Seed for random number generation')
+parser.add_argument('-type',
+                    '--sampling-type',
+                    type=str,
+                    default='DDPM',
+                    help='Sampling type for diffusion')
+parser.add_argument('-ddim-eta',
+                    '--ddim-eta',
+                    type=float,
+                    default=0.1,
+                    help='eta for DDIM')
+parser.add_argument('-ddim-nsteps',
+                    '--ddim-nsteps',
+                    type=int,
+                    default=10,
+                    help='nsteps for DDIM')
 
 args, remaining_args = parser.parse_known_args()
 
@@ -96,8 +116,9 @@ if args.config_help:
     parser.print_help()
     sys.exit()
 
-seed = cst.SEED  # Random seed specification on the command line.
-
+seed = args.seed  # Random seed specification on the command line.
+torch.manual_seed(seed)
+np.random.seed(seed)
 exchange_log_orders = True
 log_orders = True
 warnings.filterwarnings("ignore")
@@ -148,8 +169,7 @@ agent_count += 1
 
 # 2) World Agent
 if args.diffusion:
-    chosen_model = args.chosen_model
-    dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model))
+    dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model.value))
     best_val_loss = np.inf
     if args.id is None:
         for file in dir_path.iterdir():
@@ -171,28 +191,33 @@ if args.diffusion:
                 continue
     print("checkpoint used: ", checkpoint_reference)
     checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
+    checkpoint["hyper_parameters"]["chosen_model"] = chosen_model
     config = checkpoint["hyper_parameters"]["config"]
     config.IS_WANDB = False
+    config.CHOSEN_MODEL = chosen_model
+    config.SAMPLING_TYPE = args.sampling_type
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_ETA] = args.ddim_eta
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_NSTEPS] = args.ddim_nsteps
     if config.CHOSEN_MODEL == cst.Models.TRADES:
         # load checkpoint
-        model = NNEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+        model = DiffusionEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
         agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
                           symbol=symbol,
                           date=str(historical_date.date()),
                           date_trading_days=cst.DATE_TRADING_DAYS,
-                          diffusion_model=model,
+                          model=model,
                           data_dir=cst.DATA_DIR,
-                          cond_type=config.COND_TYPE if args.diffusion else None,
-                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE] if args.diffusion else None,
-                          size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB] if args.diffusion else None,
+                          cond_type=config.COND_TYPE,
+                          cond_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] - config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+                          size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB],
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=cst.SEED),
+                              seed=args.SEED),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
-                            chosen_model=args.chosen_model if args.diffusion else None,
+                            chosen_model=args.chosen_model,
                           )
                ])
     elif config.CHOSEN_MODEL == cst.Models.CGAN:
@@ -203,15 +228,15 @@ if args.diffusion:
                           symbol=symbol,
                           date=str(historical_date.date()),
                           date_trading_days=cst.DATE_TRADING_DAYS,
-                          diffusion_model=model,
+                          model=model,
                           data_dir=cst.DATA_DIR,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=cst.SEED),
+                              seed=args.SEED),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
-                            chosen_model=args.chosen_model if args.diffusion else None,
-                            seq_len=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE] if args.diffusion else None,
+                            chosen_model=args.chosen_model,
+                            seq_len=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
                           )
                ])
             
@@ -219,7 +244,25 @@ if args.diffusion:
     for param in model.parameters():
         param.requires_grad = False
 else:
-    model = None
+    agents.extend([WorldAgent(id=1,
+                          name="WORLD_AGENT",
+                          type="WorldAgent",
+                          symbol=symbol,
+                          date=str(historical_date.date()),
+                          date_trading_days=cst.DATE_TRADING_DAYS,
+                          model=None,
+                          data_dir=cst.DATA_DIR,
+                          cond_type=None,
+                          cond_seq_size=None,
+                          size_type_emb=None,
+                          log_orders=log_orders,
+                          random_state=np.random.RandomState(
+                              seed=args.SEED),
+                          normalization_terms=normalization_terms,
+                          using_diffusion=args.diffusion,
+                            chosen_model=args.chosen_model if args.diffusion else None,
+                          )
+               ])
 
 
 
@@ -274,17 +317,16 @@ time_mkt_close = str(tmp.time()).replace(':', '-')
 
 if trade_pov:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_pov_{}_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume, cst.SEED) + checkpoint_reference.name[:-5] 
+        log_dir = "world_agent_{}_{}_{}_pov_{}_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume, seed) + checkpoint_reference.name[:-5] 
     else:
-        log_dir = "market_replay_{}_{}_{}_pov_{}_{}".format(symbol, date, time_mkt_close, pov_proportion_of_volume, cst.SEED)
+        log_dir = "market_replay_{}_{}_{}_pov_{}_{}".format(symbol, date, time_mkt_close, pov_proportion_of_volume, seed)
 else:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, cst.SEED) + checkpoint_reference.name[:-5]
+        log_dir = "world_agent_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, seed) + checkpoint_reference.name[:-5]
     else:
-        log_dir = "market_replay_{}_{}_{}_{}".format(symbol, date, time_mkt_close, cst.SEED)
+        log_dir = "market_replay_{}_{}_{}_{}".format(symbol, date, time_mkt_close, seed)
 
 defaultComputationDelay = 0  # 50 nanoseconds
-# time.sleep(3)
 kernel.runner(agents=agents,
               startTime=kernelStartTime,
               stopTime=kernelStopTime,
