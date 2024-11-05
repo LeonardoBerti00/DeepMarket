@@ -16,7 +16,7 @@ are ported from the original Ho et al. diffusion models codebase: https://github
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
-    def __init__(self, config, feature_augmenter, bin):
+    def __init__(self, config, feature_augmenter):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
@@ -25,18 +25,14 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
-        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
-        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
-        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.sampling_type = config.SAMPLING_TYPE
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         self.cond_method = config.COND_METHOD
-        self.bin = bin
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
@@ -94,9 +90,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         
     def ddim_sample(self, x_0, cond_orders, cond_lob):
         orig_cond_orders = cond_orders.detach().clone()
-        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
-        cond_lob = self.bin(cond_lob)
-        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:
@@ -135,9 +128,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     
     def ddpm_sample(self, x_0, cond_orders, cond_lob, weights):
         orig_cond_orders = cond_orders.detach().clone()
-        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
-        cond_lob = self.bin(cond_lob)
-        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:

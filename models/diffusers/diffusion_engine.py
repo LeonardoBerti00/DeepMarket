@@ -14,7 +14,6 @@ from utils.utils_models import pick_augmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.diffusers.TRADES.Sampler import LossSecondMomentResampler
-from models.diffusers.TRADES.bin import BiN
 
 
 class DiffusionEngine(LightningModule):
@@ -50,12 +49,11 @@ class DiffusionEngine(LightningModule):
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.cond_size = config.COND_SIZE
-        self.bin = BiN(cst.N_LOB_LEVELS*4, self.seq_size)
         if self.IS_AUGMENTATION:
             self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method, self.chosen_model)
-            self.diffuser = GaussianDiffusion(config, self.feature_augmenter, self.bin).to(cst.DEVICE, non_blocking=True)
+            self.diffuser = GaussianDiffusion(config, self.feature_augmenter).to(cst.DEVICE, non_blocking=True)
         else:
-            self.diffuser = GaussianDiffusion(config, None, self.bin).to(cst.DEVICE, non_blocking=True)
+            self.diffuser = GaussianDiffusion(config, None).to(cst.DEVICE, non_blocking=True)
             
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
@@ -104,9 +102,6 @@ class DiffusionEngine(LightningModule):
         if torch.isnan(x_t).any():
             print("before aug:", x_t.max())
         # augment
-        cond_lob = rearrange(cond_lob, 'b l c -> b c l')
-        cond_lob = self.bin(cond_lob)
-        cond_lob = rearrange(cond_lob, 'b c l -> b l c')
         x_t_aug, cond_orders, cond_lob = self.diffuser.augment(x_t, cond_orders, cond_lob)
         if torch.isnan(x_t_aug).any():
             print("after aug:", x_t_aug.max())
@@ -118,9 +113,7 @@ class DiffusionEngine(LightningModule):
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
-        #print(order_type[:10])
         order_type_emb = self.type_embedder(order_type.long())
-        #print(order_type_emb[:10])
         x_0 = torch.cat((x_0[:, :, :1], order_type_emb, x_0[:, :, 2:]), dim=2)
         cond_type = cond[:, :, 1]
         cond_depth_emb = self.type_embedder(cond_type.long())
@@ -161,28 +154,6 @@ class DiffusionEngine(LightningModule):
         self.vlb_sampler.update_losses(self.t, L_vlb[0])
         self.simple_sampler.update_losses(self.t, L_simple[0])
         self.diffuser.init_losses()
-        if batch_idx % 1000 == 0 and batch_idx != 0:
-            print(f'train loss: {sum(self.train_losses) / len(self.train_losses)}')
-            print("fc_var grad", self.diffuser.NN.fc_var.weight.grad.max())
-            #print(self.feature_augmenter.fwd_mlp[0].weight.grad.max())
-            #print(self.feature_augmenter.fwd_mlp[0].weight.sum())
-            print(self.diffuser.NN.fc_var.weight.grad.max())
-            #print(self.diffuser.NN.fc_var.weight.sum())
-            print(self.diffuser.NN.fc_noise.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[0].qkv.q.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[0].qkv.k.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[0].qkv.v.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[0].w0.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[0].mlp.fc.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[1].qkv.q.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[1].qkv.k.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[1].qkv.v.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[1].w0.weight.grad.max())
-            print(self.diffuser.NN.layers.layers[1].mlp.fc.weight.grad.max())
-            if batch_loss_mean < self.min_train_loss:
-                self.model_checkpointing(batch_loss_mean.item())
-                self.min_train_loss = batch_loss_mean
-                
         self.ema.update()
         return batch_loss_mean
 
