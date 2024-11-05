@@ -5,7 +5,6 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 from configuration import Configuration
 import constants as cst
-from models.NNEngine import NNEngine
 from models.gan.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
 from preprocessing.DataModule import DataModule
 from preprocessing.LOBDataset import LOBDataset
@@ -14,6 +13,8 @@ from lightning.pytorch.callbacks import TQDMProgressBar
 from collections import namedtuple
 from models.diffusers.TRADES.TRADES_hparam import HP_TRADES, HP_TRADES_FIXED
 from models.gan.CGAN_hparam import HP_CGAN, HP_CGAN_FIXED
+from models.diffusers.diffusion_engine import DiffusionEngine
+from models.gan.gan_engine import GANEngine
 
 HP_SEARCH_TYPES = namedtuple('HPSearchTypes', ("sweep", "fixed"))
 HP_DICT_MODEL = {
@@ -65,7 +66,10 @@ def train(config: Configuration, trainer: L.Trainer):
         test_batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
         num_workers=4
     )
-    model = NNEngine.factory(class_path=config.USE_ENGINE, config=config)
+    if config.CHOSEN_MODEL == cst.Models.CGAN:
+        model = GANEngine(config)
+    elif config.CHOSEN_MODEL == cst.Models.TRADES:
+        model = DiffusionEngine(config)
     train_dataloader, val_dataloader = data_module.train_dataloader(), data_module.val_dataloader()
     trainer.fit(model, train_dataloader, val_dataloader)
 
@@ -89,10 +93,7 @@ def run(config: Configuration, accelerator, model=None):
         diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         augmenter = config.CHOSEN_AUGMENTER
         aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-        if is_augmentation:
-            config.FILENAME_CKPT = f"{stock_name}_{cond_type}_aug_{augmenter}_dim_{aug_dim}_{wandb_instance_name}_diffsteps_{diffsteps}"
-        else:
-            config.FILENAME_CKPT = f"{stock_name}_{cond_type}_{wandb_instance_name}_diffsteps_{diffsteps}"
+        config.FILENAME_CKPT = f"{stock_name}_{wandb_instance_name}"
         wandb_instance_name = config.FILENAME_CKPT
 
     trainer = L.Trainer(
@@ -100,13 +101,14 @@ def run(config: Configuration, accelerator, model=None):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.005),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
             TQDMProgressBar(refresh_rate=100)
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
-        profiler="simple",
-        check_val_every_n_epoch=1
+        profiler="advanced",
+        check_val_every_n_epoch=1,
+        limit_val_batches=50
     )
     train(config, trainer)
 
@@ -140,12 +142,8 @@ def run_wandb(config: Configuration, accelerator):
             run.name = wandb_instance_name
             aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
             config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_NUM_HEADS] = aug_dim // 64
-            cond_type = config.COND_TYPE
             stock_name = config.CHOSEN_STOCK.name
-            diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-            augmenter = config.CHOSEN_AUGMENTER
-            cond_augmenter = config.CHOSEN_COND_AUGMENTER
-            config.FILENAME_CKPT = str(stock_name) + "_" +  str(cond_type) + "_cond_aug_" + str(cond_augmenter) + "_" + config.COND_METHOD + "_" + str(augmenter) + "_" + wandb_instance_name + "_diffsteps_" + str(diffsteps)
+            config.FILENAME_CKPT = str(stock_name) + "_" + wandb_instance_name 
             wandb_instance_name = config.FILENAME_CKPT
             
         trainer = L.Trainer(
@@ -153,13 +151,15 @@ def run_wandb(config: Configuration, accelerator):
             precision=cst.PRECISION,
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             callbacks=[
-                EarlyStopping(monitor="val_ema_loss", mode="min", patience=3, verbose=True, min_delta=0.005),
+                EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
                 TQDMProgressBar(refresh_rate=1000)
             ],
             num_sanity_val_steps=0,
             logger=wandb_logger,
             detect_anomaly=False,
+            profiler="advanced",
             check_val_every_n_epoch=1,
+            limit_val_batches=50
         )
 
         # log simulation details in WANDB console

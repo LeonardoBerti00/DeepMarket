@@ -111,6 +111,7 @@ class Stocks(Enum):
     INTC = "INTC"
     TSLA = "TSLA"
     AVXL = "AVXL"
+    GOOG = "GOOG"
 
 
 class OrderEvent(Enum):
@@ -130,8 +131,8 @@ class DatasetType(Enum):
 class Engine(str, Enum):    
     """NN_ENGINE = "NNEngine"
     GAN_ENGINE = "GANEngine"""
-    DIFFUSION_ENGINE = "models.diffusers.engine.DiffusionEngine"
-    GAN_ENGINE = "models.gan.engine.GANEngine"
+    DIFFUSION_ENGINE = "models.diffusers.DiffusionEngine"
+    GAN_ENGINE = "models.gan.GANEngine"
 
     
 
@@ -195,7 +196,7 @@ INTC_STD_SIZE_100 = 5.5826348200688924
 
 
 
-SEED = 20
+SEED = 30
 
 PRECISION = 32
 N_LOB_LEVELS = 10
@@ -204,12 +205,14 @@ LEN_ORDER = 6
 LEN_ORDER_CGAN = 7
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
-#DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-DEVICE = 'cpu'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+#DEVICE = 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 DATA_DIR = "data"
 RECON_DIR = "data/reconstructions"
-PROJECT_NAME = "TRADES"
+PROJECT_NAME = "CDTS"
+SPLIT_RATES = (.85, .05, .10)
+
 
 

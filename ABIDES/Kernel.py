@@ -5,7 +5,9 @@ import os, queue, sys
 from message.Message import MessageType
 
 from util.util import log_print
-
+from util.plotting import liquidity_telemetry
+from main import plot_graphs
+from evaluation.quantitative_eval import predictive_lstm
 
 class Kernel:
 
@@ -316,7 +318,19 @@ class Kernel:
       print ("{}: {:d}".format(a, int(round(value / count))))
 
     print ("Simulation ending!")
-
+    stock_name = self.log_dir.split("_")[2]
+    date = self.log_dir.split("_")[3]
+    path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir)
+    liquidity_telemetry.main(
+      exchange_path=path+"/EXCHANGE_AGENT.bz2", 
+      ob_path=path+f"/ORDERBOOK_{stock_name}_FULL.bz2", 
+      outfile=path+"/world_agent_sim.png", 
+      plot_config="ABIDES/util/plotting/configs/plot_09.30_12.00.json"
+    )
+    real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_12-00-00", "processed_orders.csv")
+    trades_data_path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir, "processed_orders.csv")
+    plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
+    predictive_lstm.main(real_data_path, trades_data_path)
     return self.custom_state
 
 

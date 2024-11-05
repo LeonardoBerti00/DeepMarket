@@ -1,27 +1,29 @@
+from einops import rearrange
 import numpy as np
 from torch import nn
 import os
-
+from lightning import LightningModule
 import torch
 import constants as cst
 from constants import LearningHyperParameter
 import matplotlib.pyplot as plt
 
 import wandb
-from models.NNEngine import NNEngine
 from models.diffusers.gaussian_diffusion import GaussianDiffusion
 from utils.utils_models import pick_augmenter
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
 from models.diffusers.TRADES.Sampler import LossSecondMomentResampler
+from models.diffusers.TRADES.bin import BiN
 
 
-class DiffusionEngine(NNEngine):
+class DiffusionEngine(LightningModule):
     
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__()
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
+        self.IS_WANDB = config.IS_WANDB
         self.one_hot_encoding_type = config.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]
         self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
@@ -31,18 +33,34 @@ class DiffusionEngine(NNEngine):
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.size_type_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB]
         self.size_order_emb = config.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB]
+        self.chosen_model = config.CHOSEN_MODEL.value
         self.betas = config.BETAS
+        self.training = config.IS_TRAINING
+        self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
+        self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
+        self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
+        self.chosen_stock = config.CHOSEN_STOCK.name
+        self.chosen_stock = config.CHOSEN_STOCK.name
+        self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
+        self.val_ema_losses, self.test_ema_losses = [], []
+        self.min_loss_ema = np.inf
+        self.min_train_loss = np.inf
+        self.filename_ckpt = config.FILENAME_CKPT
+        self.last_path_ckpt_ema = None
+        self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
+        self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.cond_size = config.COND_SIZE
+        self.bin = BiN(cst.N_LOB_LEVELS*4, self.seq_size)
         if self.IS_AUGMENTATION:
             self.feature_augmenter = pick_augmenter(config.CHOSEN_AUGMENTER, self.size_order_emb, self.augment_dim, self.cond_size, self.cond_type, config.CHOSEN_COND_AUGMENTER, self.cond_method, self.chosen_model)
-            self.diffuser = GaussianDiffusion(config, self.feature_augmenter).to(cst.DEVICE, non_blocking=True)
+            self.diffuser = GaussianDiffusion(config, self.feature_augmenter, self.bin).to(cst.DEVICE, non_blocking=True)
         else:
-            self.diffuser = GaussianDiffusion(config, None).to(cst.DEVICE, non_blocking=True)
+            self.diffuser = GaussianDiffusion(config, None, self.bin).to(cst.DEVICE, non_blocking=True)
             
         if not self.one_hot_encoding_type:
             self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
-            #self.type_embedder.requires_grad_(False)
-            #self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+            self.type_embedder.requires_grad_(False)
+            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
             if self.IS_WANDB:
                 wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
@@ -60,7 +78,7 @@ class DiffusionEngine(NNEngine):
             x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         if is_train:
             self.t, _ = self.sampler.sample(x_0.shape[0])
-            recon = self.single_step(cond_orders, x_0, cond_lob)
+            recon = self.single_step(cond_orders, x_0, cond_lob, batch_idx)
         else:
             self.t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
             for i in range(self.num_diffusionsteps-1, -1, -1):
@@ -80,20 +98,29 @@ class DiffusionEngine(NNEngine):
         return x_t
 
 
-    def single_step(self, cond_orders, x_0, cond_lob):
+    def single_step(self, cond_orders, x_0, cond_lob, batch_idx=None):
         # forward process
         x_t, noise = self.diffuser.forward_reparametrized(x_0, self.t)
+        if torch.isnan(x_t).any():
+            print("before aug:", x_t.max())
         # augment
+        cond_lob = rearrange(cond_lob, 'b l c -> b c l')
+        cond_lob = self.bin(cond_lob)
+        cond_lob = rearrange(cond_lob, 'b c l -> b l c')
         x_t_aug, cond_orders, cond_lob = self.diffuser.augment(x_t, cond_orders, cond_lob)
+        if torch.isnan(x_t_aug).any():
+            print("after aug:", x_t_aug.max())
         weights = self.sampler.weights()
-        x_recon = self.diffuser.ddpm_single_step(x_0, x_t_aug, x_t, self.t, cond_orders, noise, weights, cond_lob)
+        x_recon = self.diffuser.ddpm_single_step(x_0, x_t_aug, x_t, self.t, cond_orders, noise, weights, cond_lob, batch_idx)
         # return the deaugmented denoised input and the reverse context
         return x_recon
     
 
     def type_embedding(self, x_0, cond):
         order_type = x_0[:, :, 1]
+        #print(order_type[:10])
         order_type_emb = self.type_embedder(order_type.long())
+        #print(order_type_emb[:10])
         x_0 = torch.cat((x_0[:, :, :1], order_type_emb, x_0[:, :, 2:]), dim=2)
         cond_type = cond[:, :, 1]
         cond_depth_emb = self.type_embedder(cond_type.long())
@@ -128,22 +155,34 @@ class DiffusionEngine(NNEngine):
         batch_loss, L_simple, L_vlb = self.loss()
         self.simple_train_losses.append(torch.mean(L_simple).item())
         self.vlb_train_losses.append(torch.mean(L_vlb).item())
-
         batch_loss_mean = torch.mean(batch_loss)
         self.train_losses.append(batch_loss_mean.item())
         self.sampler.update_losses(self.t, batch_loss[0])
         self.vlb_sampler.update_losses(self.t, L_vlb[0])
         self.simple_sampler.update_losses(self.t, L_simple[0])
         self.diffuser.init_losses()
-        '''
-        #check if all the parameters layers are training successfully
-        print(self.feature_augmenter.fwd_cond_lob[0].weight.grad)
-        print(self.feature_augmenter.fwd_cond_lob[0].weight.sum())
-        print(self.diffuser.diffuser.input_projection.weight.grad)
-        print(self.diffuser.diffuser.input_projection.weight.sum())
-        print(self.diffuser.diffuser.output_projection1.weight.grad)
-        print(self.diffuser.diffuser.output_projection1.weight.sum())
-        '''
+        if batch_idx % 1000 == 0 and batch_idx != 0:
+            print(f'train loss: {sum(self.train_losses) / len(self.train_losses)}')
+            print("fc_var grad", self.diffuser.NN.fc_var.weight.grad.max())
+            #print(self.feature_augmenter.fwd_mlp[0].weight.grad.max())
+            #print(self.feature_augmenter.fwd_mlp[0].weight.sum())
+            print(self.diffuser.NN.fc_var.weight.grad.max())
+            #print(self.diffuser.NN.fc_var.weight.sum())
+            print(self.diffuser.NN.fc_noise.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[0].qkv.q.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[0].qkv.k.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[0].qkv.v.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[0].w0.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[0].mlp.fc.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[1].qkv.q.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[1].qkv.k.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[1].qkv.v.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[1].w0.weight.grad.max())
+            print(self.diffuser.NN.layers.layers[1].mlp.fc.weight.grad.max())
+            if batch_loss_mean < self.min_train_loss:
+                self.model_checkpointing(batch_loss_mean.item())
+                self.min_train_loss = batch_loss_mean
+                
         self.ema.update()
         return batch_loss_mean
 
@@ -228,7 +267,13 @@ class DiffusionEngine(NNEngine):
 
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            self.optimizer = torch.optim.Adam(
+                [
+                    {'params': self.diffuser.parameters()},
+                    {'params': self.type_embedder.parameters(), "lr": 0.01},
+                ], 
+                lr=self.lr
+                )
         elif self.optimizer == 'RMSprop':
             self.optimizer = torch.optim.RMSprop(self.parameters(), lr=self.lr)
         elif self.optimizer == 'SGD':
@@ -236,9 +281,6 @@ class DiffusionEngine(NNEngine):
         elif self.optimizer == 'LION':
             self.optimizer = Lion(self.parameters(), lr=self.lr)
         return self.optimizer
-
-    #def on_before_zero_grad(self, *args, **kwargs):
-    #    self.ema.update()
 
     def _define_log_metrics(self):
         wandb.define_metric("val_loss", summary="min")

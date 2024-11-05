@@ -263,9 +263,11 @@ def load_fundamental(ob_path):
         return None
 
 
-def main(exchange_path, ob_path, title=None, outfile='liquidity_telemetry.png', verbose=False):
+def main(exchange_path, ob_path, title=None, outfile='liquidity_telemetry.png', verbose=False, plot_config=None):
     """ Processes orderbook from files, creates the liquidity telemetry plot and (optionally) prints statistics. """
-
+    print(os.getcwd())
+    with open(plot_config, 'r') as f:
+        PLOT_PARAMS_DICT = json.load(f)
     processed_orderbook, transacted_orders, cleaned_orderbook = create_orderbooks(exchange_path, ob_path)
     fundamental_ts = load_fundamental(ob_path)
 

@@ -10,20 +10,16 @@ import constants as cst
 import configuration
 import warnings
 from preprocessing.LOBSTERDataBuilder import LOBSTERDataBuilder
-from models.NNEngine import NNEngine
 import evaluation.quantitative_eval.predictive_lstm as predictive_lstm
-import evaluation.quantitative_eval.discriminative_lstm as discriminative_lstm
 import evaluation.visualizations.comparison_distribution_order_type as comparison_distribution_order_type
 import evaluation.visualizations.comparison_distribution_market_spread as comparison_distribution_market_spread
 import evaluation.visualizations.PCA_plots as PCA_plots
 import evaluation.visualizations.comparison_midprice as comparison_midprice
-import evaluation.visualizations.comparison_multiple_days_midprice as comparison_multiple_days_midprice
 import evaluation.visualizations.comparison_volume_distribution as comparison_volume_distribution
 import evaluation.visualizations.comparison_core_coef_lags as comparison_core_coef_lags
 import evaluation.visualizations.comparison_correlation_coefficient as comparison_correlation_coefficient
 import evaluation.visualizations.comparison_log_return_frequency as comparison_log_return_frequency
-import trash.comparison_depth as comparison_depth
-import evaluation.visualizations.responsiveness as responsiveness
+import evaluation.visualizations.comparison_distribution_log_interarrival_times as comparison_distribution_log_interarrival_times
 
 def set_repoducibility():
     torch.manual_seed(cst.SEED)
@@ -51,7 +47,7 @@ def plot_graphs(real_data_path=None, TRADES_data_path=None, iabs_data_path=None,
     comparison_core_coef_lags.main(real_data_path, TRADES_data_path, iabs_data_path, cgan_data_path)
     comparison_correlation_coefficient.main(real_data_path, TRADES_data_path, iabs_data_path, cgan_data_path)
     comparison_log_return_frequency.main(real_data_path, TRADES_data_path, cgan_data_path)
-    
+    comparison_distribution_log_interarrival_times.main(real_data_path, TRADES_data_path, iabs_data_path, cgan_data_path)
 
 if __name__ == "__main__":
     set_torch()

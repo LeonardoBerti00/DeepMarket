@@ -8,7 +8,7 @@ HP_TRADES = {
 
 
 HP_TRADES_FIXED = {
-    cst.LearningHyperParameter.TRADES_DEPTH.value: 8,
+    cst.LearningHyperParameter.TRADES_DEPTH.value: 4,
     cst.LearningHyperParameter.AUGMENT_DIM.value: 64,
     cst.LearningHyperParameter.SEQ_SIZE.value: 256,
 } 

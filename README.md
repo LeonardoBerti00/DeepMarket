@@ -45,8 +45,6 @@ If your objective is to train a TRADES model or implement your model you should 
 
 ## Implementing and Training a new model 
 To train a new model, follow these steps:
- 
-### Model
 1. Implement your model class in the models/ directory. Your model class should inherit from the NNEngine class and should be a Pytorch Lightning engine. 
 2. Update the HP_DICT_MODEL dictionary in run.py to include your model and its hyperparameters.
 3. Create a file {model_name}_hparam and write the hyperparameters that you want to use for your model. You can also specify hyperparameters for a hyperparameter search. Use the TRADES model as an example.

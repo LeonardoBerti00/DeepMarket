@@ -1,20 +1,36 @@
 from typing import Union
-
+from lightning import LightningModule
 import torch
 from configuration import Configuration
 import constants as cst
 from constants import LearningHyperParameter, LearningHyperParameter
-
+import numpy as np
 import wandb
 from lion_pytorch import Lion
 from torch_ema import ExponentialMovingAverage
-from models.NNEngine import NNEngine
 from models.gan.cgan import Generator, Discriminator
 
-class GANEngine(NNEngine):
+class GANEngine(LightningModule):
     
     def __init__(self, config: Configuration):
-        super().__init__(config)
+        super().__init__()
+        self.IS_WANDB = config.IS_WANDB
+        self.IS_DEBUG = config.IS_DEBUG
+        self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
+        self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
+        self.training = config.IS_TRAINING
+        self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
+        self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
+        self.chosen_stock = config.CHOSEN_STOCK.name
+        self.chosen_stock = config.CHOSEN_STOCK.name
+        self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
+        self.val_ema_losses, self.test_ema_losses = [], []
+        self.min_loss_ema = np.inf
+        self.filename_ckpt = config.FILENAME_CKPT
+        self.num_violations_price = 0
+        self.num_violations_size = 0
+        self.chosen_model = config.CHOSEN_MODEL
+        self.last_path_ckpt_ema = None
         # hyperparameters for the GAN
         self.seq_len = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.order_feature_dim=config.HYPER_PARAMETERS[LearningHyperParameter.ORDER_FEATURES_DIM]

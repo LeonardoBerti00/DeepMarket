@@ -17,7 +17,7 @@ def load_and_compute_log_returns(file_path):
     df = df.query("ask_price_1 > -9999999")
     df = df.query("bid_price_1 > -9999999")
     df = df.groupby('minute')['MID_PRICE'].first().reset_index()
-    df['log_return'] = np.log(df['MID_PRICE'] / df['MID_PRICE'].shift(1))
+    df['log_return'] = np.log(df['MID_PRICE'].shift(1) / df['MID_PRICE'])
     df.dropna(inplace=True)
     return df['log_return']
 
@@ -31,9 +31,9 @@ def load_and_compute_volatility(df, i):
     df = df.query("ask_price_1 > -9999999")
     df = df.query("bid_price_1 > -9999999")
     df = df.groupby(['minute', 'second'])['MID_PRICE'].first().reset_index()
-    df['log_return'] = np.log(df['MID_PRICE'] / df['MID_PRICE'].shift(i))
+    df['return'] = np.log(df['MID_PRICE'].shift(i)) - np.log(df['MID_PRICE'])
     #take the indexes of the nan values
-    std_dev = df['log_return'].rolling(window=100).std().reset_index(drop=True)
+    std_dev = df['return'].rolling(window=100).std().reset_index(drop=True)
     nan_indexes = std_dev[std_dev.isna()].index
     return std_dev, nan_indexes
 
@@ -47,8 +47,7 @@ def load_and_compute_volume(df, i):
     df = df.query("ask_price_1 > -9999999")
     df = df.query("bid_price_1 > -9999999")
     df = df.groupby(['minute', 'second'])['SIZE'].sum().reset_index()
-    df['volume_shift'] = df['SIZE'].rolling(window=i).sum().reset_index(drop=True)
-    volume_sum = df['volume_shift'].rolling(window=100).sum().reset_index(drop=True)
+    volume_sum = df['SIZE']
     nan_indexes = volume_sum[volume_sum.isna()].index
     return volume_sum, nan_indexes
 
@@ -95,13 +94,13 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
     plt.ylabel('Correlation Coefficient')
     plt.title('Log Returns Autocorrelation')
     plt.legend()
-    plt.axvline(x=0, color='black', linestyle='--')
+    plt.axhline(y=0, color='black', linestyle='--')
     file_name = f"corr_coef_lag_join.pdf"
     dir_path = os.path.dirname(TRADES_path)
     file_path = os.path.join(dir_path, file_name)
     plt.savefig(file_path)
     plt.close()
-    
+    '''
     #TODO divide the code in two functions
     
     corr_iabs_coefs = []
@@ -113,16 +112,16 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
     df_iabs = pd.read_csv(iabs_path)
     df_cgan = pd.read_csv(cgan_path)
     
-    for i in range(60, 7200, 30):
-        volatility_real, nan_indexes_volat_real = load_and_compute_volatility(df_real, i)
-        volatility_TRADES, nan_indexes_volat_TRADES = load_and_compute_volatility(df_TRADES, i)
-        volatility_iabs, nan_indexes_volat_iabs = load_and_compute_volatility(df_iabs, i)
-        volatility_cgan, nan_indexes_volat_cgan = load_and_compute_volatility(df_cgan, i)
+    for i in range(10000, df_real.shape[0], 10000):
+        volatility_real, nan_indexes_volat_real = load_and_compute_volatility(df_real[i-10000:i],360)
+        volatility_TRADES, nan_indexes_volat_TRADES = load_and_compute_volatility(df_TRADES[i-10000:i],360)
+        volatility_iabs, nan_indexes_volat_iabs = load_and_compute_volatility(df_iabs[i-10000:i],360)
+        volatility_cgan, nan_indexes_volat_cgan = load_and_compute_volatility(df_cgan[i-10000:i],360)
         
-        volume_iabs, nan_indexes_vol_iabs = load_and_compute_volume(df_iabs, i)
-        volume_real, nan_indexes_vol_real = load_and_compute_volume(df_real, i)
-        volume_TRADES, nan_indexes_vol_TRADES = load_and_compute_volume(df_TRADES, i)
-        volume_cgan, nan_indexes_vol_cgan = load_and_compute_volume(df_cgan, i)
+        volume_iabs, nan_indexes_vol_iabs = load_and_compute_volume(df_iabs[i-10000:i],360)
+        volume_real, nan_indexes_vol_real = load_and_compute_volume(df_real[i-10000:i],360)
+        volume_TRADES, nan_indexes_vol_TRADES = load_and_compute_volume(df_TRADES[i-10000:i],360)
+        volume_cgan, nan_indexes_vol_cgan = load_and_compute_volume(df_cgan[i-10000:i],360)
         #drop the first value from volume
 
         nan_indexes_real = np.union1d(nan_indexes_vol_real, nan_indexes_volat_real)
@@ -139,7 +138,7 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
         volatility_TRADES = volatility_TRADES.drop(nan_indexes_TRADES)
         volatility_iabs = volatility_iabs.drop(nan_indexes_iabs)
         volatility_cgan = volatility_cgan.drop(nan_indexes_cgan)
-        
+        print(volume_real.shape)
         corr_real_coefs.append(np.corrcoef(volume_real.values, volatility_real.values)[0, 1])
         corr_TRADES_coefs.append(np.corrcoef(volume_TRADES.values, volatility_TRADES.values)[0, 1])
         corr_iabs_coefs.append(np.corrcoef(volume_iabs.values, volatility_iabs.values)[0, 1])
@@ -150,67 +149,12 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
     sns.kdeplot(corr_iabs_coefs, bw=0.1, shade=True,  color='green', label="IABS")
     sns.kdeplot(corr_real_coefs, bw=0.1, shade=True,  color='orange', label='Real')
     sns.kdeplot(corr_cgan_coefs, bw=0.1, shade=True,  color='red', label='CGAN')
-    
-    
     plt.title("Correlation between volume and volatility")
     plt.xlabel("Correlation")
     plt.ylabel("Density")
     plt.legend()
     file_name = f"corr_vol_volatility_join.pdf"
     dir_path = os.path.dirname(TRADES_path)
-    file_path = os.path.join(dir_path, file_name)
-    #set limit of x to 1 and -1
-    plt.xlim(-1, 1)
-    plt.savefig(file_path)
-    plt.close()
-    '''
-    corr_real_coefs = []
-    corr_TRADES_coefs = []
-    corr_iabs_coefs = []
-    corr_cgan_coefs = []
-    #PLOT RETURNS/VOLATILITY CORRELATION
-    for i in range(1, 7200, 10):
-        volatility_real, nan_indexes_volat_real = load_and_compute_volatility(df_real, i)
-        volatility_TRADES, nan_indexes_volat_TRADES = load_and_compute_volatility(df_TRADES, i)
-        volatility_iabs, nan_indexes_volat_iabs = load_and_compute_volatility(df_iabs, i)
-        volatility_cgan, nan_indexes_volat_cgan = load_and_compute_volatility(df_cgan, i)
-        
-        returns_real, nan_indexes_ret_real = load_and_compute_returns(df_real, i)
-        returns_TRADES, nan_indexes_ret_TRADES = load_and_compute_returns(df_TRADES, i)
-        returns_iabs, nan_indexes_ret_iabs = load_and_compute_returns(df_iabs, i)
-        returns_cgan, nan_indexes_ret_cgan = load_and_compute_returns(df_cgan, i)
-        #drop the first value from volume
-
-        nan_indexes_real = np.union1d(nan_indexes_ret_real, nan_indexes_volat_real)
-        nan_indexes_TRADES = np.union1d(nan_indexes_ret_TRADES, nan_indexes_volat_TRADES)
-        nan_indexes_iabs = np.union1d(nan_indexes_ret_iabs, nan_indexes_volat_iabs)
-        nan_indexes_cgan = np.union1d(nan_indexes_ret_cgan, nan_indexes_volat_cgan)
-        
-        returns_real = returns_real.drop(nan_indexes_real)  
-        returns_TRADES = returns_TRADES.drop(nan_indexes_TRADES)
-        returns_iabs = returns_iabs.drop(nan_indexes_iabs)
-        returns_cgan = returns_cgan.drop(nan_indexes_cgan)
-        volatility_real = volatility_real.drop(nan_indexes_real)
-        volatility_TRADES = volatility_TRADES.drop(nan_indexes_TRADES)
-        volatility_iabs = volatility_iabs.drop(nan_indexes_iabs)
-        volatility_cgan = volatility_cgan.drop(nan_indexes_cgan)
-        
-        corr_real_coefs.append(np.corrcoef(returns_real.values, volatility_real.values)[0, 1])
-        corr_TRADES_coefs.append(np.corrcoef(returns_TRADES.values, volatility_TRADES.values)[0, 1])
-        corr_iabs_coefs.append(np.corrcoef(returns_iabs.values, volatility_iabs.values)[0, 1])
-        corr_cgan_coefs.append(np.corrcoef(returns_cgan.values, volatility_cgan.values)[0, 1])
-    
-    #print(corr_real_coefs)
-    #print(corr_generated_coefs)
-    sns.kdeplot(corr_TRADES_coefs, bw=0.1, shade=True, color='blue', label='TRADES')
-    sns.kdeplot(corr_iabs_coefs, bw=0.1, shade=True, color='green', label='IABS')
-    sns.kdeplot(corr_real_coefs, bw=0.1, shade=True, color='orange', label='Real')
-    sns.kdeplot(corr_cgan_coefs, bw=0.1, shade=True, color='red', label='CGAN')
-    plt.title("Correlation between returns and volatility")
-    plt.xlabel("Correlation")
-    plt.ylabel("Density")
-    plt.legend()
-    file_name = f"corr_returns_vol_join.pdf"
     file_path = os.path.join(dir_path, file_name)
     #set limit of x to 1 and -1
     plt.xlim(-1, 1)

@@ -152,10 +152,13 @@ def normalize_messages(data, mean_size=None, mean_prices=None, std_size=None,  s
     return data, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth
 
 
-def load_compute_normalization_terms(stock_name, data_dir, date, model):
-    path = "{}/{}".format(
+def load_compute_normalization_terms(stock_name, data_dir, model, n_lob_levels):
+    path = "{}/{}/{}_{}_{}".format(
             data_dir,
             stock_name,
+            stock_name,
+            cst.DATE_TRADING_DAYS[0],
+            cst.DATE_TRADING_DAYS[-1]
         )
     COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
                                        "sell2", "vsell2", "buy2", "vbuy2",
@@ -169,34 +172,50 @@ def load_compute_normalization_terms(stock_name, data_dir, date, model):
                                        "sell10", "vsell10", "buy10", "vbuy10"],
                          "message": ["time", "event_type", "order_id", "size", "price", "direction"]}
     
-    data_path = [entry for entry in sorted(os.listdir(path)) if os.path.isdir(os.path.join(path, entry))]
-    data_path = os.path.join(path, data_path[0])
-    for i, filename in enumerate(sorted(os.listdir(data_path))):
-        if date in filename:
-            f = os.path.join(data_path, filename)
-            if "message" in filename:
-                message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
-                lob_filename = f.replace("message", "orderbook")
-                lob = pd.read_csv(lob_filename, names=COLUMNS_NAMES["orderbook"])
-            elif "orderbook" in filename:
-                lob = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
-                message_filename = f.replace("orderbook", "message")
-                message = pd.read_csv(message_filename, names=COLUMNS_NAMES["message"])
+    num_trading_days = len(os.listdir(path))//2
+    split_rates = cst.SPLIT_RATES
+    train = int(round(num_trading_days * split_rates[0]))
+    val = int(round(num_trading_days * split_rates[1])) + train
+    test = int(round(num_trading_days * split_rates[2])) + val
+    split_days = [train, val, test]
+    print(split_days)
+    split_days = [i * 2 for i in split_days]
+    for i, filename in enumerate(sorted(os.listdir(path))):
+        f = os.path.join(path, filename)
+        if os.path.isfile(f):
+            # then we create the df for the training set
+            if i < split_days[0]:
+                if (i % 2) == 0:
+                    if i == 0:
+                        train_messages = pd.read_csv(f, names=COLUMNS_NAMES["message"])
+                    else:
+                        train_message = pd.read_csv(f, names=COLUMNS_NAMES["message"])
 
-    lob, message = preprocess_data([message, lob], 10, model)
-    lob.loc[:, ::2] /= 100
-    message["price"] /= 100
+                else:
+                    if i == 1:
+                        train_orderbooks = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                        train_orderbooks, train_messages = preprocess_data([train_messages, train_orderbooks], n_lob_levels, model)
+                        if (len(train_orderbooks) != len(train_messages)):
+                            raise ValueError("train_orderbook length is different than train_messages")
+                    else:
+                        train_orderbook = pd.read_csv(f, names=COLUMNS_NAMES["orderbook"])
+                        train_orderbook, train_message = preprocess_data([train_message, train_orderbook], n_lob_levels, model)
+                        train_messages = pd.concat([train_messages, train_message], axis=0)
+                        train_orderbooks = pd.concat([train_orderbooks, train_orderbook], axis=0)
+
+    train_orderbooks.loc[:, ::2] /= 100
+    train_messages["price"] /= 100
     if model == cst.Models.TRADES:
-        _, lob_mean_size, lob_mean_prices, lob_std_size, lob_std_prices = z_score_orderbook(lob)
-        _, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth = normalize_messages(message)
+        _, lob_mean_size, lob_mean_prices, lob_std_size, lob_std_prices = z_score_orderbook(train_orderbooks)
+        _, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth = normalize_messages(train_messages)
         normalization_terms = {
             "lob": (lob_mean_size, lob_std_size, lob_mean_prices, lob_std_prices),
             "event": (mean_size, std_size, mean_prices, std_prices, mean_time, std_time, mean_depth, std_depth)
         }
         return normalization_terms
     elif model == cst.Models.CGAN:
-        _, mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol = z_score_market_features(lob)
-        _, mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100 = normalize_order_cgan(message)
+        _, mean_spread, mean_returns, mean_vol_imb, mean_abs_vol, std_spread, std_returns, std_vol_imb, std_abs_vol = z_score_market_features(train_orderbooks)
+        _, mean_size, mean_depth, mean_cancel_depth, mean_size_100, std_size, std_depth, std_cancel_depth, std_size_100 = normalize_order_cgan(train_messages)
         normalization_terms = {
             "lob": (mean_spread, std_spread, mean_returns, std_returns, mean_vol_imb, std_vol_imb, mean_abs_vol, std_abs_vol, mean_cancel_depth, std_cancel_depth, mean_size_100, std_size_100, mean_depth, std_depth, mean_size, std_size),
         }

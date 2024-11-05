@@ -93,7 +93,7 @@ parser.add_argument('-seed',
                     '--seed',
                     type=int,
                     default=cst.SEED,
-                    help='Seed for random number generation')
+                    help='seed for random number generation')
 parser.add_argument('-type',
                     '--sampling-type',
                     type=str,
@@ -140,7 +140,7 @@ if args.chosen_model == "TRADES":
     chosen_model = cst.Models.TRADES
 elif args.chosen_model == "CGAN":
     chosen_model = cst.Models.CGAN
-normalization_terms = load_compute_normalization_terms(symbol, cst.DATA_DIR, str(historical_date.date()), chosen_model)
+normalization_terms = load_compute_normalization_terms(symbol, cst.DATA_DIR, chosen_model, n_lob_levels=10)
 starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 
 # 1) Exchange Agent
@@ -214,7 +214,7 @@ if args.diffusion:
                           size_type_emb=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB],
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=args.SEED),
+                              seed=args.seed),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
                             chosen_model=args.chosen_model,
@@ -232,7 +232,7 @@ if args.diffusion:
                           data_dir=cst.DATA_DIR,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=args.SEED),
+                              seed=args.seed),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
                             chosen_model=args.chosen_model,
@@ -257,7 +257,7 @@ else:
                           size_type_emb=None,
                           log_orders=log_orders,
                           random_state=np.random.RandomState(
-                              seed=args.SEED),
+                              seed=args.seed),
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
                             chosen_model=args.chosen_model if args.diffusion else None,

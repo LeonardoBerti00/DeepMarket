@@ -16,7 +16,7 @@ are ported from the original Ho et al. diffusion models codebase: https://github
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
-    def __init__(self, config, feature_augmenter):
+    def __init__(self, config, feature_augmenter, bin):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
@@ -25,17 +25,18 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
-        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
-        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
+        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
+        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
+        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.sampling_type = config.SAMPLING_TYPE
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         self.cond_method = config.COND_METHOD
+        self.bin = bin
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
@@ -58,7 +59,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.betas = config.BETAS
         self.alphas = 1 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0, dtype=torch.float32)
-        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]), self.alphas_cumprod[:-1]])
+        self.alphas_cumprod_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE), self.alphas_cumprod[:-1]])
         # calculation for posterior q(x_{t-1} | x_t, x_0)
         self.posterior_var = (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod) * self.betas
         self.posterior_log_var_clipped = torch.log(self.posterior_var)
@@ -93,6 +94,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         
     def ddim_sample(self, x_0, cond_orders, cond_lob):
         orig_cond_orders = cond_orders.detach().clone()
+        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
+        cond_lob = self.bin(cond_lob)
+        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:
@@ -112,10 +116,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     def ddim_single_step(self, x_t_aug, cond_lob, cond_orders, ts, index, x_t):
         noise_t, v = self.NN(x_t_aug, cond_orders, ts, cond_lob)
         #check for nan in x_t_aug and cond and noise_t
-        if torch.isnan(x_t_aug).any():
-            print("x_t_aug:", x_t_aug)
-        if torch.isnan(noise_t).any():
-            print("noise_t:", noise_t)
         if self.IS_AUGMENTATION:
             e_t, v = self.deaugment(noise_t, v)
         alpha = self.ddim_alpha[index]
@@ -135,6 +135,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     
     def ddpm_sample(self, x_0, cond_orders, cond_lob, weights):
         orig_cond_orders = cond_orders.detach().clone()
+        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
+        cond_lob = self.bin(cond_lob)
+        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:
@@ -153,7 +156,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         x_t, noise = super().forward_reparametrized(x_0, t)
         return x_t, noise
 
-    def ddpm_single_step(self, x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob):
+    def ddpm_single_step(self, x_0, x_t_aug, x_t, t, cond_orders, noise_true, weights, cond_lob, batch_idx=None):
         '''
         Compute the reverse diffusion process for the current time step
         '''
@@ -167,10 +170,10 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t_aug, cond_orders, t, cond_lob)
         #check for nan in x_t_aug and cond and noise_t
-        if torch.isnan(x_t_aug).any():
-            print("x_t_aug:", x_t_aug)
+        if torch.isnan(v).any():
+            print("v", v.max())
         if torch.isnan(noise_t).any():
-            print("noise_t:", noise_t)
+            print("noise_t:", noise_t.max())
         if self.IS_AUGMENTATION:
             noise_t, v = self.deaugment(noise_t, v)
         # Compute the variance for the current time step using the formula from the IDDPM paper
@@ -209,17 +212,17 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         #check if there are nan in L_vlb
         if torch.isnan(L_vlb).any():
-            print("L_vlb:", L_vlb)
+            print("L_vlb:", L_vlb.max())
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
         return x_recon
 
     def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
         if self.IS_AUGMENTATION:
-            full_input = torch.cat([cond_orders, x_t], dim=1)
-            full_input_aug, cond_lob = self.feature_augmenter.augment(full_input, cond_lob)
-            cond_orders = full_input_aug[:, :self.cond_seq_size, :]
-            x_t = full_input_aug[:, self.cond_seq_size:, :]
+            full_orders = torch.cat([cond_orders, x_t], dim=1)
+            full_orders_aug, cond_lob = self.feature_augmenter.augment(full_orders, cond_lob)
+            cond_orders = full_orders_aug[:, :self.cond_seq_size, :]
+            x_t = full_orders_aug[:, self.cond_seq_size:, :]
         return x_t, cond_orders, cond_lob
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
@@ -256,13 +259,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         )
         #check for nan in kl and print
         if torch.isnan(kl).any():
-            print("kl:", kl)
+            print("kl:")
         kl = self._mean_flat(kl) / np.log(2.0)
         decoder_nll = -self._gaussian_log_likelihood(
             x_0, means=pred_mean, log_scales=pred_log_var*0.5
         )
         if torch.isnan(decoder_nll).any():
-            print("decoder_nll:", decoder_nll)
+            print("decoder_nll:")
         assert decoder_nll.shape == x_0.shape
         decoder_nll = self._mean_flat(decoder_nll) / np.log(2.0)
 
@@ -275,23 +278,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         '''
         Get the mean of the prior p(x_{t-1} | x_t).
         '''
-        #check for nan in each variable input
-        if torch.isnan(noise_t).any():
-            print("noise_t:", noise_t)
-        if torch.isnan(x_t).any():
-            print("x_t:", x_t)
-        if torch.isnan(t).any():
-            print("t:", t)
-        if torch.isnan(beta_t).any():
-            print("beta_t:", beta_t)
-        if torch.isnan(alpha_t).any():
-            print("alpha_t:", alpha_t)
-        if torch.isnan(alpha_cumprod_t).any():
-            print("alpha_cumprod_t:", alpha_cumprod_t)
         pred_mean = 1/torch.sqrt(alpha_t) * (x_t - (beta_t*noise_t/torch.sqrt(1-alpha_cumprod_t)))
-        #check for nan and print
-        if torch.isnan(pred_mean).any():
-            print("p_mean:", pred_mean)
         return pred_mean
 
     def _q_posterior_mean_var(self, x_0, x_t, t):
@@ -310,8 +297,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
                 + posterior_mean_coef2 * x_t
         )
         true_log_var_clipped = repeat(self.posterior_log_var_clipped[t], 'b -> b 1 d', d=x_0.shape[-1])
-        if torch.isnan(true_mean).any():
-            print("true_mean:", true_mean)
         return true_mean, true_log_var_clipped
 
 
@@ -323,8 +308,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         scalars, among other use cases.
         """
         output = 0.5 * (-1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2))
-        if torch.isnan(output).any():
-            print("normal kl:", output)
         return output
 
     def _gaussian_log_likelihood(self, x, means, log_scales):
@@ -337,19 +320,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         :return: a tensor like x of log probabilities (in nats).
         """
         assert x.shape == means.shape == log_scales.shape
-        #check for nan and print in x
-        if torch.isnan(x).any():
-            print("gaussian likelihood:", x)
         centered_x = x - means
         inv_stdv = torch.exp(log_scales)
         plus_in = inv_stdv * (centered_x + 1.0)
         cdf_plus = self._approx_standard_normal_cdf(plus_in)
-        if torch.isnan(cdf_plus).any():
-            print("cdf_plus:", cdf_plus)
         min_in = inv_stdv * (centered_x - 1.0)
         cdf_min = self._approx_standard_normal_cdf(min_in)
-        if torch.isnan(cdf_min).any():
-            print("cdf_min:", cdf_min)
         log_cdf_plus = torch.log(cdf_plus.clamp(min=1e-6))
         log_one_minus_cdf_min = torch.log((1.0 - cdf_min).clamp(min=1e-6))
         cdf_delta = cdf_plus - cdf_min
