@@ -70,10 +70,11 @@ To execute a market simulation with a TRADES checkpoint, there are two options:
 ```sh
 python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
 ```
-2. The second possibility is that you do not have LOBSTER data. In this case you can go to [LOBSTER](https://lobsterdata.com/info/DataSamples.php), download one day of INTC with 10 level, to unzip the dir and places the two XLS file in data/INTC/INTC_2012-06-21_2012-06-21. Finally you can run the following command:
+2. The second possibility is that you do not have LOBSTER data. In this case you can go to [LOBSTER](https://lobsterdata.com/info/DataSamples.php), download one of the available stock with 10 levels, unzip the dir and places the two XLS file in data/{stock_name}/{stock_name}_2012-06-21_2012-06-21. Finally you can run the following command:
 ```sh
-python -u ABIDES/abides.py -c world_agent_sim -t INTC -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' 
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' 
 ```
+Since the model was not trained with this data we cannot guarantee good performance. 
 
 If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
 
@@ -83,22 +84,4 @@ If you want to run the IABS configuration:
 python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 
 ```
 
-# Evaluate the simulation
-When the simulation ends a log file will be saved in ABIDES/log. The first step to evaluate the simulation is to do:
-```sh
-cd ABIDES/util/plotting 
-```
-
-and then:
-```sh
-python -u liquidity_telemetry.py ../../log/${LOG_NAME}/EXCHANGE_AGENT.bz2 ../../log/${LOG_NAME}/ORDERBOOK_${STOCK_NAME}_FULL.bz2 -o ../../log/${LOG_NAME}/world_agent_sim.png -c configs/plot_09.30_12.00.json -stream ../../log/${LOG_NAME}
-```
-
-you need to change `${LOG_NAME}`, `${STOCK_NAME}`, with the proper values. The log name is the name of the file that it was saved in ABIDES/log. Now you can find a plot of your simulation in the log dir.
-
-In order to compute the predictive score, you first need to perform the market replay of the day you are trying to simulate. Then you need to change config.TRADES_DATA_PATH with your log path, and config.REAL_DATA_PATH with the market replay log path, and finally config.EVALUATION to true. 
-
-The last step is to run:
-```sh
-python main.py
-```
+When the simulation ends a log dir will be saved in ABIDES/log, here you can find the processed orders of the simulation, and all the plots used to in the paper to evaluate the stylized facts. At the end of the simulation also the predictive score will be computed. 

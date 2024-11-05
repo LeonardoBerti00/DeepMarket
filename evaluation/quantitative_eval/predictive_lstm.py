@@ -193,8 +193,8 @@ def main(real_data_path, generated_data_path):
     model_r = LSTMModel(input_size=train_X_r.shape[1], hidden_size=128, num_layers=2, output_size=1)
     model_r.to(device)
     print("Predictive Score Real data:")
-    #trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
-    #trainer_r.train(epochs=100)
+    trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
+    trainer_r.train(epochs=100)
     
     #trainer_r.test()
     print("\n Predictive Score Generated data:")
@@ -251,8 +251,8 @@ def main(real_data_path, generated_data_path):
     model_g.to(device)
 
     trainer_g = Trainer(model=model_g, train_loader=train_loader, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
-    #trainer_g.train(epochs=100)
-    #trainer_g.test()
+    trainer_g.train(epochs=100)
+    trainer_g.test()
 
 if __name__ == '__main__':
     main()
