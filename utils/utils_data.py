@@ -178,7 +178,6 @@ def load_compute_normalization_terms(stock_name, data_dir, model, n_lob_levels):
     val = int(round(num_trading_days * split_rates[1])) + train
     test = int(round(num_trading_days * split_rates[2])) + val
     split_days = [train, val, test]
-    print(split_days)
     split_days = [i * 2 for i in split_days]
     for i, filename in enumerate(sorted(os.listdir(path))):
         f = os.path.join(path, filename)

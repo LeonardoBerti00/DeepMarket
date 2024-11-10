@@ -16,7 +16,7 @@ are ported from the original Ho et al. diffusion models codebase: https://github
 
 class GaussianDiffusion(nn.Module, DiffusionAB):
     """A diffusion model that uses Gaussian noise inspired from the IDDPM paper."""
-    def __init__(self, config, feature_augmenter, bin):
+    def __init__(self, config, feature_augmenter):
         super().__init__()
         self.dropout = config.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT]
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
@@ -25,18 +25,17 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
         self.cond_seq_size = self.seq_size - self.x_seq_size
-        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
-        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
-        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
-        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
-        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
-        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
+        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
+        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
+        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
+        self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
+        self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
+        self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
         self.cond_dropout_prob = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.sampling_type = config.SAMPLING_TYPE
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.init_losses()
         self.cond_method = config.COND_METHOD
-        self.bin = bin
         if config.IS_AUGMENTATION:
             self.input_size = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
             self.feature_augmenter = feature_augmenter
@@ -78,7 +77,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.t = torch.arange(0, self.num_diffusionsteps, tmp).long() + 1
             self.ddim_alpha = self.alphas_cumprod[self.t].clone()
             self.ddim_alpha_sqrt = torch.sqrt(self.ddim_alpha)
-            self.ddim_alpha_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]), self.alphas_cumprod[self.t[:-1]]])
+            self.ddim_alpha_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE), self.alphas_cumprod[self.t[:-1]]])
             self.ddim_sqrt_one_minus_alpha = (1. - self.ddim_alpha) ** .5
             self.ddim_sigma = (self.ddim_eta *
                                ((1 - self.ddim_alpha_prev) / (1 - self.ddim_alpha) *
@@ -94,16 +93,12 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         
     def ddim_sample(self, x_0, cond_orders, cond_lob):
         orig_cond_orders = cond_orders.detach().clone()
-        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
-        cond_lob = self.bin(cond_lob)
-        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:
             orig_cond_lob = None
         tmp = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
-        x_t, context = self.forward_reparametrized(x_0, tmp, **{"conditioning": cond_orders})
-        context.update({'x_t': x_t.detach().clone()})        
+        x_t, _ = self.forward_reparametrized(x_0, tmp)
         time_steps = torch.flip(self.t, dims=(0,))
         for i, step in enumerate(time_steps):
             # augment
@@ -117,14 +112,14 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         noise_t, v = self.NN(x_t_aug, cond_orders, ts, cond_lob)
         #check for nan in x_t_aug and cond and noise_t
         if self.IS_AUGMENTATION:
-            e_t, v = self.deaugment(noise_t, v)
+            noise_t, v = self.deaugment(noise_t, v)
         alpha = self.ddim_alpha[index]
         alpha_prev = self.ddim_alpha_prev[index]
         sigma = self.ddim_sigma[index]
         sqrt_one_minus_alpha = self.ddim_sqrt_one_minus_alpha[index]
         # Current prediction for x_0 
-        pred_x0 = (x_t - sqrt_one_minus_alpha * e_t) / (alpha ** 0.5)
-        dir_xt = (1. - alpha_prev - sigma ** 2).sqrt() * e_t
+        pred_x0 = (x_t - sqrt_one_minus_alpha * noise_t) / (alpha ** 0.5)
+        dir_xt = (1. - alpha_prev - sigma ** 2).sqrt() * noise_t
         # no noise is added, when η=0
         if sigma == 0.:
             noise = 0.
@@ -135,9 +130,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
     
     def ddpm_sample(self, x_0, cond_orders, cond_lob, weights):
         orig_cond_orders = cond_orders.detach().clone()
-        cond_lob = rearrange(cond_lob, 'b l f -> b f l')
-        cond_lob = self.bin(cond_lob)
-        cond_lob = rearrange(cond_lob, 'b f l -> b l f')
         if cond_lob is not None:
             orig_cond_lob = cond_lob.detach().clone()
         else:

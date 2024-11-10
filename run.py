@@ -106,8 +106,9 @@ def run(config: Configuration, accelerator, model=None):
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
-        profiler="advanced",
+        profiler="simple",
         check_val_every_n_epoch=1,
+        val_check_interval=0.5,
         limit_val_batches=50
     )
     train(config, trainer)
@@ -157,7 +158,8 @@ def run_wandb(config: Configuration, accelerator):
             num_sanity_val_steps=0,
             logger=wandb_logger,
             detect_anomaly=False,
-            profiler="advanced",
+            profiler=None,
+            val_check_interval=0.5,
             check_val_every_n_epoch=1,
             limit_val_batches=50
         )

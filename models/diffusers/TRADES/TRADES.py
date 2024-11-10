@@ -5,8 +5,7 @@ from utils.utils import sinusoidal_positional_embedding
 import constants as cst
 import random
 from models.diffusers.TRADES.Transformer import TransformerEncoder
-from models.diffusers.TRADES.bin import BiN
-from models.diffusers.TRADES.TLOB import TransformerLOB
+
 
 class TRADES(nn.Module):
     def __init__(
@@ -40,27 +39,11 @@ class TRADES(nn.Module):
         self.is_augmented = is_augmented
         self.cond_method = cond_method
         self.cond_type = cond_type
-        self.layers = TransformerLOB(input_size, depth, self.seq_size, num_heads)
+        self.layers = TransformerEncoder(num_heads, input_size, depth, dropout, cond_type, cond_method)
         self.fc_noise = nn.Linear(input_size*self.seq_size, output_size, device=cst.DEVICE)
         self.fc_var = nn.Linear(input_size*self.seq_size, output_size, device=cst.DEVICE)
         self.layer_norm = nn.LayerNorm(input_size)
-        '''
-        total_dim = input_size*self.seq_size//16
-        self.fc_noises = nn.ModuleList()
-        while total_dim > 128:
-            self.fc_noises(nn.Linear(total_dim, total_dim//4))
-            self.fc_noises(nn.GELU())
-            total_dim = total_dim//4
-        self.fc_noises(nn.Linear(total_dim, output_size))
-        
-        self.fc_vars = nn.ModuleList()
-        total_dim = input_size*self.seq_size//16
-        while total_dim > 128:
-            self.fc_vars(nn.Linear(total_dim, total_dim//4))
-            self.fc_vars(nn.GELU())
-            total_dim = total_dim//4
-        self.fc_vars(nn.Linear(total_dim, output_size))
-        '''
+
 
     def forward(self, x, cond_orders, t, cond_lob=None):
         """
@@ -76,8 +59,8 @@ class TRADES(nn.Module):
         full_input = full_input.add(self.pos_embed)
         diff_time_emb = self.t_embedder[t]
         full_input = full_input.add(diff_time_emb.view(diff_time_emb.shape[0], 1, diff_time_emb.shape[1]))
-        full_input = self.layers(full_input) 
         full_input = self.layer_norm(full_input)
+        full_input = self.layers(full_input) 
         full_input = rearrange(full_input, 'n l f -> n (l f)')
         noise = self.fc_noise(full_input)
         var = self.fc_var(full_input)

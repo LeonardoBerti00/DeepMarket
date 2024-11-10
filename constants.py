@@ -206,7 +206,6 @@ LEN_ORDER_CGAN = 7
 
 DATE_TRADING_DAYS = ["2015-01-02", "2015-01-30"]
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-#DEVICE = 'cpu'
 DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 DATA_DIR = "data"
