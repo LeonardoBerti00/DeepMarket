@@ -257,79 +257,6 @@ class WorldAgent(Agent):
         else:
             log_print("Agent ignored order of quantity zero: {}", order)
 
-    def _preprocess_market_features_for_cgan(self, lob_snapshots):
-        lob_snapshots = np.array(lob_snapshots)
-        COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
-                                       "sell2", "vsell2", "buy2", "vbuy2",
-                                       "sell3", "vsell3", "buy3", "vbuy3",
-                                       "sell4", "vsell4", "buy4", "vbuy4",
-                                       "sell5", "vsell5", "buy5", "vbuy5",
-                                       "sell6", "vsell6", "buy6", "vbuy6",
-                                       "sell7", "vsell7", "buy7", "vbuy7",
-                                       "sell8", "vsell8", "buy8", "vbuy8",
-                                       "sell9", "vsell9", "buy9", "vbuy9",
-                                       "sell10", "vsell10", "buy10", "vbuy10"],
-                        }
-        lob_dataframe = pd.DataFrame(lob_snapshots, columns=COLUMNS_NAMES["orderbook"])
-        orders = np.array(self.placed_orders[-self.seq_len*2 +1:])
-        orders_dataframe = pd.DataFrame(orders, columns=["time", "type", "order_id", "quantity", "price", "direction"])
-        dataframes = [[orders_dataframe, lob_dataframe]]
-        mean_spread = self.normalization_terms["lob"][0]
-        std_spread = self.normalization_terms["lob"][1]
-        mean_return = self.normalization_terms["lob"][2]
-        std_return = self.normalization_terms["lob"][3]
-        mean_vol_imb = self.normalization_terms["lob"][4]
-        std_vol_imb = self.normalization_terms["lob"][5]
-        mean_abs_vol = self.normalization_terms["lob"][6]
-        std_abs_vol = self.normalization_terms["lob"][7]
-        for i in range(len(dataframes)):
-            lob_sizes = dataframes[i][1].iloc[:, 1::2]
-            lob_prices = dataframes[i][1].iloc[:, 0::2]
-            dataframes[i][1]["volume_imbalance_1"] = lob_sizes.iloc[:, 1] / (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0])
-            dataframes[i][1]["volume_imbalance_5"] = (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 3] + lob_sizes.iloc[:, 5] + lob_sizes.iloc[:, 7] + lob_sizes.iloc[:, 9]) / (lob_sizes.iloc[:, :10].sum(axis=1))
-            dataframes[i][1]["absolute_volume_1"] = lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0]
-            dataframes[i][1]["absolute_volume_5"] = lob_sizes.iloc[:, :10].sum(axis=1)
-            dataframes[i][1]["spread"] = lob_prices.iloc[:, 0] - lob_prices.iloc[:, 1]
-
-        for i in range(len(dataframes)):
-            order_sign_imbalance_256 = pd.Series(0, index=dataframes[i][1].index)
-            order_sign_imbalance_128 = pd.Series(0, index=dataframes[i][1].index)
-            returns_50 = pd.Series(0, index=dataframes[i][1].index)
-            returns_1 = pd.Series(0, index=dataframes[i][1].index)
-            lob_prices = dataframes[i][1].iloc[:, 0::2]
-            mid_prices = (lob_prices.iloc[:, 0] + lob_prices.iloc[:, 1]) / 2
-            for j in range(len(dataframes[i][1])-256):
-                order_sign_imbalance_256.iloc[j] = dataframes[i][0]["direction"].iloc[j:j+256].sum()
-                order_sign_imbalance_128.iloc[j] = dataframes[i][0]["direction"].iloc[j+128:j+256].sum()
-                returns_1.iloc[j] = mid_prices[j+255] / mid_prices[j+254] - 1
-                returns_50.iloc[j] = mid_prices[j+255] / mid_prices[j+205] - 1
-            dataframes[i][1] = dataframes[i][1].iloc[255:]
-            dataframes[i][1].loc[:, "order_sign_imbalance_256"] = order_sign_imbalance_256.iloc[:-255] / 256
-            dataframes[i][1].loc[:, "order_sign_imbalance_128"] = order_sign_imbalance_128.iloc[:-255] / 128
-            dataframes[i][1].loc[:, "returns_1"] = returns_1.iloc[:-255]
-            dataframes[i][1].loc[:, "returns_50"] = returns_50.iloc[:-255]
-            dataframes[i][1] = dataframes[i][1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
-        
-        dataframes = reset_indexes(dataframes)
-        
-        for i in range(len(dataframes)):
-            #transform nan values in 0
-            dataframes[i][1] = dataframes[i][1].fillna(0)
-
-        market_features = dataframes[0][1]
-        market_features["returns_1"] = (market_features["returns_1"] - mean_return) / std_return
-        market_features["returns_50"] = (market_features["returns_50"] - mean_return) / std_return
-        market_features["volume_imbalance_1"] = (market_features["volume_imbalance_1"] - mean_vol_imb) / std_vol_imb
-        market_features["volume_imbalance_5"] = (market_features["volume_imbalance_5"] - mean_vol_imb) / std_vol_imb
-        market_features["absolute_volume_1"] = (market_features["absolute_volume_1"] - mean_abs_vol) / std_abs_vol
-        market_features["absolute_volume_5"] = (market_features["absolute_volume_5"] - mean_abs_vol) / std_abs_vol
-        market_features["spread"] = (market_features["spread"] - mean_spread) / std_spread
-        market_features = market_features.to_numpy()
-        market_features = torch.from_numpy(market_features).to(cst.DEVICE, torch.float32)
-        market_features = market_features.unsqueeze(0)
-        return market_features
-        
-
     def _generate_order(self, currentTime):
         generated = None
         while generated is None:
@@ -566,7 +493,7 @@ class WorldAgent(Agent):
         time = generated[0].item() * self.normalization_terms["event"][5] + self.normalization_terms["event"][4]
 
         # if the price or the size are negative we return None and we generate another order
-        if size < 0:
+        if size < 0 or size > 1000:
             self.count_neg_size += 1
             return None
         
@@ -843,6 +770,79 @@ class WorldAgent(Agent):
         self.last_lob_snapshot = last_lob_snapshot
         self.lob_snapshots.append(last_lob_snapshot)
         self.sparse_lob_snapshots.append(to_sparse_representation(last_lob_snapshot, 100))
+        
+        
+    def _preprocess_market_features_for_cgan(self, lob_snapshots):
+        lob_snapshots = np.array(lob_snapshots)
+        COLUMNS_NAMES = {"orderbook": ["sell1", "vsell1", "buy1", "vbuy1",
+                                       "sell2", "vsell2", "buy2", "vbuy2",
+                                       "sell3", "vsell3", "buy3", "vbuy3",
+                                       "sell4", "vsell4", "buy4", "vbuy4",
+                                       "sell5", "vsell5", "buy5", "vbuy5",
+                                       "sell6", "vsell6", "buy6", "vbuy6",
+                                       "sell7", "vsell7", "buy7", "vbuy7",
+                                       "sell8", "vsell8", "buy8", "vbuy8",
+                                       "sell9", "vsell9", "buy9", "vbuy9",
+                                       "sell10", "vsell10", "buy10", "vbuy10"],
+                        }
+        lob_dataframe = pd.DataFrame(lob_snapshots, columns=COLUMNS_NAMES["orderbook"])
+        orders = np.array(self.placed_orders[-self.seq_len*2 +1:])
+        orders_dataframe = pd.DataFrame(orders, columns=["time", "type", "order_id", "quantity", "price", "direction"])
+        dataframes = [[orders_dataframe, lob_dataframe]]
+        mean_spread = self.normalization_terms["lob"][0]
+        std_spread = self.normalization_terms["lob"][1]
+        mean_return = self.normalization_terms["lob"][2]
+        std_return = self.normalization_terms["lob"][3]
+        mean_vol_imb = self.normalization_terms["lob"][4]
+        std_vol_imb = self.normalization_terms["lob"][5]
+        mean_abs_vol = self.normalization_terms["lob"][6]
+        std_abs_vol = self.normalization_terms["lob"][7]
+        for i in range(len(dataframes)):
+            lob_sizes = dataframes[i][1].iloc[:, 1::2]
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            dataframes[i][1]["volume_imbalance_1"] = lob_sizes.iloc[:, 1] / (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0])
+            dataframes[i][1]["volume_imbalance_5"] = (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 3] + lob_sizes.iloc[:, 5] + lob_sizes.iloc[:, 7] + lob_sizes.iloc[:, 9]) / (lob_sizes.iloc[:, :10].sum(axis=1))
+            dataframes[i][1]["absolute_volume_1"] = lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0]
+            dataframes[i][1]["absolute_volume_5"] = lob_sizes.iloc[:, :10].sum(axis=1)
+            dataframes[i][1]["spread"] = lob_prices.iloc[:, 0] - lob_prices.iloc[:, 1]
+
+        for i in range(len(dataframes)):
+            order_sign_imbalance_256 = pd.Series(0, index=dataframes[i][1].index)
+            order_sign_imbalance_128 = pd.Series(0, index=dataframes[i][1].index)
+            returns_50 = pd.Series(0, index=dataframes[i][1].index)
+            returns_1 = pd.Series(0, index=dataframes[i][1].index)
+            lob_prices = dataframes[i][1].iloc[:, 0::2]
+            mid_prices = (lob_prices.iloc[:, 0] + lob_prices.iloc[:, 1]) / 2
+            for j in range(len(dataframes[i][1])-256):
+                order_sign_imbalance_256.iloc[j] = dataframes[i][0]["direction"].iloc[j:j+256].sum()
+                order_sign_imbalance_128.iloc[j] = dataframes[i][0]["direction"].iloc[j+128:j+256].sum()
+                returns_1.iloc[j] = mid_prices[j+255] / mid_prices[j+254] - 1
+                returns_50.iloc[j] = mid_prices[j+255] / mid_prices[j+205] - 1
+            dataframes[i][1] = dataframes[i][1].iloc[255:]
+            dataframes[i][1].loc[:, "order_sign_imbalance_256"] = order_sign_imbalance_256.iloc[:-255] / 256
+            dataframes[i][1].loc[:, "order_sign_imbalance_128"] = order_sign_imbalance_128.iloc[:-255] / 128
+            dataframes[i][1].loc[:, "returns_1"] = returns_1.iloc[:-255]
+            dataframes[i][1].loc[:, "returns_50"] = returns_50.iloc[:-255]
+            dataframes[i][1] = dataframes[i][1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
+        
+        dataframes = reset_indexes(dataframes)
+        
+        for i in range(len(dataframes)):
+            #transform nan values in 0
+            dataframes[i][1] = dataframes[i][1].fillna(0)
+
+        market_features = dataframes[0][1]
+        market_features["returns_1"] = (market_features["returns_1"] - mean_return) / std_return
+        market_features["returns_50"] = (market_features["returns_50"] - mean_return) / std_return
+        market_features["volume_imbalance_1"] = (market_features["volume_imbalance_1"] - mean_vol_imb) / std_vol_imb
+        market_features["volume_imbalance_5"] = (market_features["volume_imbalance_5"] - mean_vol_imb) / std_vol_imb
+        market_features["absolute_volume_1"] = (market_features["absolute_volume_1"] - mean_abs_vol) / std_abs_vol
+        market_features["absolute_volume_5"] = (market_features["absolute_volume_5"] - mean_abs_vol) / std_abs_vol
+        market_features["spread"] = (market_features["spread"] - mean_spread) / std_spread
+        market_features = market_features.to_numpy()
+        market_features = torch.from_numpy(market_features).to(cst.DEVICE, torch.float32)
+        market_features = market_features.unsqueeze(0)
+        return market_features
 
 
 

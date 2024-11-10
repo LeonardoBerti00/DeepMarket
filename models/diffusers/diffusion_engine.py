@@ -155,6 +155,8 @@ class DiffusionEngine(LightningModule):
         self.simple_sampler.update_losses(self.t, L_simple[0])
         self.diffuser.init_losses()
         self.ema.update()
+        if batch_idx % 1000 == 0:
+            print(f"batch loss: {batch_loss_mean}")
         return batch_loss_mean
 
     def on_train_epoch_start(self) -> None:

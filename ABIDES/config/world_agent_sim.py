@@ -99,15 +99,15 @@ parser.add_argument('-type',
                     type=str,
                     default='DDPM',
                     help='Sampling type for diffusion')
-parser.add_argument('-ddim-eta',
+parser.add_argument('-eta',
                     '--ddim-eta',
                     type=float,
-                    default=0.1,
+                    default=0.5,
                     help='eta for DDIM')
-parser.add_argument('-ddim-nsteps',
+parser.add_argument('-nsteps',
                     '--ddim-nsteps',
                     type=int,
-                    default=10,
+                    default=1,
                     help='nsteps for DDIM')
 
 args, remaining_args = parser.parse_known_args()
@@ -140,6 +140,7 @@ if args.chosen_model == "TRADES":
     chosen_model = cst.Models.TRADES
 elif args.chosen_model == "CGAN":
     chosen_model = cst.Models.CGAN
+    
 normalization_terms = load_compute_normalization_terms(symbol, cst.DATA_DIR, chosen_model, n_lob_levels=10)
 starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 
@@ -317,12 +318,12 @@ time_mkt_close = str(tmp.time()).replace(':', '-')
 
 if trade_pov:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_pov_{}_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume, seed) + checkpoint_reference.name[:-5] 
+        log_dir = "world_agent_{}_{}_{}_pov_{}_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, pov_proportion_of_volume, seed, args.sampling_type, args.ddim_eta, args.ddim_nsteps) + checkpoint_reference.name[:13] 
     else:
         log_dir = "market_replay_{}_{}_{}_pov_{}_{}".format(symbol, date, time_mkt_close, pov_proportion_of_volume, seed)
 else:
     if args.diffusion:
-        log_dir = "world_agent_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, seed) + checkpoint_reference.name[:-5]
+        log_dir = "world_agent_{}_{}_{}_{}_{}_{}_{}_".format(symbol, date, time_mkt_close, seed, args.sampling_type, args.ddim_eta, args.ddim_nsteps) + checkpoint_reference.name[:13]
     else:
         log_dir = "market_replay_{}_{}_{}_{}".format(symbol, date, time_mkt_close, seed)
 
