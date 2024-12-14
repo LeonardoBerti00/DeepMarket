@@ -28,8 +28,8 @@ class WorldAgent(Agent):
     # and generates new orders for the next time step
 
 
-    def __init__(self, id, name, type, symbol, date, date_trading_days, model, data_dir, log_orders=True, random_state=None, 
-                 normalization_terms=None, using_diffusion=False, chosen_model=None, seq_len=256, cond_seq_size=255, cond_type='full', size_type_emb=3):
+    def __init__(self, id, name, type, symbol, date, date_trading_days, model, data_dir, log_orders=True, random_state=None, normalization_terms=None, 
+                 using_diffusion=False, chosen_model=None, seq_len=256, cond_seq_size=255, cond_type='full', size_type_emb=3, gen_seq_size=1):
 
         super().__init__(id, name, type, random_state=random_state, log_to_file=log_orders)
         self.count_neg_size = 0
@@ -38,6 +38,7 @@ class WorldAgent(Agent):
         self.sparse_lob_snapshots = []
         self.symbol = symbol
         self.date = date
+        self.gen_seq_size = gen_seq_size
         self.size_type_emb = size_type_emb
         self.log_orders = log_orders
         self.executed_trades = dict()
@@ -46,7 +47,7 @@ class WorldAgent(Agent):
         self.historical_orders, self.historical_lob = self._load_orders_lob(self.symbol, data_dir, self.date, date_trading_days)
         self.historical_order_ids = self.historical_orders[:, 2]
         self.unused_order_ids = np.setdiff1d(np.arange(0, 99999999), self.historical_order_ids)
-        self.next_order = None
+        self.next_orders = None
         self.subscription_requested = False
         self.date_trading_days = date_trading_days
         self.first_wakeup = True
@@ -159,10 +160,10 @@ class WorldAgent(Agent):
                     temporal_distance = temporal_distance[temporal_distance > 0]
                     self.shape_temp_distance, self.loc_temp_distance, self.scale_temp_distance = stats.gamma.fit(temporal_distance)
         
-                generated = self._generate_order(currentTime)
-                self.next_order = generated
+                generated_orders = self._generate_order(currentTime)
+                self.next_orders = generated_orders
                 self.first_generation = False
-                offset_time = datetime.timedelta(seconds=generated[0])
+                offset_time = datetime.timedelta(seconds=generated_orders[0][0])
                 self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
                 return
 
@@ -173,16 +174,21 @@ class WorldAgent(Agent):
                     wait = True
                     
             # first we place the last order generated and next we generate the next order
-            if self.next_order is not None and not wait:
-                self.placeOrder(currentTime, self.next_order)
-                self.next_order = self._generate_order(currentTime)
-                offset_time = datetime.timedelta(seconds=self.next_order[0])
-                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
-
+            if self.next_orders is not None and not wait:
+                self.placeOrder(currentTime, self.next_orders[0])
+                self.next_orders = self.next_orders[1:]
+                
             elif wait:
                 self.setWakeup(currentTime + datetime.timedelta(microseconds=1))
+                return 
+            
+            if len(self.next_orders) == 0:
+                self.next_orders = self._generate_order(currentTime)
+                offset_time = datetime.timedelta(seconds=self.next_orders[0][0])
+                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
+                return 
 
-
+        
     def receiveMessage(self, currentTime, msg):
         if currentTime > self.mkt_open + pd.Timedelta(self.starting_time_diffusion) and not self.using_diffusion:
             return
@@ -259,7 +265,8 @@ class WorldAgent(Agent):
 
     def _generate_order(self, currentTime):
         generated = None
-        while generated is None:
+        post_processed_orders = []
+        while len(post_processed_orders) == 0:
             if self.chosen_model == 'TRADES':
                 if self.cond_type == 'full':
                     orders = np.array(self.placed_orders[-self.cond_seq_size:])
@@ -274,10 +281,14 @@ class WorldAgent(Agent):
                 else:
                     raise ValueError("cond_type not recognized")
                 cond_orders = cond_orders.unsqueeze(0)   
-                x = torch.zeros(1, 1, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
+                x = torch.zeros(1, self.gen_seq_size, cst.LEN_ORDER, device=cst.DEVICE, dtype=torch.float32)
                 generated = self.model.sample(cond_orders=cond_orders, x=x, cond_lob=cond_lob)
-                generated = generated[0, 0, :]
-                generated = self._postprocess_generated_TRADES(generated)
+                post_processed_orders = []
+                for i in range(generated.shape[1]):
+                    order = self._postprocess_generated_TRADES(generated[0, i, :])
+                    if order is not None:
+                        post_processed_orders.append(order)
+                
             elif self.chosen_model == 'CGAN':
                 cond_market_features = self._preprocess_market_features_for_cgan(np.array(self.lob_snapshots[-(self.seq_len)*2+1:]))
                 '''
@@ -298,8 +309,10 @@ class WorldAgent(Agent):
                 # generated = ['event_type', 'size', 'direction', 'depth', 'cancel_depth', 'quantity_100', 'quantity_type']
                 generated = generated[0, 0, :]
                 generated = self._postprocess_generated_gan(generated)
-                # generated = [offset, order_type, order_id, size, price, direction]
-        return generated
+                if generated is not None:
+                    post_processed_orders = [generated]
+                    # generated = [offset, order_type, order_id, size, price, direction]
+        return post_processed_orders
 
 
     def placeLimitOrder(self, symbol, quantity, is_buy_order, limit_price, order_id=None, ignore_risk=True, tag=None):
@@ -825,7 +838,8 @@ class WorldAgent(Agent):
             dataframes[i][1].loc[:, "returns_50"] = returns_50.iloc[:-255]
             dataframes[i][1] = dataframes[i][1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
         
-        dataframes = reset_indexes(dataframes)
+        for i in range(len(dataframes)):
+            dataframes[i][1] = dataframes[i][1].reset_index(drop=True)
         
         for i in range(len(dataframes)):
             #transform nan values in 0

@@ -22,12 +22,9 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         self.batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.BATCH_SIZE]
         self.num_diffusionsteps = config.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS]
         self.lambda_ = config.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA]
-        self.x_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
+        self.gen_seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
-        self.cond_seq_size = self.seq_size - self.x_seq_size
-        #self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH]
-        #self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS]
-        #self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO]
+        self.cond_seq_size = self.seq_size - self.gen_seq_size
         self.depth = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH]
         self.num_heads = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS]
         self.mlp_ratio = config.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO]
@@ -47,7 +44,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             self.num_diffusionsteps,
             self.depth,
             self.num_heads,
-            self.x_seq_size,
+            self.gen_seq_size,
             self.cond_dropout_prob,
             self.IS_AUGMENTATION,
             self.dropout,
@@ -110,7 +107,6 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         
     def ddim_single_step(self, x_t_aug, cond_lob, cond_orders, ts, index, x_t):
         noise_t, v = self.NN(x_t_aug, cond_orders, ts, cond_lob)
-        #check for nan in x_t_aug and cond and noise_t
         if self.IS_AUGMENTATION:
             noise_t, v = self.deaugment(noise_t, v)
         alpha = self.ddim_alpha[index]
@@ -156,29 +152,34 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         beta_t = self.betas[t]
         alpha_t = 1 - beta_t
         alpha_cumprod_t = self.alphas_cumprod[t]
-        beta_t = repeat(beta_t, 'b -> b 1 d', d=x_0.shape[-1])
-        alpha_t = repeat(alpha_t, 'b -> b 1 d', d=x_0.shape[-1])
-        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b 1 d', d=x_0.shape[-1])
+        beta_t = repeat(beta_t, 'b -> b l d', l=self.gen_seq_size, d=x_0.shape[-1])
+        alpha_t = repeat(alpha_t, 'b -> b l d', l=self.gen_seq_size, d=x_0.shape[-1])
+        alpha_cumprod_t = repeat(alpha_cumprod_t, 'b -> b l d', l=self.gen_seq_size, d=x_0.shape[-1])
         # Get the noise and v outputs from the neural network for the current time step
         noise_t, v = self.NN(x_t_aug, cond_orders, t, cond_lob)
+        #noise_t = self.NN(x_t_aug, cond_orders, t, cond_lob)
         #check for nan in x_t_aug and cond and noise_t
-        if torch.isnan(v).any():
-            print("v", v.max())
+        #if torch.isnan(v).any():
+        #    print("v", v.max())
         if torch.isnan(noise_t).any():
             print("noise_t:", noise_t.max())
         if self.IS_AUGMENTATION:
             noise_t, v = self.deaugment(noise_t, v)
         # Compute the variance for the current time step using the formula from the IDDPM paper
+        
         frac = (v + 1) / 2
         max_log = torch.log(beta_t)
         min_log = self.posterior_log_var_clipped[t]
-        min_log = repeat(min_log, 'b -> b 1 d', d=x_0.shape[-1])
+        min_log = repeat(min_log, 'b -> b l d', l=self.gen_seq_size, d=x_0.shape[-1])
         log_var_t = frac * max_log + (1 - frac) * min_log
         var_t = torch.exp(log_var_t)
         std_t = torch.sqrt(var_t)
+        
         # Sample a standard normal random variable z
         z = torch.distributions.normal.Normal(0, 1).sample(x_t.shape).to(cst.DEVICE, non_blocking=True)
-
+        
+        #std_t = self.betas[t]
+        #std_t = repeat(std_t, 'b -> b l d', l=self.gen_seq_size, d=x_0.shape[-1])
         #take the indexes for which t = 1
         indexes = torch.where(t == 0)
         z[indexes] = 0.0
@@ -190,6 +191,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         # Append the loss to the mse_losses list
         self.mse_losses.append(L_mse)
         # Compute the variational lower bound loss for the current time step
+        
         L_vlb = self._vlb_loss(
             noise_t=noise_t.detach(),
             pred_log_var=log_var_t,
@@ -201,12 +203,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             alpha_cumprod_t=alpha_cumprod_t,
             clip_denoised=False,
             weights=weights
-        )
+        )#.clamp(max=100)
         #check if there are nan in L_vlb
         if torch.isnan(L_vlb).any():
             print("L_vlb:", L_vlb.max())
         # Append the loss to the vbl_losses list
         self.vlb_losses.append(L_vlb)
+        
         return x_recon
 
     def augment(self, x_t: torch.Tensor, cond_orders: torch.Tensor, cond_lob: torch.Tensor):
@@ -219,6 +222,7 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
 
     def deaugment(self, noise: torch.Tensor, v: torch.Tensor):
         noise, v = self.feature_augmenter.deaugment(noise, v)
+        #noise = self.feature_augmenter.deaugment(noise)
         return noise, v
 
     def _mse_loss(self, noise_t, noise_true):

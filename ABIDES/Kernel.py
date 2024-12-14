@@ -320,6 +320,7 @@ class Kernel:
     print ("Simulation ending!")
     stock_name = self.log_dir.split("_")[2]
     date = self.log_dir.split("_")[3]
+    time = self.log_dir.split("_")[4]
     path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir)
     liquidity_telemetry.main(
       exchange_path=path+"/EXCHANGE_AGENT.bz2", 
@@ -327,7 +328,7 @@ class Kernel:
       outfile=path+"/world_agent_sim.png", 
       plot_config="ABIDES/util/plotting/configs/plot_09.30_12.00.json"
     )
-    real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_12-00-00", "processed_orders.csv")
+    real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_{time}", "processed_orders.csv")
     trades_data_path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir, "processed_orders.csv")
     plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
     predictive_lstm.main(real_data_path, trades_data_path)

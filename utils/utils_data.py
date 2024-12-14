@@ -201,10 +201,9 @@ def load_compute_normalization_terms(stock_name, data_dir, model, n_lob_levels):
                         train_orderbook, train_message = preprocess_data([train_message, train_orderbook], n_lob_levels, model)
                         train_messages = pd.concat([train_messages, train_message], axis=0)
                         train_orderbooks = pd.concat([train_orderbooks, train_orderbook], axis=0)
-
-    train_orderbooks.loc[:, ::2] /= 100
-    train_messages["price"] /= 100
     if model == cst.Models.TRADES:
+        train_orderbooks.loc[:, ::2] /= 100
+        train_messages["price"] /= 100
         _, lob_mean_size, lob_mean_prices, lob_std_size, lob_std_prices = z_score_orderbook(train_orderbooks)
         _, mean_size, mean_prices, std_size,  std_prices, mean_time, std_time, mean_depth, std_depth = normalize_messages(train_messages)
         normalization_terms = {
@@ -293,14 +292,18 @@ def preprocess_data(dataframes, n_lob_levels, chosen_model):
 
     dataframes = reset_indexes(dataframes)
     if chosen_model == cst.Models.CGAN:
+        # Initialize new columns
         dataframes[0]["cancel_depth"] = 0
         dataframes[0]["quantity_100"] = dataframes[0]["size"].apply(lambda x: x // 100 if x % 100 == 0 else 0)
         dataframes[0]["quantity_type"] = dataframes[0]["size"].apply(lambda x: -1 if x % 100 == 0 else 1)
 
-        # Calculate cancel_depth
-        for j in range(1, dataframes[0].shape[0]):
-            if dataframes[0].loc[j, "event_type"] == 3:
-                dataframes[0].loc[j, "cancel_depth"] = dataframes[1].iloc[j-1, 0::2].tolist().index(dataframes[0].loc[j, "price"]) // 2
+        # Calculate cancel_depth using vectorization
+        cancel_mask = dataframes[0]["event_type"] == 3
+        shifted_prices = dataframes[1].shift(1).fillna(method='bfill')
+        price_levels = shifted_prices.iloc[:, ::2].apply(lambda row: dict(zip(row, range(0, len(row)*2, 2))), axis=1)
+        dataframes[0].loc[cancel_mask, "cancel_depth"] = dataframes[0].loc[cancel_mask].apply(
+            lambda row: price_levels[row.name].get(row["price"], np.nan) // 2, axis=1
+        )
 
         # Drop unnecessary columns
         dataframes[0] = dataframes[0].drop(columns=["price", "time"])
@@ -309,41 +312,51 @@ def preprocess_data(dataframes, n_lob_levels, chosen_model):
         dataframes[1] = dataframes[1].shift(1).fillna(0)
 
         # Calculate volume imbalances, absolute volumes, and spread
-        lob_sizes = dataframes[1].iloc[:, 1::2]
-        lob_prices = dataframes[1].iloc[:, 0::2]
+        lob_sizes = dataframes[1].iloc[:, 1::2]  # Even columns (size)
+        lob_prices = dataframes[1].iloc[:, 0::2]  # Odd columns (price)
+
+        # Volume imbalance for level 1
         dataframes[1]["volume_imbalance_1"] = lob_sizes.iloc[:, 1] / (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0])
-        dataframes[1]["volume_imbalance_5"] = (lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 3] + lob_sizes.iloc[:, 5] + lob_sizes.iloc[:, 7] + lob_sizes.iloc[:, 9]) / (lob_sizes.iloc[:, :10].sum(axis=1))
+
+        # Volume imbalance for levels 1-5
+        best_5_asks = lob_sizes.iloc[:, 1:10:2]  # Columns 1,3,5,7,9
+        best_5_bids = lob_sizes.iloc[:, 0:10:2]  # Columns 0,2,4,6,8
+        dataframes[1]["volume_imbalance_5"] = best_5_asks.sum(axis=1) / (best_5_asks.sum(axis=1) + best_5_bids.sum(axis=1))
+
+        # Absolute volumes
         dataframes[1]["absolute_volume_1"] = lob_sizes.iloc[:, 1] + lob_sizes.iloc[:, 0]
-        dataframes[1]["absolute_volume_5"] = lob_sizes.iloc[:, :10].sum(axis=1)
+        dataframes[1]["absolute_volume_5"] = (lob_sizes.iloc[:, :10]).sum(axis=1)
+
+        # Spread
         dataframes[1]["spread"] = lob_prices.iloc[:, 0] - lob_prices.iloc[:, 1]
 
-        # Initialize new columns for order sign imbalances and returns
-        order_sign_imbalance_256 = pd.Series(0, index=dataframes[1].index)
-        order_sign_imbalance_128 = pd.Series(0, index=dataframes[1].index)
-        returns_50 = pd.Series(0, index=dataframes[1].index)
-        returns_1 = pd.Series(0, index=dataframes[1].index)
+        # Calculate mid prices
         mid_prices = (lob_prices.iloc[:, 0] + lob_prices.iloc[:, 1]) / 2
 
-        # Calculate order sign imbalances and returns
-        for j in range(len(dataframes[1]) - 256):
-            order_sign_imbalance_256.iloc[j] = dataframes[0]["direction"].iloc[j:j+256].sum()
-            order_sign_imbalance_128.iloc[j] = dataframes[0]["direction"].iloc[j+128:j+256].sum()
-            returns_1.iloc[j] = mid_prices[j+255] / mid_prices[j+254] - 1
-            returns_50.iloc[j] = mid_prices[j+255] / mid_prices[j+205] - 1
+        # Calculate order sign imbalances and returns using rolling sums
+        dataframes[0]["cumulative_direction"] = dataframes[0]["direction"].cumsum()
+        dataframes[1]["order_sign_imbalance_256"] = dataframes[0]["cumulative_direction"] - dataframes[0]["cumulative_direction"].shift(256, fill_value=0)
+        dataframes[1]["order_sign_imbalance_128"] = dataframes[0]["cumulative_direction"].shift(128, fill_value=0) - dataframes[0]["cumulative_direction"].shift(256, fill_value=0)
 
-        # Trim the first 255 rows and assign new columns
-        dataframes[1] = dataframes[1].iloc[255:]
-        dataframes[0] = dataframes[0].iloc[255:]
-        dataframes[1]["order_sign_imbalance_256"] = order_sign_imbalance_256.iloc[255:].values
-        dataframes[1]["order_sign_imbalance_128"] = order_sign_imbalance_128.iloc[255:].values
-        dataframes[1]["returns_1"] = returns_1.iloc[255:].values
-        dataframes[1]["returns_50"] = returns_50.iloc[255:].values
-        dataframes[1] = dataframes[1][["volume_imbalance_1", "volume_imbalance_5", "absolute_volume_1", "absolute_volume_5", "spread", "order_sign_imbalance_256", "order_sign_imbalance_128", "returns_1", "returns_50"]]
+        # Returns
+        dataframes[1]["returns_1"] = mid_prices.pct_change(periods=1).shift(-1)
+        dataframes[1]["returns_50"] = mid_prices.pct_change(periods=50).shift(-50)
 
-        # Reset indexes and fill NaN values
-        dataframes = reset_indexes(dataframes)
-        dataframes[1] = dataframes[1].fillna(0)
+        # Trim the first 255 rows
+        dataframes[0] = dataframes[0].iloc[256:].reset_index(drop=True)
+        dataframes[1] = dataframes[1].iloc[256:].reset_index(drop=True)
+
+        # Select required columns
+        dataframes[1] = dataframes[1][[
+            "volume_imbalance_1", "volume_imbalance_5",
+            "absolute_volume_1", "absolute_volume_5",
+            "spread", "order_sign_imbalance_256",
+            "order_sign_imbalance_128", "returns_1", "returns_50"
+        ]]
+
+        # Fill NaN values
         dataframes[0] = dataframes[0].fillna(0)
+        dataframes[1] = dataframes[1].fillna(0)
     
     # we transform the execution of a sell limit order in a buy market order and viceversa
     dataframes[0]["direction"] = dataframes[0]["direction"] * dataframes[0]["event_type"].apply(

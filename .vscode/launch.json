@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["-u", "ABIDES/abides.py", "-m", "TRADES", "-c", "world_agent_sim", "-t", "TSLA", "-date", "20150129", "-seed", "40", "-st", "'09:30:00'", "-et", "'10:00:00'", "-d", "True", "-id", "0.811"]
+            "args": ["-u", "ABIDES/abides.py", "-m", "TRADES", "-c", "world_agent_sim", "-t", "TSLA", "-date", "20150129", "-seed", "40", "-st", "'09:30:00'", "-et", "'10:00:00'", "-d", "True", "-id", "0.811", "-type", "DDIM"]
         },
         {
             "name": "Python: Current File",

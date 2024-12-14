@@ -102,7 +102,7 @@ parser.add_argument('-type',
 parser.add_argument('-eta',
                     '--ddim-eta',
                     type=float,
-                    default=0.5,
+                    default=0.0,
                     help='eta for DDIM')
 parser.add_argument('-nsteps',
                     '--ddim-nsteps',
@@ -219,6 +219,7 @@ if args.diffusion:
                           normalization_terms=normalization_terms,
                           using_diffusion=args.diffusion,
                             chosen_model=args.chosen_model,
+                            gen_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
                           )
                ])
     elif config.CHOSEN_MODEL == cst.Models.CGAN:

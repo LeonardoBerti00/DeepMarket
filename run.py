@@ -24,40 +24,42 @@ HP_DICT_MODEL = {
 
 def train(config: Configuration, trainer: L.Trainer):
     print_setup(config)
-    
-    # due to the fact that CGAN uses a different dataset, we need to create different numpy files
-    if config.CHOSEN_MODEL == cst.Models.CGAN:
-        train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train_cgan.npy"
-        val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val_cgan.npy" 
-    else:
-        train_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/train.npy"
-        val_data_path = cst.DATA_DIR + "/" + config.CHOSEN_STOCK.name + "/val.npy"
+    train_data_paths = []
+    val_data_paths = []
+    for i in range(len(config.CHOSEN_STOCK)):
+        # due to the fact that CGAN uses a different dataset, we need to create different numpy files
+        if config.CHOSEN_MODEL == cst.Models.CGAN:
+            train_data_paths.append(cst.DATA_DIR + "/" + config.CHOSEN_STOCK[i].name + "/train_cgan.npy")
+            val_data_paths.append(cst.DATA_DIR + "/" + config.CHOSEN_STOCK[i].name + "/val_cgan.npy") 
+        else:
+            train_data_paths.append(cst.DATA_DIR + "/" + config.CHOSEN_STOCK[i].name + "/train.npy")
+            val_data_paths.append(cst.DATA_DIR + "/" + config.CHOSEN_STOCK[i].name + "/val.npy")
         
     train_set = LOBDataset(
-        path=train_data_path,
+        paths=train_data_paths,
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
-        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+        gen_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
         chosen_model=config.CHOSEN_MODEL,
-        chosen_stock=config.CHOSEN_STOCK,
+        is_val = False,
     )
 
     val_set = LOBDataset(
-        path=val_data_path,
+        paths=val_data_paths,
         seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE],
-        one_hot_encoding_type=config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE],
-        x_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
+        gen_seq_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.MASKED_SEQ_SIZE],
         chosen_model=config.CHOSEN_MODEL,
-        chosen_stock=config.CHOSEN_STOCK,
+        is_val = True,
+        batch_size=config.HYPER_PARAMETERS[cst.LearningHyperParameter.TEST_BATCH_SIZE],
+        limit_val_batches=100
     )
     
-    #print("size of train set: ", train_set.data.size())
-    #print("size of val set: ", val_set.data.size())
+    print("size of train set: ", train_set.data.size())
+    print("size of val set: ", val_set.data.size())
     
     if config.IS_DEBUG:
         train_set.data = train_set.data[:256]
         val_set.data = val_set.data[:256]
-        config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_DEPTH] = 1
+        config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH] = 1
         
     data_module = DataModule(
         train_set=train_set,
@@ -86,14 +88,11 @@ def run(config: Configuration, accelerator, model=None):
     if config.CHOSEN_MODEL == cst.Models.CGAN:
         config.FILENAME_CKPT = "CGAN_" + wandb_instance_name
         wandb_instance_name = config.FILENAME_CKPT
-    else:
-        cond_type = config.COND_TYPE
-        is_augmentation = config.IS_AUGMENTATION
-        stock_name = config.CHOSEN_STOCK.name
-        diffsteps = config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]
-        augmenter = config.CHOSEN_AUGMENTER
-        aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-        config.FILENAME_CKPT = f"{stock_name}_{wandb_instance_name}"
+    else: 
+        stock_name = ""
+        for i in range(len(config.CHOSEN_STOCK)):
+            stock_name += config.CHOSEN_STOCK[i].name + "_"
+        config.FILENAME_CKPT = f"{stock_name}{wandb_instance_name}"
         wandb_instance_name = config.FILENAME_CKPT
 
     trainer = L.Trainer(
@@ -101,15 +100,15 @@ def run(config: Configuration, accelerator, model=None):
         precision=cst.PRECISION,
         max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
         callbacks=[
-            EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
+            EarlyStopping(monitor="val_ema_loss", mode="min", patience=6, verbose=True, min_delta=0.005),
             TQDMProgressBar(refresh_rate=100)
             ],
         num_sanity_val_steps=0,
         detect_anomaly=False,
-        profiler="simple",
+        profiler=None,
         check_val_every_n_epoch=1,
         val_check_interval=0.5,
-        limit_val_batches=50
+        #gradient_clip_val=5.0 if during training comes out the error "nan" impose gradient clip
     )
     train(config, trainer)
 
@@ -142,9 +141,11 @@ def run_wandb(config: Configuration, accelerator):
         elif config.CHOSEN_MODEL == cst.Models.TRADES:
             run.name = wandb_instance_name
             aug_dim = config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]
-            config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_NUM_HEADS] = aug_dim // 64
-            stock_name = config.CHOSEN_STOCK.name
-            config.FILENAME_CKPT = str(stock_name) + "_" + wandb_instance_name 
+            config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS] = aug_dim // 64
+            stock_name = ""
+            for i in range(len(config.CHOSEN_STOCK)):
+                stock_name += config.CHOSEN_STOCK[i].name + "_"
+            config.FILENAME_CKPT = str(stock_name) + wandb_instance_name 
             wandb_instance_name = config.FILENAME_CKPT
             
         trainer = L.Trainer(
@@ -152,7 +153,7 @@ def run_wandb(config: Configuration, accelerator):
             precision=cst.PRECISION,
             max_epochs=config.HYPER_PARAMETERS[cst.LearningHyperParameter.EPOCHS],
             callbacks=[
-                EarlyStopping(monitor="val_ema_loss", mode="min", patience=1, verbose=True, min_delta=0.005),
+                EarlyStopping(monitor="val_ema_loss", mode="min", patience=6, verbose=True, min_delta=0.005),
                 TQDMProgressBar(refresh_rate=1000)
             ],
             num_sanity_val_steps=0,
@@ -161,21 +162,21 @@ def run_wandb(config: Configuration, accelerator):
             profiler=None,
             val_check_interval=0.5,
             check_val_every_n_epoch=1,
-            limit_val_batches=50
+            #gradient_clip_val=5.0 if during training comes out the error "nan" impose gradient clip
         )
 
         # log simulation details in WANDB console
         run.log({"model": config.CHOSEN_MODEL.name}, commit=False)
-        run.log({"stock train": config.CHOSEN_STOCK.name}, commit=False)
-        run.log({"stock test": config.CHOSEN_STOCK.name}, commit=False)
+        for i in range(len(config.CHOSEN_STOCK)):
+            run.log({f"stock train {i}": config.CHOSEN_STOCK[i].name}, commit=False)
         if config.CHOSEN_MODEL == cst.Models.TRADES:
             run.log({"cond type": config.COND_TYPE}, commit=False)
             run.log({"num diff steps": config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS]}, commit=False)
             run.log({"is augmentation": config.IS_AUGMENTATION}, commit=False)
             run.log({"seq size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE]}, commit=False)
             run.log({"augmentation dim": config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM]}, commit=False)
-            run.log({"TRADES depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_DEPTH]}, commit=False)
-            run.log({"TRADES num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_NUM_HEADS]}, commit=False)
+            run.log({"TRADES depth": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH]}, commit=False)
+            run.log({"TRADES num heads": config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS]}, commit=False)
             run.log({"learning rate": config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE]}, commit=False)
             run.log({"optimizer": config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER]}, commit=False)
             run.log({"batch size": config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE]}, commit=False)
@@ -233,17 +234,15 @@ def print_setup(config: Configuration):
         if config.IS_AUGMENTATION:
             print("Augmentation dim: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.AUGMENT_DIM])
             print("Augmenter: ", config.CHOSEN_AUGMENTER)
-            print("TRADES depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_DEPTH])
-            print("TRADES num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.TRADES_NUM_HEADS])
+            print("TRADES depth: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_DEPTH])
+            print("TRADES num heads: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.CDT_NUM_HEADS])
         print("Conditioning type: ", config.COND_TYPE)
         print("Number of diffusion steps: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
         print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])
         print("Batch size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.BATCH_SIZE])
         print("Learning rate: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.LEARNING_RATE])
         print("Optimizer: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.OPTIMIZER])
-        print("One hot encoding type: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE])
-        if not config.HYPER_PARAMETERS[cst.LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
-            print("Size order embedding: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB])  
+        print("Size order embedding: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SIZE_TYPE_EMB])  
     elif config.CHOSEN_MODEL == cst.Models.CGAN:
         #self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_LEN] = 256
         print("Sequence size: ", config.HYPER_PARAMETERS[cst.LearningHyperParameter.SEQ_SIZE])

@@ -16,6 +16,7 @@ class MLPAugmenter(AugmenterAB, nn.Module):
         self.input_size = input_size
         self.fwd_mlp = nn.Sequential(
             nn.Linear(input_size, augment_dim//2, dtype=torch.float32),
+            #nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, augment_dim, dtype=torch.float32),
         )
         self.cond_type = cond_type
@@ -32,10 +33,12 @@ class MLPAugmenter(AugmenterAB, nn.Module):
             augment_dim = augment_dim*2
         self.bck_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            #nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, input_size, dtype=torch.float32),
         )
         self.v_mlp = nn.Sequential(
             nn.Linear(augment_dim, augment_dim//2, dtype=torch.float32),
+            #nn.LayerNorm(augment_dim//2),
             nn.Linear(augment_dim//2, input_size, dtype=torch.float32)
         )
         

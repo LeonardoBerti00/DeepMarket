@@ -23,7 +23,6 @@ class DiffusionEngine(LightningModule):
         self.conditional_dropout = config.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT]
         self.IS_AUGMENTATION = config.IS_AUGMENTATION
         self.IS_WANDB = config.IS_WANDB
-        self.one_hot_encoding_type = config.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]
         self.augment_dim = config.HYPER_PARAMETERS[LearningHyperParameter.AUGMENT_DIM]
         self.cond_type = config.COND_TYPE
         self.cond_method = config.COND_METHOD
@@ -38,8 +37,6 @@ class DiffusionEngine(LightningModule):
         self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
         self.seq_size = config.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE]
-        self.chosen_stock = config.CHOSEN_STOCK.name
-        self.chosen_stock = config.CHOSEN_STOCK.name
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = np.inf
@@ -55,12 +52,11 @@ class DiffusionEngine(LightningModule):
         else:
             self.diffuser = GaussianDiffusion(config, None).to(cst.DEVICE, non_blocking=True)
             
-        if not self.one_hot_encoding_type:
-            self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
-            self.type_embedder.requires_grad_(False)
-            self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            if self.IS_WANDB:
-                wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
+        self.type_embedder = nn.Embedding(3, self.size_type_emb, dtype=torch.float32)
+        self.type_embedder.requires_grad_(False)
+        self.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
+        if self.IS_WANDB:
+            wandb.log({"type_embedder": self.type_embedder.weight.data}, step=0)
             
         self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
         self.ema.to(cst.DEVICE)
@@ -71,9 +67,8 @@ class DiffusionEngine(LightningModule):
         
 
     def forward(self, cond_orders, x_0, cond_lob, is_train, batch_idx=None):
-        # x_0 shape is (batch_size, seq_size=1, cst.LEN_ORDER_ONE_HOT=8)
-        if not self.one_hot_encoding_type:
-            x_0, cond_orders = self.type_embedding(x_0, cond_orders)
+        # x_0 shape is (batch_size, seq_size=1, cst.LEN_ORDER=8)
+        x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         if is_train:
             self.t, _ = self.sampler.sample(x_0.shape[0])
             recon = self.single_step(cond_orders, x_0, cond_lob, batch_idx)
@@ -88,8 +83,7 @@ class DiffusionEngine(LightningModule):
         cond_orders: torch.Tensor = kwargs['cond_orders']
         x_0: torch.Tensor = kwargs['x']
         cond_lob: torch.Tensor = kwargs['cond_lob']
-        if not self.one_hot_encoding_type:
-            x_0, cond_orders = self.type_embedding(x_0, cond_orders)
+        x_0, cond_orders = self.type_embedding(x_0, cond_orders)
         x_0 = torch.zeros_like(x_0)
         weights = self.sampler.weights()
         x_t = self.diffuser.sample(x_0, cond_orders, cond_lob, weights)
@@ -123,17 +117,17 @@ class DiffusionEngine(LightningModule):
     
     def loss(self):
         # regularization term to avoid order with negative size
-        if isinstance(self.diffuser, GaussianDiffusion):
-            L_hybrid, L_simple, L_vlb = self.diffuser.loss()
-            #print(f"hybrid loss: {L_hybrid.mean()}")
-            #print(f"simple loss: {L_simple.mean()}")
-            #print(f"vlb loss: {L_vlb.mean()}")
-            return L_hybrid, L_simple, L_vlb
-        else:
-            L_simple = self.diffuser.loss()
-            return L_simple, L_simple, L_simple
+        L_hybrid, L_simple, L_vlb = self.diffuser.loss()
+        #print(f"hybrid loss: {L_hybrid.mean()}")
+        #print(f"simple loss: {L_simple.mean()}")
+        #print(f"vlb loss: {L_vlb.mean()}")
+        return L_hybrid, L_simple, L_vlb
+
 
     def training_step(self, input, batch_idx):
+        #print(batch_idx)
+        #if batch_idx == 5:
+        #    print("stop")
         if self.global_step == 0 and self.IS_WANDB:
             self._define_log_metrics()
         x_0 = input[1].contiguous()
@@ -218,7 +212,7 @@ class DiffusionEngine(LightningModule):
         # model checkpointing
         if loss_ema < self.min_loss_ema:
             # if the improvement is less than 0.01, we halve the learning rate
-            if loss_ema - self.min_loss_ema > -0.005:
+            if loss_ema - self.min_loss_ema > -0.002:
                 self.optimizer.param_groups[0]["lr"] /= 2  
             self.min_loss_ema = loss_ema
             self.model_checkpointing(loss_ema)

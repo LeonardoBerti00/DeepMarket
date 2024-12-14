@@ -9,18 +9,18 @@ class Configuration:
 
         self.IS_WANDB = False
         self.IS_SWEEP = False
-        self.IS_TRAINING = False
+        self.IS_TRAINING = True
         self.IS_DEBUG = False
-        self.IS_EVALUATION = True
+        self.IS_EVALUATION = False
 
         self.VALIDATE_EVERY = 1
 
-        self.IS_AUGMENTATION = False
+        self.IS_AUGMENTATION = True
 
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.TRADES
+        self.CHOSEN_MODEL = cst.Models.CGAN
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         self.SAMPLING_TYPE = "DDPM" #it can be DDPM or DDIM
@@ -30,7 +30,7 @@ class Configuration:
             cst.PROJECT_NAME = "CGAN"
 
         # select a stock 
-        self.CHOSEN_STOCK = cst.Stocks.TSLA
+        self.CHOSEN_STOCK = [cst.Stocks.TSLA]
 
         self.WANDB_INSTANCE = None
         self.WANDB_RUN_NAME = None
@@ -40,7 +40,7 @@ class Configuration:
 
         # insert the path of the generated and real orders with a relative path
         self.REAL_DATA_PATH = "ABIDES/log/paper/market_replay_INTC_2015-01-30_16-00-00/processed_orders.csv"
-        self.TRADES_DATA_PATH = "ABIDES/log/paper/world_agent_INTC_2015-01-30_11-00-00_val_ema=2.317/processed_orders.csv"
+        self.TRADES_DATA_PATH = "ABIDES/log/world_agent_INTC_2015-01-30_11-00-00_25_DDIM_0.0_1_val_ema=3.03_/processed_orders.csv"
         self.IABS_DATA_PATH = "ABIDES/log/paper/IABS_INTC_20150130_110000/processed_orders.csv"
         self.CGAN_DATA_PATH = "ABIDES/log/paper/world_agent_INTC_2015-01-30_11-00-00_20_val_ema=-1.05518_epoch=1_INTC_CGAN_lr_0.001_seq_size_256_seed_20/processed_orders.csv"
 
@@ -55,24 +55,20 @@ class Configuration:
         self.HYPER_PARAMETERS[LearningHyperParameter.DDIM_NSTEPS] = 10
         
         self.HYPER_PARAMETERS[LearningHyperParameter.SEQ_SIZE] = 256        #it's the sequencce length
-        self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be masked, so the events that we generate at a time
+        self.HYPER_PARAMETERS[LearningHyperParameter.MASKED_SEQ_SIZE] = 1      #it's the number of elements to be gen, so the events that we generate at a time
 
         self.HYPER_PARAMETERS[LearningHyperParameter.CONDITIONAL_DROPOUT] = 0.0
         self.HYPER_PARAMETERS[LearningHyperParameter.DROPOUT] = 0.1
-        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 10
+        self.HYPER_PARAMETERS[LearningHyperParameter.NUM_DIFFUSIONSTEPS] = 100
         self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] = 3
-        self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE] = False
-        if not self.HYPER_PARAMETERS[LearningHyperParameter.ONE_HOT_ENCODING_TYPE]:
-            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
-        else:
-            self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER
+        self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_ORDER_EMB] = cst.LEN_ORDER + self.HYPER_PARAMETERS[LearningHyperParameter.SIZE_TYPE_EMB] - 1
         
         self.HYPER_PARAMETERS[LearningHyperParameter.LAMBDA] = 0.01       #its the parameter used in the loss function to prevent L_vlb from overwhleming L_simple
         self.HYPER_PARAMETERS[LearningHyperParameter.P_NORM] = 2 if self.CHOSEN_STOCK == cst.Stocks.INTC else 5
         self.HYPER_PARAMETERS[LearningHyperParameter.REG_TERM_WEIGHT] = 1
-        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_DEPTH] = 8
-        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_MLP_RATIO] = 4
-        self.HYPER_PARAMETERS[LearningHyperParameter.TRADES_NUM_HEADS] = 1
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_DEPTH] = 8
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_MLP_RATIO] = 4
+        self.HYPER_PARAMETERS[LearningHyperParameter.CDT_NUM_HEADS] = 1
 
         self.BETAS = noise_scheduler(num_diffusion_timesteps=self.HYPER_PARAMETERS[cst.LearningHyperParameter.NUM_DIFFUSIONSTEPS])
 

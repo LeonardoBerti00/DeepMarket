@@ -60,16 +60,17 @@ if __name__ == "__main__":
         accelerator = "gpu"
 
     if (not config.IS_DATA_PREPROCESSED):
-        # prepare the datasets, this will save train.npy, val.npy and test.npy in the data directory
-        data_builder = LOBSTERDataBuilder(
-            stock_name=config.CHOSEN_STOCK.name,
-            data_dir=cst.DATA_DIR,
-            date_trading_days=cst.DATE_TRADING_DAYS,
-            split_rates=config.SPLIT_RATES,
-            chosen_model=config.CHOSEN_MODEL
-        )
-        data_builder.prepare_save_datasets()
-
+        for i in range(len(config.CHOSEN_STOCK)):
+            # prepare the datasets, this will save train.npy, val.npy and test.npy in the data directory
+            data_builder = LOBSTERDataBuilder(
+                stock_name=config.CHOSEN_STOCK[i].name,
+                data_dir=cst.DATA_DIR,
+                date_trading_days=cst.DATE_TRADING_DAYS,
+                split_rates=config.SPLIT_RATES,
+                chosen_model=config.CHOSEN_MODEL
+            )
+            data_builder.prepare_save_datasets()
+        
     if config.IS_WANDB:
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)

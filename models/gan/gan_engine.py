@@ -16,13 +16,14 @@ class GANEngine(LightningModule):
         super().__init__()
         self.IS_WANDB = config.IS_WANDB
         self.IS_DEBUG = config.IS_DEBUG
+        self.chosen_stock = config.CHOSEN_STOCK
+        if type(self.chosen_stock) == list:
+            self.chosen_stock = self.chosen_stock[0].name 
         self.lr = config.HYPER_PARAMETERS[LearningHyperParameter.LEARNING_RATE]
         self.optimizer = config.HYPER_PARAMETERS[LearningHyperParameter.OPTIMIZER]
         self.training = config.IS_TRAINING
         self.test_batch_size = config.HYPER_PARAMETERS[LearningHyperParameter.TEST_BATCH_SIZE]
         self.epochs = config.HYPER_PARAMETERS[LearningHyperParameter.EPOCHS]
-        self.chosen_stock = config.CHOSEN_STOCK.name
-        self.chosen_stock = config.CHOSEN_STOCK.name
         self.train_losses, self.vlb_train_losses, self.simple_train_losses = [], [], []
         self.val_ema_losses, self.test_ema_losses = [], []
         self.min_loss_ema = np.inf
@@ -110,7 +111,7 @@ class GANEngine(LightningModule):
     
     def sample(self, **kwargs):
         noise: torch.Tensor = kwargs['noise']
-        y: torch.Tensor = kwargs['y']
+        y: torch.Tensor = kwargs['cond_market_features']
         generated_order = self(noise, y)
         return generated_order
 
