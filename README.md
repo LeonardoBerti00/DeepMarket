@@ -2,7 +2,6 @@
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
 This is the official repository for the paper ...
 
-
 ## Introduction 
 DeepMarket offers the following features: 
 1. Pre-processing for high-frequency market data.
@@ -68,7 +67,7 @@ python main.py
 If your objective is to execute a market simulation this is the section for you.
 
 ## Generate a Market Simulation with TRADES checkpoint
-First of all you need to download the TRADES checkpoints from [link](), then place the checkpoints in data/checkpoints/TRADES/.
+First of all you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC.
 To execute a market simulation with a TRADES checkpoint, there are two options:
 1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally you can run the following command:
 ```sh
