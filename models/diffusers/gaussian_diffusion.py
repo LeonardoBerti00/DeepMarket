@@ -132,10 +132,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             orig_cond_lob = None
         t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
         x_t, noise = self.forward_reparametrized(x_0, t)
+        x_t_orig = x_t
         for i in range(self.num_diffusionsteps-1, -1, -1):
             # augment
             x_t_aug, cond_orders, cond_lob = self.augment(x_t, orig_cond_orders, orig_cond_lob)
-            x_t = self.ddpm_single_step(x_0, x_t_aug, x_t, t, cond_orders, noise, weights, cond_lob)
+            x_t = self.ddpm_single_step(x_0, x_t_aug, x_t_orig, t, cond_orders, noise, weights, cond_lob)
             t -= 1
         return x_t
 

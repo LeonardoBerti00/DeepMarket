@@ -59,26 +59,30 @@ python main.py
 To train a TRADES model, you need to follow these steps:
 1. Set the CHOSEN_MODEL in configuration.py to cst.Models.TRADES
 2. Optionally, adjust the simulation parameters in `configuration.py`.
-2. Now you can run the main.py with:
+3. Now you can run the main.py with:
 ```sh
 python main.py
 ```
 
-# Generate a Market Simulation with TRADES checkpoint
+# Market Simulation
+If your objective is to execute a market simulation this is the section for you.
+
+## Generate a Market Simulation with TRADES checkpoint
+First of all you need to download the TRADES checkpoints from [link](), then place the checkpoints in data/checkpoints/TRADES/.
 To execute a market simulation with a TRADES checkpoint, there are two options:
-1. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC in the following point. Then you need to simply run the following command, inserting the stock symbol and the date that you want to simulate:
+1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally you can run the following command:
 ```sh
-python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
-```
-2. The second possibility is that you do not have LOBSTER data. In this case you can go to [LOBSTER](https://lobsterdata.com/info/DataSamples.php), download one of the available stock with 10 levels, unzip the dir and places the two XLS file in data/{stock_name}/{stock_name}_2012-06-21_2012-06-21. Finally you can run the following command:
-```sh
-python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' 
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.0178
 ```
 Since the model was not trained with this data we cannot guarantee good performance. 
 
+2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_DIR setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
+```sh
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
+```
 If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
 
-# Running a Market Simulation with IABS configuration
+## Running a Market Simulation with IABS configuration
 If you want to run the IABS configuration:
 ```sh
 python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 

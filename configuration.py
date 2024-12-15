@@ -20,7 +20,7 @@ class Configuration:
         self.IS_DATA_PREPROCESSED = True
         self.SPLIT_RATES = (.85, .05, .10)
 
-        self.CHOSEN_MODEL = cst.Models.CGAN
+        self.CHOSEN_MODEL = cst.Models.TRADES
         self.CHOSEN_AUGMENTER = "MLP"
         self.CHOSEN_COND_AUGMENTER = "MLP"
         self.SAMPLING_TYPE = "DDPM" #it can be DDPM or DDIM

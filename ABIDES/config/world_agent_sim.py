@@ -97,7 +97,7 @@ parser.add_argument('-seed',
 parser.add_argument('-type',
                     '--sampling-type',
                     type=str,
-                    default='DDPM',
+                    default='DDIM',
                     help='Sampling type for diffusion')
 parser.add_argument('-eta',
                     '--ddim-eta',
