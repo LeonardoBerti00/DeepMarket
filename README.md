@@ -9,6 +9,7 @@ DeepMarket offers the following features:
 3. Hyperparameter search facilitated with WANDB. 
 4. Implementations and checkpoints for TRADES and CGAN to directly generate market simulations without training.
 5. comprehensive qualitative (via the plots in the paper) and quantitative (via the predictive score) evaluation. 
+
 To perform the simulation with our world agent and historical data, we extend ABIDES, an open-source agent-based interactive Python tool.
 
 # Getting Started 
