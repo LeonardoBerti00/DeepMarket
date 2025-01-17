@@ -93,7 +93,7 @@ def plot_data(pca, pca2, generated_path):
 
     # Add legend and title
     plt.legend()
-    file_name = "PCA_plot.png"
+    file_name = "PCA_plot.pdf"
     generated_path = os.path.dirname(generated_path)
     file_path = os.path.join(generated_path, file_name)
     plt.title(f'PCA 2D Plot for {label}')

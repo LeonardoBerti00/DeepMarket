@@ -149,9 +149,11 @@ def main(real_data_path, generated_data_path):
     df_r = df_r.query("bid_price_1 < 9999999")
     df_r = df_r.query("ask_price_1 > -9999999")
     df_r = df_r.query("bid_price_1 > -9999999")
+    
     print("size of real data: ", len(df_r))
     print("size of generated data: ", len(df_g))
     # undersampling on the real dataset
+    '''
     if len(df_r) > len(df_g):
         n_remove = len(df_r) - len(df_g)
         drop_indices = np.random.choice(df_r.index, n_remove, replace=False)
@@ -160,6 +162,7 @@ def main(real_data_path, generated_data_path):
         n_remove = len(df_g) - len(df_r)
         drop_indices = np.random.choice(df_g.index, n_remove, replace=False)
         df_g = df_g.drop(drop_indices)
+    '''
     print("size of real data after undersampling: ", len(df_r))
     print("size of generated data after undersampling: ", len(df_g))
     df_r = Preprocessor(df_r).preprocess()
@@ -192,11 +195,11 @@ def main(real_data_path, generated_data_path):
 
     model_r = LSTMModel(input_size=train_X_r.shape[1], hidden_size=128, num_layers=2, output_size=1)
     model_r.to(device)
-    print("Predictive Score Real data:")
+    #print("Predictive Score Real data:")
     trainer_r = Trainer(model=model_r, train_loader=train_loader_r, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_r.parameters(), lr=0.001), device=device)
-    trainer_r.train(epochs=100)
+    #trainer_r.train(epochs=100)
     
-    trainer_r.test()
+    #trainer_r.test()
     print("\n Predictive Score Generated data:")
     ############ TEST "generated" lstm on "real" test set ############
 
@@ -205,7 +208,7 @@ def main(real_data_path, generated_data_path):
     labels_g = df_g['MID_PRICE'].values
 
     # Split the data into training and test sets
-    train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=0.2, random_state=42)
+    train_X_g, test_X_g, train_y_g, test_y_g = train_test_split(features_g, labels_g, test_size=2, random_state=42)
     train_X_g = np.concatenate([train_X_g[:, :7], train_X_g[:, -4:]], axis=1)
     # Convert to PyTorch tensors
     train_X_g = torch.tensor(train_X_g, dtype=torch.float32).to(device, non_blocking=True)
@@ -251,8 +254,8 @@ def main(real_data_path, generated_data_path):
     model_g.to(device)
 
     trainer_g = Trainer(model=model_g, train_loader=train_loader, test_loader=test_loader_r, criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model_g.parameters(), lr=0.001), device=device)
-    trainer_g.train(epochs=100)
-    trainer_g.test()
+    #trainer_g.train(epochs=100)
+    #trainer_g.test()
 
 if __name__ == '__main__':
     main()

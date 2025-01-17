@@ -26,9 +26,9 @@ def main(real_path, TRADES_path, cgan_path):
     
     sns.set(style="whitegrid")
 
-    sns.kdeplot(log_returns_real, shade=True, color="blue", label='Real', alpha=0.15)
-    sns.kdeplot(log_returns_TRADES, shade=True, color="red", label='TRADES', alpha=0.15)
-    sns.kdeplot(log_returns_cgan, shade=True, color="green", label='CGAN', alpha=0.15)
+    sns.kdeplot(log_returns_real, shade=True, color="orange", label='Real', alpha=0.15)
+    sns.kdeplot(log_returns_TRADES, shade=True, color="blue", label='TRADES', alpha=0.15)
+    sns.kdeplot(log_returns_cgan, shade=True, color="red", label='CGAN', alpha=0.15)
 
     plt.yscale('log')
 

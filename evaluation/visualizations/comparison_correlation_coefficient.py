@@ -27,10 +27,10 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
     
     sns.set(style="whitegrid")
 
-    sns.kdeplot(correlation_real, shade=True, color="blue", label='Real')
+    sns.kdeplot(correlation_real, shade=True, color="orange", label='Real')
     sns.kdeplot(correlation_iabs, shade=True, color="green", label='IABS')
-    sns.kdeplot(correlation_TRADES, shade=True, color="red", label='TRADES')
-    sns.kdeplot(correlation_cgan, shade=True, color="purple", label='CGAN')
+    sns.kdeplot(correlation_TRADES, shade=True, color="blue", label='TRADES')
+    sns.kdeplot(correlation_cgan, shade=True, color="red", label='CGAN')
 
     plt.xlabel('Correlation Coefficient')
     plt.ylabel('Frequency')

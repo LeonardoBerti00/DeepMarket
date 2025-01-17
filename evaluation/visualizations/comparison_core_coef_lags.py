@@ -85,10 +85,10 @@ def main(real_path, TRADES_path, iabs_path, cgan_path):
     correlations_iabs = compute_correlation_by_lag(log_returns_iabs, 30)
     correlations_cgan = compute_correlation_by_lag(log_returns_cgan, 30)
     
-    plt.plot(range(1, 31, 2), correlations_real, marker='o', linestyle='-', label='Real')
-    plt.plot(range(1, 31, 2), correlations_TRADES, marker='o', linestyle='-', label='TRADES')
-    plt.plot(range(1, 31, 2), correlations_iabs, marker='o', linestyle='-', label='IABS')
-    plt.plot(range(1, 31, 2), correlations_cgan, marker='o', linestyle='-', label='CGAN')
+    plt.plot(range(1, 31, 2), correlations_real, marker='o', linestyle='-', label='Real', color='orange')
+    plt.plot(range(1, 31, 2), correlations_TRADES, marker='o', linestyle='-', label='TRADES', color='blue')
+    plt.plot(range(1, 31, 2), correlations_iabs, marker='o', linestyle='-', label='IABS', color='green')
+    plt.plot(range(1, 31, 2), correlations_cgan, marker='o', linestyle='-', label='CGAN', color='red')
 
     plt.xlabel('Lag (minutes)')
     plt.ylabel('Correlation Coefficient')
