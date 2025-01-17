@@ -1,4 +1,4 @@
-# DeepMarket: Conditioned Diffusion Models for Realistic Market Simulation
+# DeepMarket
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
 This is the official repository for the paper ...
 
