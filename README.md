@@ -9,6 +9,7 @@ DeepMarket offers the following features:
 3. Hyperparameter search facilitated with WANDB. 
 4. Implementations and checkpoints for TRADES and CGAN to directly generate market simulations without training.
 5. comprehensive qualitative (via the plots in the paper) and quantitative (via the predictive score) evaluation. 
+
 To perform the simulation with our world agent and historical data, we extend ABIDES, an open-source agent-based interactive Python tool.
 
 # Getting Started 
@@ -34,11 +35,37 @@ conda env create -f environment.yml
 conda activate deepmarket
 ```
 
+# Market Simulation
+If your objective is to execute a market simulation this is the section for you.
+
+## Generate a Market Simulation with TRADES checkpoint
+First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC.
+To execute a market simulation with a TRADES checkpoint, there are two options:
+1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally, you can run the following command:
+```sh
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.317
+```
+Since the model was not trained with this data we cannot guarantee good performance. 
+
+2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_DIR setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
+```sh
+python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
+```
+If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
+
+## Running a Market Simulation with IABS configuration
+If you want to run the IABS configuration:
+```sh
+python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 
+```
+
+When the simulation ends a log dir will be saved in ABIDES/log, here you can find the processed orders of the simulation, and all the plots used to in the paper to evaluate the stylized facts. At the end of the simulation also the predictive score will be computed. 
+
 # Training
-If your objective is to train a TRADES model or implement your model you should follow those steps. If your objective is to simply execute a market simulation skip this section.
+If your objective is to train a TRADES model or implement your model you should follow those steps.
 
 ## Data 
-1. Firstly you need to have some LOBSTER data otherwise it would be impossible to train a new model. The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". Type can be or message or orderbook.
+1. Firstly you need to have some LOBSTER data otherwise it would be impossible to train a new model. The format of the data should be the same as LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The type can be a message or orderbook.
 2. You need to add the new stock to the constants and to the config file.
 3. You need to start the preprocessing setting, to do so set config.IS_DATA_PREPROCESSED to False and run python main.py
 
@@ -63,28 +90,4 @@ To train a TRADES model, you need to follow these steps:
 python main.py
 ```
 
-# Market Simulation
-If your objective is to execute a market simulation this is the section for you.
 
-## Generate a Market Simulation with TRADES checkpoint
-First of all you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC.
-To execute a market simulation with a TRADES checkpoint, there are two options:
-1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally you can run the following command:
-```sh
-python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.0178
-```
-Since the model was not trained with this data we cannot guarantee good performance. 
-
-2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_DIR setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
-```sh
-python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
-```
-If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
-
-## Running a Market Simulation with IABS configuration
-If you want to run the IABS configuration:
-```sh
-python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 
-```
-
-When the simulation ends a log dir will be saved in ABIDES/log, here you can find the processed orders of the simulation, and all the plots used to in the paper to evaluate the stylized facts. At the end of the simulation also the predictive score will be computed. 
