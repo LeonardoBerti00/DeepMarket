@@ -123,7 +123,7 @@ def run_wandb(config: Configuration, accelerator):
                 if param.value in model_params:
                     run_name += str(param.value[:3]) + "_" + str(model_params[param.value]) + "_"
 
-        run = wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="leonardo-berti07")
+        run = wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="")
         if config.IS_SWEEP:
             model_params = run.config
                        

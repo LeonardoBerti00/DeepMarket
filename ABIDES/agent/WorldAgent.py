@@ -113,17 +113,17 @@ class WorldAgent(Agent):
         super().wakeup(currentTime)
         #make a print every 5 minutes
         
-        if currentTime.minute % 1 == 0 and currentTime.second == 00:
+        if currentTime.minute % 5 == 0 and currentTime.second == 00:
             print("Current time: {}".format(currentTime))
-            print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
-            print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
-            print("Number of generated cancel orders matched: {}".format(self.diff_cancel_order_placed))
-            print("Number of negative size: {}".format(self.count_neg_size))
-            print("Number of generated placed orders: {}".format(self.count_diff_placed_orders))
-            print("Of which {} market order and {} limit order".format(self.diff_market_order_placed, self.diff_limit_order_placed))
+            #print("Number of generated orders out of depth: {}".format(self.generated_orders_out_of_depth))
+            #print("Number of generated cancel orders unmatched: {}".format(self.generated_cancel_orders_empty_depth))
+            #print("Number of generated cancel orders matched: {}".format(self.diff_cancel_order_placed))
+            #print("Number of negative size: {}".format(self.count_neg_size))
+            #print("Number of generated placed orders: {}".format(self.count_diff_placed_orders))
+            #print("Of which {} market order and {} limit order".format(self.diff_market_order_placed, self.diff_limit_order_placed))
             now = datetime.datetime.now()
             current_time = now.strftime("%H:%M:%S")
-            print("Current Time =", current_time)
+            #print("Current Time =", current_time)
 
         if self.first_wakeup:
             self.state = 'PRE_GENERATING'

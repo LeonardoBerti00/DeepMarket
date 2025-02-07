@@ -1,6 +1,6 @@
-# DeepMarket: Conditioned Diffusion Models for Realistic Market Simulation
+# DeepMarket: Limit Order Book (LOB) simulation with Deep Learning.
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
-This is the official repository for the paper ...
+This is also the official repository for the paper 'TRADES: Generating Realistic Market Simulations with Diffusion Models'.
 
 ## Introduction 
 DeepMarket offers the following features: 
@@ -16,7 +16,7 @@ To perform the simulation with our world agent and historical data, we extend AB
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
 ## Prerequisities
-This project requires Python and Conda. If you don't have them installed, please do so first. It is possible to do it using pip, but in that case you are on you own.   
+This project requires Python and pip. If you don't have them installed, please do so first.   
 
 ## Installing
 To set up the environment for this project, follow these steps:
@@ -26,13 +26,17 @@ To set up the environment for this project, follow these steps:
 git clone <repository_url>
 ```
 2. Navigate to the project directory
-3. Create a new Conda environment using the environment.yml file:
+3. Create a virtual environment:
 ```sh
-conda env create -f environment.yml
+python -m venv env
 ```
 4. Activate the new Conda environment:
 ```sh
-conda activate deepmarket
+env\Scripts\activate
+```
+5. Download the necessary packages:
+```sh
+pip install -r requirements.txt
 ```
 
 # Market Simulation
@@ -43,11 +47,11 @@ First of all, you need to download the TRADES checkpoints from [link](https://dr
 To execute a market simulation with a TRADES checkpoint, there are two options:
 1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally, you can run the following command:
 ```sh
-python -u ABIDES/abides.py -c world_agent_sim -t ${stock_name} -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.317
+python -u ABIDES/abides.py -c world_agent_sim -t INTC -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.317
 ```
 Since the model was not trained with this data we cannot guarantee good performance. 
 
-2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_DIR setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
+2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_TRAING_DAYS setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
 ```sh
 python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
 ```
@@ -67,7 +71,8 @@ If your objective is to train a TRADES model or implement your model you should 
 ## Data 
 1. Firstly you need to have some LOBSTER data otherwise it would be impossible to train a new model. The format of the data should be the same as LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The type can be a message or orderbook.
 2. You need to add the new stock to the constants and to the config file.
-3. You need to start the preprocessing setting, to do so set config.IS_DATA_PREPROCESSED to False and run python main.py
+3. you need to change cst.DATE_TRAING_DAYS setting the start day and end day
+4. You need to start the preprocessing setting, to do so set config.IS_DATA_PREPROCESSED to False and run python main.py
 
 ## Implementing and Training a new model 
 To train a new model, follow these steps:

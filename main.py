@@ -74,7 +74,7 @@ if __name__ == "__main__":
     if config.IS_WANDB:
         if config.IS_SWEEP:
             sweep_config = sweep_init(config)
-            sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME, entity="leonardo-berti07")
+            sweep_id = wandb.sweep(sweep_config, project=cst.PROJECT_NAME, entity="")
             wandb.agent(sweep_id, run_wandb(config, accelerator), count=sweep_config["run_cap"])
         else:
             start_wandb = run_wandb(config, accelerator)
