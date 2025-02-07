@@ -98,17 +98,17 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
 
     #do the same thing for prices
     if (mean_prices is None) or (std_prices is None):
-        mean_prices = data.iloc[:, 0::2].stack().mean() #price
-        std_prices = data.iloc[:, 0::2].stack().std() #price
+        mean_prices = data.iloc[:, 0::2].stack().mean()
+        std_prices = data.iloc[:, 0::2].stack().std()
 
     # apply the z score to the original data using .loc with explicit float cast
     price_cols = data.columns[0::2]
     size_cols = data.columns[1::2]
 
     #apply the z score to the original data
-    for col in price_cols:
+    for col in size_cols:
         data[col] = data[col].astype("float64")
-        data[col] = (data[col] - mean_prices) / std_prices
+        data[col] = (data[col] - mean_size) / std_size
 
     for col in price_cols:
         data[col] = data[col].astype("float64")
