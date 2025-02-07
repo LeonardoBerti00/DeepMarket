@@ -9,6 +9,7 @@ DeepMarket offers the following features:
 3. Hyperparameter search facilitated with WANDB. 
 4. Implementations and checkpoints for TRADES and CGAN to directly generate market simulations without training.
 5. comprehensive qualitative (via the plots in the paper) and quantitative (via the predictive score) evaluation. 
+6. TRADES-LOB: a synthetic LOB dataset in data/TRADES-LOB. 
 
 To perform the simulation with our world agent and historical data, we extend ABIDES, an open-source agent-based interactive Python tool.
 
@@ -95,4 +96,6 @@ To train a TRADES model, you need to follow these steps:
 python main.py
 ```
 
+# TRADES-LOB: A synthetic LOB dataset 
+In order to foster collaboration and help the research community we release a synthetic LOB dataset: TRADES-LOB. TRADES-LOB comprises simulated TRADES market data for Tesla and Intel, for 29/01 and 30/01. Specifically, the dataset is structured into four CSV files, each containing 50 columns. The initial six columns delineate the order features, followed by 40 columns that represent a snapshot of the LOB across the top 10 levels. The concluding four columns provide key financial metrics: mid-price, spread, order volume imbalance, and Volume-Weighted Average Price (VWAP), which can be useful for downstream financial tasks, such as stock price prediction. In total the dataset is composed of 265,986 rows and 13,299,300 cells, which is similar in size to the benchmark FI-2010 dataset.
 
