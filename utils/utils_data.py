@@ -101,10 +101,18 @@ def z_score_orderbook(data, mean_size=None, mean_prices=None, std_size=None, std
         mean_prices = data.iloc[:, 0::2].stack().mean() #price
         std_prices = data.iloc[:, 0::2].stack().std() #price
 
+    # apply the z score to the original data using .loc with explicit float cast
+    price_cols = data.columns[0::2]
+    size_cols = data.columns[1::2]
+
     #apply the z score to the original data
-    data.iloc[:, 1::2] = (data.iloc[:, 1::2] - mean_size) / std_size
-    #do the same thing for prices
-    data.iloc[:, 0::2] = (data.iloc[:, 0::2] - mean_prices) / std_prices
+    for col in price_cols:
+        data[col] = data[col].astype("float64")
+        data[col] = (data[col] - mean_prices) / std_prices
+
+    for col in price_cols:
+        data[col] = data[col].astype("float64")
+        data[col] = (data[col] - mean_prices) / std_prices
 
     # check if there are null values, then raise value error
     if data.isnull().values.any():

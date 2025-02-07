@@ -207,7 +207,7 @@ DIR_EXPERIMENTS = "data/experiments"
 DIR_SAVED_MODEL = "data/checkpoints"
 DATA_DIR = "data"
 RECON_DIR = "data/reconstructions"
-PROJECT_NAME = "CDTS"
+PROJECT_NAME = ""
 SPLIT_RATES = (.85, .05, .10)
 
 

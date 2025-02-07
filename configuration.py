@@ -17,7 +17,7 @@ class Configuration:
 
         self.IS_AUGMENTATION = True
 
-        self.IS_DATA_PREPROCESSED = True
+        self.IS_DATA_PREPROCESSED = False
         self.SPLIT_RATES = (.85, .05, .10)
 
         self.CHOSEN_MODEL = cst.Models.TRADES

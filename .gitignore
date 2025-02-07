@@ -16,5 +16,5 @@ data/real_orders.csv
 wandb/
 output
 launch.sh
+env
 launch_sim.sh
-trades

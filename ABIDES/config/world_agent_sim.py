@@ -191,7 +191,7 @@ if args.diffusion:
             except:
                 continue
     print("checkpoint used: ", checkpoint_reference)
-    checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE)
+    checkpoint = torch.load(checkpoint_reference, map_location=cst.DEVICE, weights_only=False)
     checkpoint["hyper_parameters"]["chosen_model"] = chosen_model
     config = checkpoint["hyper_parameters"]["config"]
     config.IS_WANDB = False
