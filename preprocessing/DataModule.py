@@ -1,9 +1,9 @@
-import pytorch_lightning as pl
+import lightning as L
 from torch.utils.data import DataLoader
 import constants as cst
 
 
-class DataModule(pl.LightningDataModule):
+class DataModule(L.LightningDataModule):
     """ Splits the datasets in TRAIN, VALIDATION. """
 
     def   __init__(self, train_set, val_set, batch_size, test_batch_size,  num_workers=16):
