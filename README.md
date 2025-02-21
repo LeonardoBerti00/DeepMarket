@@ -44,8 +44,8 @@ pip install -r requirements.txt
 ```
 
 # Market Simulation
-![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations-1.png)
 If your objective is to execute a market simulation this is the section for you.
+![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations-1.png)
 
 ## Generate a Market Simulation with TRADES checkpoint
 First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC. 
