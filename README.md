@@ -44,7 +44,7 @@ pip install -r requirements.txt
 ```
 
 # Market Simulation
-![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations.jpg)
+![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations.pdf)
 If your objective is to execute a market simulation this is the section for you.
 
 ## Generate a Market Simulation with TRADES checkpoint
