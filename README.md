@@ -44,6 +44,7 @@ pip install -r requirements.txt
 ```
 
 # Market Simulation
+![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations.jpg)
 If your objective is to execute a market simulation this is the section for you.
 
 ## Generate a Market Simulation with TRADES checkpoint
@@ -92,6 +93,7 @@ python main.py
 6. A checkpoint will be saved in data/checkpoints/ that later you can use to perform a market simulation
 
 ## Training a TRADES Model 
+![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
 To train a TRADES model, you need to follow these steps:
 1. Set the CHOSEN_MODEL in configuration.py to cst.Models.TRADES
 2. Optionally, adjust the simulation parameters in `configuration.py`.
