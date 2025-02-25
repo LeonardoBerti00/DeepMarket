@@ -102,5 +102,16 @@ To train a TRADES model, you need to follow these steps:
 python main.py
 ```
 
+# Citing
+If you use the framework in a research project please cite:
+@misc{berti2025tradesgeneratingrealisticmarket,
+      title={TRADES: Generating Realistic Market Simulations with Diffusion Models}, 
+      author={Leonardo Berti and Bardh Prenkaj and Paola Velardi},
+      year={2025},
+      eprint={2502.07071},
+      archivePrefix={arXiv},
+      primaryClass={q-fin.TR},
+      url={https://arxiv.org/abs/2502.07071}, 
+}
 
 
