@@ -104,6 +104,7 @@ python main.py
 
 # Citing
 If you use the framework in a research project please cite:
+```sh
 @misc{berti2025tradesgeneratingrealisticmarket,
       title={TRADES: Generating Realistic Market Simulations with Diffusion Models}, 
       author={Leonardo Berti and Bardh Prenkaj and Paola Velardi},
@@ -113,5 +114,5 @@ If you use the framework in a research project please cite:
       primaryClass={q-fin.TR},
       url={https://arxiv.org/abs/2502.07071}, 
 }
-
+```
 
