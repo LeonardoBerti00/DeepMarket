@@ -1,6 +1,6 @@
 # DeepMarket: Limit Order Book (LOB) simulation with Deep Learning.
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
-This is also the official repository for the paper 'TRADES: Generating Realistic Market Simulations with Diffusion Models'.
+This is also the official repository for the paper [TRADES: Generating Realistic Market Simulations with Diffusion Models](https://arxiv.org/abs/2502.07071).
 
 ## Introduction 
 DeepMarket offers the following features: 
