@@ -1,6 +1,6 @@
 # DeepMarket: Limit Order Book (LOB) simulation with Deep Learning.
 DeepMarket is a Python-based open-source framework developed for Limit Order Book (LOB) simulation with Deep Learning.
-This is also the official repository for the paper 'TRADES: Generating Realistic Market Simulations with Diffusion Models'.
+This is also the official repository for the paper [TRADES: Generating Realistic Market Simulations with Diffusion Models](https://arxiv.org/abs/2502.07071).
 
 ## Introduction 
 DeepMarket offers the following features: 
@@ -13,6 +13,9 @@ DeepMarket offers the following features:
 
 To perform the simulation with our world agent and historical data, we extend ABIDES, an open-source agent-based interactive Python tool.
 
+## TRADES-LOB: A synthetic LOB dataset 
+To foster collaboration and help the research community we release a synthetic LOB dataset: TRADES-LOB. TRADES-LOB comprises simulated TRADES market data for Tesla and Intel, for 29/01 and 30/01. Specifically, the dataset is structured into four CSV files, each containing 50 columns. The initial six columns delineate the order features, followed by 40 columns that represent a snapshot of the LOB across the top 10 levels. The concluding four columns provide key financial metrics: mid-price, spread, order volume imbalance, and Volume-Weighted Average Price (VWAP), which can be useful for downstream financial tasks, such as stock price prediction. In total, the dataset is composed of 265,986 rows and 13,299,300 cells, which is similar in size to the benchmark FI-2010 dataset.
+
 # Getting Started 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
@@ -24,7 +27,7 @@ To set up the environment for this project, follow these steps:
 
 1. Clone the repository:
 ```sh
-git clone <repository_url>
+git clone https://github.com/LeonardoBerti00/DeepMarket.git
 ```
 2. Navigate to the project directory
 3. Create a virtual environment:
@@ -42,9 +45,10 @@ pip install -r requirements.txt
 
 # Market Simulation
 If your objective is to execute a market simulation this is the section for you.
+![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations-1.png)
 
 ## Generate a Market Simulation with TRADES checkpoint
-First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC.
+First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC. 
 To execute a market simulation with a TRADES checkpoint, there are two options:
 1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally, you can run the following command:
 ```sh
@@ -56,7 +60,10 @@ Since the model was not trained with this data we cannot guarantee good performa
 ```sh
 python -u ABIDES/abides.py -c world_agent_sim -t ${stock_symbol} -date ${date} -d True -m TRADES -st '09:30:00' -et '12:00:00' 
 ```
+
+When the simulation ends a log dir will be saved in ABIDES/log, here you can find the processed orders of the simulation, and all the plots used to in the paper to evaluate the stylized facts. At the end of the simulation also the predictive score will be computed. 
 If you want to perform a simulation with CGAN you need simply to change the -m option to CGAN.
+To reproduce the results of the paper you need exactly the same data, so TSLA or INTC of 29/01/2015 or 30/01/2015.
 
 ## Running a Market Simulation with IABS configuration
 If you want to run the IABS configuration:
@@ -64,10 +71,8 @@ If you want to run the IABS configuration:
 python -u ABIDES/abides.py -c rsmc_03 -date 20150130 -st '09:30:00' -et '12:00:00' 
 ```
 
-When the simulation ends a log dir will be saved in ABIDES/log, here you can find the processed orders of the simulation, and all the plots used to in the paper to evaluate the stylized facts. At the end of the simulation also the predictive score will be computed. 
-
 # Training
-If your objective is to train a TRADES model or implement your model you should follow those steps.
+If you aim to train a TRADES model or implement your model you should follow those steps.
 
 ## Data 
 1. Firstly you need to have some LOBSTER data otherwise it would be impossible to train a new model. The format of the data should be the same as LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}" and the data should be saved in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The type can be a message or orderbook.
@@ -88,6 +93,7 @@ python main.py
 6. A checkpoint will be saved in data/checkpoints/ that later you can use to perform a market simulation
 
 ## Training a TRADES Model 
+![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
 To train a TRADES model, you need to follow these steps:
 1. Set the CHOSEN_MODEL in configuration.py to cst.Models.TRADES
 2. Optionally, adjust the simulation parameters in `configuration.py`.
@@ -96,6 +102,17 @@ To train a TRADES model, you need to follow these steps:
 python main.py
 ```
 
-# TRADES-LOB: A synthetic LOB dataset 
-In order to foster collaboration and help the research community we release a synthetic LOB dataset: TRADES-LOB. TRADES-LOB comprises simulated TRADES market data for Tesla and Intel, for 29/01 and 30/01. Specifically, the dataset is structured into four CSV files, each containing 50 columns. The initial six columns delineate the order features, followed by 40 columns that represent a snapshot of the LOB across the top 10 levels. The concluding four columns provide key financial metrics: mid-price, spread, order volume imbalance, and Volume-Weighted Average Price (VWAP), which can be useful for downstream financial tasks, such as stock price prediction. In total the dataset is composed of 265,986 rows and 13,299,300 cells, which is similar in size to the benchmark FI-2010 dataset.
+# Citing
+If you use the framework in a research project please cite:
+```sh
+@misc{berti2025tradesgeneratingrealisticmarket,
+      title={TRADES: Generating Realistic Market Simulations with Diffusion Models}, 
+      author={Leonardo Berti and Bardh Prenkaj and Paola Velardi},
+      year={2025},
+      eprint={2502.07071},
+      archivePrefix={arXiv},
+      primaryClass={q-fin.TR},
+      url={https://arxiv.org/abs/2502.07071}, 
+}
+```
 
