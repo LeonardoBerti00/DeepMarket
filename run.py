@@ -162,7 +162,6 @@ def run_wandb(config: Configuration, accelerator):
             profiler=None,
             val_check_interval=0.5,
             check_val_every_n_epoch=1,
-            #gradient_clip_val=5.0 if during training comes out the error "nan" impose gradient clip
         )
 
         # log simulation details in WANDB console

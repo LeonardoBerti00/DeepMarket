@@ -136,11 +136,54 @@ agent_count, agents, agent_types = 0, [], []
 
 # Hyperparameters
 symbol = args.ticker
+#check if INTC is zip or unzip
+path = "{}/{}/{}_{}_{}".format(
+            cst.DATA_DIR,
+            symbol,
+            symbol,
+            cst.DATE_TRADING_DAYS[0],
+            cst.DATE_TRADING_DAYS[-1]
+        )
+if symbol == "INTC" and not Path(path).exists():
+    print("INTC is not unzipped, unzipping...")
+    import zipfile
+    with zipfile.ZipFile(cst.DATA_DIR + f"/{symbol}/{symbol}.zip", 'r') as zip_ref:
+        zip_ref.extractall(cst.DATA_DIR + f"/{symbol}")
+    print("INTC unzipped")
+
 if args.chosen_model == "TRADES":
     chosen_model = cst.Models.TRADES
 elif args.chosen_model == "CGAN":
     chosen_model = cst.Models.CGAN
-    
+
+#check if there are the checkpoints in data/checkpoints
+if args.diffusion:
+    dir_path = Path(cst.DIR_SAVED_MODEL + "/" + str(chosen_model.value))
+    if not dir_path.exists():
+        print("Checkpoints not found, downloading...")
+        try:
+            import gdown
+            
+            # Create the directory if it doesn't exist
+            dir_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Google Drive folder ID
+            folder_id = '1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W'
+            
+            # Use gdown's download_folder functionality
+            gdown.download_folder(
+                id=folder_id,
+                output=str(dir_path),
+                quiet=False,
+                use_cookies=False
+            )
+            print("Checkpoints downloaded successfully")
+            
+        except Exception as e:
+            print(f"Error downloading checkpoints: {str(e)}")
+            print("Please ensure you have a working internet connection")
+            sys.exit(1)
+
 normalization_terms = load_compute_normalization_terms(symbol, cst.DATA_DIR, chosen_model, n_lob_levels=10)
 starting_cash = 100000000000  # Cash in this simulator is always in CENTS.
 

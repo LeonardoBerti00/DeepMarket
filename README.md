@@ -48,13 +48,13 @@ If your objective is to execute a market simulation this is the section for you.
 ![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations-1.png)
 
 ## Generate a Market Simulation with TRADES checkpoint
-First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC. 
+![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
 To execute a market simulation with a TRADES checkpoint, there are two options:
-1. If you do not have LOBSTER data, you can unzip INTC.zip and places the dir unzipped named INTC_2012-06-21_2012-06-21 in INTC. Finally, you can run the following command:
+1. If you do not have LOBSTER data, you can run the following command:
 ```sh
 python -u ABIDES/abides.py -c world_agent_sim -t INTC -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.317
 ```
-Since the model was not trained with this data we cannot guarantee good performance. 
+The data that you are going to use is from [LOBSTER](https://lobsterdata.com/info/DataSamples.php). Since the model was not trained with this data we cannot guarantee good performance. 
 
 2. If you have LOBSTER data you need to save the data in f"data/{stock_name}/{stock_name}_{year}-{start_month}-{start_day}_{year}-{end_month}-{end_day}". The format of the data should be the same of LOBSTER: f"{year}-{month}-{day}_34200000_57600000_{type}". You can see an example with INTC. Then you need to simply change cst.DATE_TRAING_DAYS setting the start day and end day, run the following command, inserting the stock symbol and the date that you want to simulate:
 ```sh
@@ -93,7 +93,6 @@ python main.py
 6. A checkpoint will be saved in data/checkpoints/ that later you can use to perform a market simulation
 
 ## Training a TRADES Model 
-![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
 To train a TRADES model, you need to follow these steps:
 1. Set the CHOSEN_MODEL in configuration.py to cst.Models.TRADES
 2. Optionally, adjust the simulation parameters in `configuration.py`.
