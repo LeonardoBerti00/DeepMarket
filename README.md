@@ -25,10 +25,7 @@ This project requires Python and pip. If you don't have them installed, please d
 ## Installing
 To set up the environment for this project, follow these steps:
 
-1. Clone the repository:
-```sh
-git clone https://github.com/LeonardoBerti00/DeepMarket.git
-```
+1. Clone the repository
 2. Navigate to the project directory
 3. Create a virtual environment:
 ```sh
@@ -45,10 +42,8 @@ pip install -r requirements.txt
 
 # Market Simulation
 If your objective is to execute a market simulation this is the section for you.
-![TRADES's simulations mid-price traces](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/simulations-1.png)
 
 ## Generate a Market Simulation with TRADES checkpoint
-![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
 To execute a market simulation with a TRADES checkpoint, there are two options:
 1. If you do not have LOBSTER data, you can run the following command:
 ```sh
@@ -101,17 +96,4 @@ To train a TRADES model, you need to follow these steps:
 python main.py
 ```
 
-# Citing
-If you use the framework in a research project please cite:
-```sh
-@misc{berti2025tradesgeneratingrealisticmarket,
-      title={TRADES: Generating Realistic Market Simulations with Diffusion Models}, 
-      author={Leonardo Berti and Bardh Prenkaj and Paola Velardi},
-      year={2025},
-      eprint={2502.07071},
-      archivePrefix={arXiv},
-      primaryClass={q-fin.TR},
-      url={https://arxiv.org/abs/2502.07071}, 
-}
-```
 
