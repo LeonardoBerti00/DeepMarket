@@ -123,7 +123,7 @@ def run_wandb(config: Configuration, accelerator):
                 if param.value in model_params:
                     run_name += str(param.value[:3]) + "_" + str(model_params[param.value]) + "_"
 
-        run = wandb.init(project=cst.PROJECT_NAME, name=run_name, entity="")
+        run = wandb.init(project=cst.PROJECT_NAME, name=run_name)
         if config.IS_SWEEP:
             model_params = run.config
                        
@@ -209,7 +209,7 @@ def run_wandb(config: Configuration, accelerator):
 
 def sweep_init(config: Configuration):
     # put your wandb key here
-    wandb.login()
+    wandb.login(cst.WANDB_API_KEY)
     sweep_config = {
         'method': 'grid',
         'metric': {
@@ -228,6 +228,9 @@ def sweep_init(config: Configuration):
 
 def print_setup(config: Configuration):
     print("Chosen model is: ", config.CHOSEN_MODEL.name)
+    print(f"PyTorch version: {torch.__version__}")
+    print("Device: ", cst.DEVICE)
+    print(f"CUDA version: {torch.version.cuda if torch.cuda.is_available() else 'None'}")
     if config.CHOSEN_MODEL == cst.Models.TRADES:
         print("Is augmented: ", config.IS_AUGMENTATION)
         if config.IS_AUGMENTATION:

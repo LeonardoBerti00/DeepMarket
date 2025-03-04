@@ -162,24 +162,32 @@ class DiffusionEngine(LightningModule):
             L_simple = sum(self.simple_train_losses) / len(self.simple_train_losses)
             L_vlb = sum(self.vlb_train_losses) / len(self.vlb_train_losses)
             if self.IS_WANDB:
-                wandb.log({'train loss simple': L_simple}, step=self.current_epoch + 1)
-                wandb.log({'train loss vlb': L_vlb}, step=self.current_epoch + 1)
-                wandb.log({'train_loss': loss}, step=self.current_epoch + 1)
+                # Use global_step instead of current_epoch for logging
+                wandb.log({
+                    'train loss simple': L_simple,
+                    'train loss vlb': L_vlb,
+                    'train_loss': loss,
+                }, step=self.global_step)
+                
                 #Simple loss plot
+                plt.figure()
                 plt.plot(range(self.num_diffusionsteps), np.mean(self.simple_sampler._loss_history, axis=-1))
                 plt.xlabel('num_diffusionsteps')
                 plt.ylabel('Simple')
-                wandb.log({"simple_loss": wandb.Image(plt)}, step=self.current_epoch + 1)
+                wandb.log({"simple_loss": wandb.Image(plt)}, step=self.global_step)
                 plt.close()
+                
                 # VLB loss plot
+                plt.figure()
                 plt.plot(range(self.num_diffusionsteps), np.mean(self.vlb_sampler._loss_history, axis=-1))
                 plt.xlabel('num_diffusionsteps')
                 plt.ylabel('VLB')
-                wandb.log({"vlb_loss": wandb.Image(plt)}, step=self.current_epoch + 1)
+                wandb.log({"vlb_loss": wandb.Image(plt)}, step=self.global_step)
                 plt.close()
-                print(f'\ntrain loss simple on epoch {self.current_epoch} is {round(L_simple, 3)}')
-                print(f'\ntrain loss vlb on epoch {self.current_epoch} is {round(L_vlb, 3)}')
-                print(f'\ntrain loss on epoch {self.current_epoch} is {round(loss, 3)}')
+                
+                print(f'\ntrain loss simple on step {self.global_step} is {round(L_simple, 3)}')
+                print(f'\ntrain loss vlb on step {self.global_step} is {round(L_vlb, 3)}')
+                print(f'\ntrain loss on step {self.global_step} is {round(loss, 3)}')
         self.train_losses = []
         self.simple_train_losses = []
         self.vlb_train_losses = []

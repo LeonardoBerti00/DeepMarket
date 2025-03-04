@@ -16,6 +16,31 @@ To perform the simulation with our world agent and historical data, we extend AB
 ## TRADES-LOB: A synthetic LOB dataset 
 To foster collaboration and help the research community we release a synthetic LOB dataset: TRADES-LOB. TRADES-LOB comprises simulated TRADES market data for Tesla and Intel, for 29/01 and 30/01. Specifically, the dataset is structured into four CSV files, each containing 50 columns. The initial six columns delineate the order features, followed by 40 columns that represent a snapshot of the LOB across the top 10 levels. The concluding four columns provide key financial metrics: mid-price, spread, order volume imbalance, and Volume-Weighted Average Price (VWAP), which can be useful for downstream financial tasks, such as stock price prediction. In total, the dataset is composed of 265,986 rows and 13,299,300 cells, which is similar in size to the benchmark FI-2010 dataset.
 
+## Repository Structure
+```
+DeepMarket/
+├── ABIDES/
+│   ├── abides.py              # Main entry point for running market simulations.
+│   ├── configs/               # Contains configuration files for different simulation modes.
+│   └── agents/                # Implements various trading agents.
+├── data/
+│   ├── checkpoints/           # Stores model checkpoint files.
+│   └── TRADES-LOB/            # Contains the synthetic Limit Order Book dataset.
+├── models/
+│   ├── diffusers/
+│   │   ├── gaussian_diffusion.py    # Implements the diffusion process for generating market simulations.
+│   │   ├── diffusion_engine.py      # Pytorch Lightning engine for training diffusion models.
+│   │   └── TRADES/                  # Components specific to the TRADES model.    
+│   └── CGAN/                  # Contains the implementation of the CGAN model.    
+├── utils/
+│   ├── data_preprocessor.py   # Preprocesses raw market data.
+│   └── utils_models.py        # Helper functions for model building and training. 
+├── configuration.py           # Central configuration settings for the project.   
+├── constants.py               # Defines project-wide constants and parameters.    
+├── main.py                    # Main training script.
+└── requirements.txt           # Lists all project dependencies.
+```
+
 # Getting Started 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 

@@ -330,8 +330,8 @@ class Kernel:
     )
     real_data_path = os.path.join(os.getcwd(), "ABIDES", "log", "paper", f"market_replay_{stock_name}_{date}_{time}", "processed_orders.csv")
     trades_data_path = os.path.join(os.getcwd(), "ABIDES", "log", self.log_dir, "processed_orders.csv")
-    plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
-    predictive_lstm.main(real_data_path, trades_data_path)
+    #plot_graphs(real_data_path, trades_data_path, trades_data_path, trades_data_path)
+    #predictive_lstm.main(real_data_path, trades_data_path)
     return self.custom_state
 
 

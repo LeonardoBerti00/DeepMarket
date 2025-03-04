@@ -14,9 +14,9 @@ seaborn
 setuptools
 shapely
 tensorboard
-torch
+torch --index-url https://download.pytorch.org/whl/cu118
+torchvision --index-url https://download.pytorch.org/whl/cu118
 torch_ema
-torchvision
 tqdm
 wandb
 gdown

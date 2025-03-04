@@ -73,10 +73,6 @@ class WorldAgent(Agent):
         self.chosen_model = chosen_model
         if using_diffusion:
             self.starting_time_diffusion = '15min'
-            #self.model.type_embedder.weight.data = torch.tensor([[ 0.4438, -0.2984,  0.2888], [ 0.8249,  0.5847,  0.1448], [ 1.5600, -1.2847,  1.0294]], device=cst.DEVICE, dtype=torch.float32)
-            #print(self.model.type_embedder.weight.data)
-            #self.model.type_embedder.weight.data = torch.tensor([[ 0.1438, -0.4984,  0.5888], [ 0.8249,  0.3847,  0.0448], [ 1.6600, -1.9847,  1.7294]], device=cst.DEVICE, dtype=torch.float32)
-            #exit()
         else:
             self.starting_time_diffusion = '157780min'
 
@@ -174,19 +170,31 @@ class WorldAgent(Agent):
                     wait = True
                     
             # first we place the last order generated and next we generate the next order
-            if self.next_orders is not None and not wait:
+            if len(self.next_orders) > 1 and not wait:
                 self.placeOrder(currentTime, self.next_orders[0])
+                offset_time = datetime.timedelta(seconds=self.next_orders[0][0])
                 self.next_orders = self.next_orders[1:]
-                
-            elif wait:
-                self.setWakeup(currentTime + datetime.timedelta(microseconds=1))
-                return 
+                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
+                return
             
-            if len(self.next_orders) == 0:
+            elif len(self.next_orders) == 1 and not wait:
+                self.placeOrder(currentTime, self.next_orders[0])
+                offset_time = datetime.timedelta(seconds=self.next_orders[0][0])
+                self.next_orders = []
+                self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
+                return
+            
+            elif len(self.next_orders) == 0 and not wait:
                 self.next_orders = self._generate_order(currentTime)
                 offset_time = datetime.timedelta(seconds=self.next_orders[0][0])
                 self.setWakeup(currentTime + offset_time + datetime.timedelta(microseconds=1))
                 return 
+            
+            elif wait:
+                self.setWakeup(currentTime + datetime.timedelta(microseconds=1))
+                return 
+            
+            
 
         
     def receiveMessage(self, currentTime, msg):
