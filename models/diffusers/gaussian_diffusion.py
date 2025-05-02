@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from einops import rearrange, repeat, reduce
 
-from models.diffusers.diffusionAB import DiffusionAB
+from models.diffusers.DiffusionAB import DiffusionAB
 import constants as cst
 from constants import LearningHyperParameter
 from torch import nn
