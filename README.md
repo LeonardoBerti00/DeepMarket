@@ -48,7 +48,7 @@ If your objective is to execute a market simulation, this is the section for you
 
 ## Generate a Market Simulation with TRADES checkpoint
 ![TRADES's Architecture](https://github.com/LeonardoBerti00/DeepMarket/blob/main/data/architecture.jpg)
-To execute a market simulation with a TRADES checkpoint, there are two options:
+First of all, you need to download the TRADES checkpoints from [link](https://drive.google.com/drive/folders/1fg5G9KzmzC6E4FUYSCjObJ7sCEdjo43W?usp=sharing), then place the checkpoints in data/checkpoints/TRADES/. There is one trained with TSLA and one with INTC. To execute a market simulation with a TRADES checkpoint, there are two options:
 1. If you do not have LOBSTER data, you can run the following command:
 ```sh
 python -u ABIDES/abides.py -c world_agent_sim -t INTC -date 2012-06-21 -d True -m TRADES -st '09:30:00' -et '12:00:00' -id 2.317
