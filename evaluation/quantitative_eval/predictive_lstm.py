@@ -17,6 +17,9 @@ from utils.utils import calculate_ftsd, plot, compute_prd_from_embedding, comput
 # and forecasts the mid-price change HORIZON events ahead. One LSTM is trained on real data and
 # one on generated data; both are tested on the same real test set (train on synthetic, test on real).
 # All splits are chronological: rows are never shuffled before windowing.
+# The LSTMs are trained with an L1 loss, consistent with the MAE metric. Since the mid-price rarely moves
+# within HORIZON events, each MAE is also reported relative to the trivial "zero change" predictor
+# (relative score < 1 means the model beats predicting no change).
 SEQ_LEN = 100
 HORIZON = 10
 REAL_TEST_RATE = 0.2    # last 20% of the real day is the test set
@@ -198,7 +201,14 @@ def _make_trainer(train_df, val_df, test_df, device):
         loaders.append(DataLoader(TDataset(x, mid), batch_size=BATCH_SIZE, shuffle=shuffle))
     model = LSTMModel(input_size=len(FEATURES), hidden_size=128, num_layers=2, output_size=1).to(device)
     return Trainer(model=model, train_loader=loaders[0], val_loader=loaders[1], test_loader=loaders[2],
-                   criterion=nn.MSELoss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
+                   criterion=nn.L1Loss(), optimizer=torch.optim.Adam(model.parameters(), lr=0.001), device=device)
+
+
+def zero_change_mae(test_df):
+    """MAE of always predicting a zero mid-price change, on the same windows used by TDataset."""
+    mid = test_df['MID_PRICE'].values
+    t = np.arange(SEQ_LEN - 1, len(mid) - HORIZON)
+    return float(np.abs(mid[t + HORIZON] - mid[t]).mean())
 
 
 def _chronological_split(df, rate):
@@ -253,7 +263,10 @@ def main(real_data_path, generated_data_path):
     print(f"Improved Precision {precision} and Recall {recall}")
     print("PRDC: ", compute_prdc(hidden_states_r, hidden_states_g, nearest_k=5))
     '''
-    return {"real": mae_r, "generated": mae_g}
+    mae_zero = zero_change_mae(test_r)
+    print(f"\n Zero-change MAE: {mae_zero}  relative real: {mae_r / mae_zero:.3f}  relative generated: {mae_g / mae_zero:.3f}")
+    return {"real": mae_r, "generated": mae_g, "zero_change": mae_zero,
+            "real_relative": mae_r / mae_zero, "generated_relative": mae_g / mae_zero}
 
 if __name__ == '__main__':
     main()
