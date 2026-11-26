@@ -240,11 +240,11 @@ if args.diffusion:
     config.IS_WANDB = False
     config.CHOSEN_MODEL = chosen_model
     config.SAMPLING_TYPE = args.sampling_type
-    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_ETA] = args.ddim_eta
-    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_NSTEPS] = args.ddim_nsteps
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_ETA] = float(args.ddim_eta)
+    config.HYPER_PARAMETERS[cst.LearningHyperParameter.DDIM_NSTEPS] = int(args.ddim_nsteps)
     if config.CHOSEN_MODEL == cst.Models.TRADES:
         # load checkpoint
-        model = DiffusionEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+        model = DiffusionEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE, weights_only=False)
         agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
@@ -266,7 +266,7 @@ if args.diffusion:
                           )
                ])
     elif config.CHOSEN_MODEL == cst.Models.CGAN:
-        model = GANEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE)
+        model = GANEngine.load_from_checkpoint(checkpoint_reference, config=config, map_location=cst.DEVICE, weights_only=False)
         agents.extend([WorldAgent(id=1,
                           name="WORLD_AGENT",
                           type="WorldAgent",
@@ -285,7 +285,8 @@ if args.diffusion:
                           )
                ])
             
-    # we freeze the model
+    # we freeze the model; eval() disables dropout, which load_from_checkpoint leaves active
+    model.eval()
     for param in model.parameters():
         param.requires_grad = False
 else:

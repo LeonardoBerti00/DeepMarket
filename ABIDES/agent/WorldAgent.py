@@ -223,6 +223,9 @@ class WorldAgent(Agent):
             self.logEvent('ORDER_CANCELLED', msg.body['order'].to_dict())
 
     def placeOrder(self, currentTime, order):
+        # time gap of the order being placed; it is recorded as the time feature of the resulting
+        # ACCEPTED/EXECUTED/CANCELLED events (previously it was only updated during the replay phase)
+        self.last_offset_time = order[0]
         order_id = order[2]
         type = order[1]
         quantity = order[3]

@@ -87,6 +87,8 @@ class DiffusionEngine(LightningModule):
         x_0 = torch.zeros_like(x_0)
         weights = self.sampler.weights()
         x_t = self.diffuser.sample(x_0, cond_orders, cond_lob, weights)
+        # ddpm_single_step accumulates training losses; drop them so they do not pile up during simulation
+        self.diffuser.init_losses()
         return x_t
 
 

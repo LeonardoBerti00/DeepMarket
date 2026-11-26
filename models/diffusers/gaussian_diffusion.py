@@ -70,11 +70,13 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
         if self.sampling_type == "DDIM":
             self.ddim_eta = config.HYPER_PARAMETERS[LearningHyperParameter.DDIM_ETA]
             self.ddim_nsteps = config.HYPER_PARAMETERS[LearningHyperParameter.DDIM_NSTEPS]
-            tmp = self.num_diffusionsteps / self.ddim_nsteps
-            self.t = torch.arange(0, self.num_diffusionsteps, tmp).long() + 1
+            # evenly spaced sub-sequence of timesteps whose last element is T-1, the noise level x_T is drawn at
+            # (e.g. nsteps=1 -> [T-1], nsteps=10 -> [10, 20, ..., T-1])
+            self.t = torch.linspace(0, self.num_diffusionsteps - 1, self.ddim_nsteps + 1)[1:].round().long()
             self.ddim_alpha = self.alphas_cumprod[self.t].clone()
             self.ddim_alpha_sqrt = torch.sqrt(self.ddim_alpha)
-            self.ddim_alpha_prev = torch.cat([torch.Tensor([self.alphas_cumprod[0]]).to(cst.DEVICE), self.alphas_cumprod[self.t[:-1]]])
+            # the last denoising step goes to the clean sample, so its previous alpha_bar is 1
+            self.ddim_alpha_prev = torch.cat([torch.ones(1, device=cst.DEVICE), self.alphas_cumprod[self.t[:-1]]])
             self.ddim_sqrt_one_minus_alpha = (1. - self.ddim_alpha) ** .5
             self.ddim_sigma = (self.ddim_eta *
                                ((1 - self.ddim_alpha_prev) / (1 - self.ddim_alpha) *
@@ -132,11 +134,11 @@ class GaussianDiffusion(nn.Module, DiffusionAB):
             orig_cond_lob = None
         t = torch.full(size=(x_0.shape[0],), fill_value=self.num_diffusionsteps-1, device=cst.DEVICE, dtype=torch.int64)
         x_t, noise = self.forward_reparametrized(x_0, t)
-        x_t_orig = x_t
         for i in range(self.num_diffusionsteps-1, -1, -1):
             # augment
             x_t_aug, cond_orders, cond_lob = self.augment(x_t, orig_cond_orders, orig_cond_lob)
-            x_t = self.ddpm_single_step(x_0, x_t_aug, x_t_orig, t, cond_orders, noise, weights, cond_lob)
+            # each reverse step must start from the current x_t, not from the initial noise
+            x_t = self.ddpm_single_step(x_0, x_t_aug, x_t, t, cond_orders, noise, weights, cond_lob)
             t -= 1
         return x_t
 
