@@ -60,14 +60,14 @@ class TransformerBlockCrossAtt(nn.Module):
         # Scale the query (q) by the square root of the dimensionality of the model (d_model)
         q = torch.mul(q, 1/(self.d_model ** 0.5))
         # Compute the dot product of the query (q) and key (k) to get the raw attention scores (e)
-        e = torch.einsum('b h l j, b h k i -> b h l k', q, k)
+        e = torch.einsum('b h l j, b h k j -> b h l k', q, k)
         # Apply the mask to the raw attention scores (e)
         if mask is not None:
             e = torch.add(e, mask)
         # Apply the softmax function to the masked attention scores to get the attention weights (att)
         att = torch.nan_to_num(F.softmax(e, dim=-1))
         # Multiply the attention weights (att) with the value (v) to get the output of the attention mechanism
-        out_att = torch.einsum('b h l l, b h l j -> b h l j', att, v)
+        out_att = torch.einsum('b h l k, b h k j -> b h l j', att, v)
         out_att = rearrange(out_att, 'b h l j -> b l (h j)')
         # Pass the output through the output linear layer
         out_att = self.to_out(out_att)
@@ -108,14 +108,14 @@ class TransformerBlockSelfAtt(nn.Module):
         # Scale the query (q) by the square root of the dimensionality of the model (d_model)
         q = torch.mul(q, 1/(self.d_model ** 0.5))
         # Compute the dot product of the query (q) and key (k) to get the raw attention scores (e)
-        e = torch.einsum('b h l j, b h k i -> b h l k', q, k)
+        e = torch.einsum('b h l j, b h k j -> b h l k', q, k)
         # Apply the mask to the raw attention scores (e)
         if mask is not None:
             e = torch.add(e, mask)
         # Apply the softmax function to the masked attention scores to get the attention weights (att)
         att = torch.nan_to_num(F.softmax(e, dim=-1))
         # Multiply the attention weights (att) with the value (v) to get the output of the attention mechanism
-        out_att = torch.einsum('b h l l, b h l j -> b h l j', att, v)
+        out_att = torch.einsum('b h l k, b h k j -> b h l j', att, v)
         out_att = rearrange(out_att, 'b h l j -> b l (h j)')
         # Pass the output through the output linear layer
         out_att = self.to_out(out_att)
